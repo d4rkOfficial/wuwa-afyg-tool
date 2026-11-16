@@ -25,12 +25,18 @@ DamageEntry ──┐
 BuffInstance ─┘
 ```
 
-- **写入键 = 作用 id**（`ActionId`）：`atkPct` / `bonusDmg` / `defPen` / `finalDmg` / `specialFinal2` … 见
+- **写入键 = 作用 id**（`ActionId`，字符串或 symbol）：`atkPct` / `bonusDmg` / `defPen` / `finalDmg` / `specialFinal2` … 见
   `registry/actions.ts` 的 `BUFF_ACTIONS`。**「乘区」一词只指公式链上的乘子**（增伤区 / 防御区 / 暴击区…），
   Buff 能施加的东西叫**作用**。
+- 注册表只放内核会读的字段（`side` / `combine` / `panel` / `overridable` / `init` / `initCoeff` / `targetField`）；
+  展示名、分组、单位、是否内部作用、条件匹配能力、乘区展示形态都在
+  [`calc/display-meta.ts`](../src/lib/calc/display-meta.ts)，按 id 取。
 - 装备（武器/声骸）词条经 `applyEntryStatToAccum` 归一化后写入同一个面板。
-- 面板是 `zones: Record<ActionId, number>` + `base`（白值）+ `total`（三维合计），
-  三维合计由 `recomputeTotals` 按注册表的 `panel` 声明派生。
+- 面板是 `zones: Record<ActionId, number>` + `base`（白值）+ `total`（合计），维度清单由注册层的
+  `PANEL_CONFIG.dims` 给（现在是 `atk` / `hp` / `def`），合计由 `recomputeTotals` 按各作用的 `panel` 声明派生。
+- 目标面板的字段也是注册的（`TARGET_FIELDS`：`defense` / `dmgReduction` / `coefficient` 是标量、
+  `type` 是文本、`resistance` 是按元素分组），内核只按 `kind` 分派，不认字段名。
+- 「元素加成 / 伤害类型加成」是工具箱自己的口径：存 app 的 `AppPanel`，写进 `bonusDmg` 后内核只认那一个作用。
 - `ResultEntry` 是结果页 / 乘区溯源 / 贡献分析唯一消费的数据形状：它们只读 `ResultEntry`，不感知引擎内部结构。
   贡献分析（副词条 / Buff）另走「改动入参 → `computeOneEntry` 重算 → 差值」这一条路径，与结果页同一实现。
 - `ResultEntry` 的结构化真源是 `formula`（走哪条公式）、`panel`（三维白值 / 合计 / 作用落值）与
@@ -127,6 +133,15 @@ BuffInstance ─┘
 - **拉表同步挡勾**：可用性判定 `buffUsableByEntry`（分类/分段平铺共用，见 `damage-table.utils.ts`）
   把「对该条目不生效的乘区」算作不可用，因此**追加型暴击率 / 暴击伤害 buff 在这些条目上不可勾**
   （覆盖型可勾）；`EFFECT/TUNE_RELEVANT_ZONES` 仍列出双暴，是否可勾由 `zoneAppliesToCoeffEntry` 终判。
+
+### 暴击区的等效暴击率
+
+暴击区 = `1 + 等效暴击率 × (暴击伤害 - 1)`，**等效暴击率**把面板暴击率钳在 0–100
+（`effectiveCritRate`，见 `core-config.ts`）：低于 0 按必不暴（乘子 1），高于 100 按必暴（乘子 = 暴伤比值）。
+
+面板 `zones.critRate` 本身**不裁剪**：负值与 >100 都照原样保留，因为引用读的就是原值 ——
+「暴击超过 100 的部分转成暴击伤害」这类 buff 靠 `StatRef` 读 `critRate` 再减 `baseLine: 100` 实现。
+结果页的 `critRate` 字段是等效值（`0–1`），面板原值仍可从 `panel.zones.critRate` 取。
 
 ### 同一个 Buff 里的「同名乘区」
 

@@ -1,31 +1,39 @@
 export { CoconutCore } from './coconut-core'
-export type { BaseStats, CharacterBaseStats, ComputeOptions, EnemyBaseStats, WeaponBaseStats } from './coconut-core'
-export type { CoconutCoreConfig } from './config'
+export type { ComputeOptions } from './coconut-core'
+export type { CoconutCoreConfig, ConstantDef } from './config'
 
-export type { BuffActionDef, ActionRegistry, RefSourceDef } from './actions'
-export type { CritBase, FormulaDef, FormulaHandle, FormulaRegistry, MultiplierDef } from './formulas'
+export type {
+    BuffActionDef,
+    ActionRegistry,
+    ActionCombine,
+    ActionSide,
+    PanelConfig,
+    PanelDim,
+    PanelRounding,
+    RefSourceDef,
+    TargetFieldDef,
+    TargetFieldKind
+} from './actions'
+export type { CritBase, FormulaCtx, FormulaDef, FormulaHandle, FormulaRegistry, MultiplierDef } from './formulas'
 export type { CharacterPanel, TargetPanel } from './panel'
 
 export type {
-    ApplyToEnum,
+    ActionId,
     Buff,
     BuffEffect,
+    BuffId,
+    BuffRole,
+    BuffScope,
     BuffValue,
     BuffWrite,
     CalculationFormula,
-    CharacterStatEnum,
-    CritDMG,
-    CritRate,
     Damage,
     DamageEntry,
     ElementEnum,
-    EnemyTypeEnum,
-    EnemyStatEnum,
+    FormulaId,
     GeneralTable,
-    MultiEnum,
     Stat,
-    StatKeyEnum,
     StatRef
 } from './general-table'
 
-export type { CoreResult, DamageResult, MultiplierDisplay, MultiplierZone } from './result'
+export type { BuffContribution, CoreResult, DamageResult, MultiplierZone } from './result'

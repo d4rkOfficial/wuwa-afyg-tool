@@ -1,43 +1,38 @@
 import type { BuffConf } from './calculation.types'
-import {
-    ACTION_GROUPS,
-    BUFF_ACTIONS,
-    REF_SOURCES,
-    REF_SOURCE_MAP,
-    type ActionId,
-    type BuffActionDef,
-    type RefSourceDef
-} from '$lib/calc/core-config'
+import { BUFF_ACTIONS, REF_SOURCES, type BuffActionDef, type RefSourceDef } from '$lib/calc/core-config'
+import { ACTION_GROUPS, actionMetaOf } from '$lib/calc/display-meta'
 
 /**
  * @desc 界面与迁移共用的兼容层：作用注册表（`registry/actions.ts`）派生出的
  * 「乘区形态」视图。命名沿用旧口径（`ZONE_*`），语义已改为「Buff 作用」——
  * 「乘区」一词现在只指公式链上的乘子（增伤区 / 防御区 / 暴击区…），不再是这里的实体。
+ *
+ * 展示分组来自 `display-meta.ts`：注册层只给内核会读的字段。
  */
-export type { ActionId, ActionCombine, ActionSide, BuffActionDef, PanelDim, RefSourceDef } from '$lib/calc/core-config'
-export {
-    ACTION_GROUPS,
-    ACTION_MAP,
-    BUFF_ACTIONS,
-    REF_SOURCES,
-    REF_SOURCE_MAP,
-    refWrittenBy,
-    writtenByOf
+export type {
+    CalcActionId as ActionId,
+    ActionCombine,
+    ActionSide,
+    BuffActionDef,
+    PanelDim,
+    RefSourceDef
 } from '$lib/calc/core-config'
+export { ACTION_MAP, BUFF_ACTIONS, REF_SOURCES, REF_SOURCE_MAP, refWrittenBy, writtenByOf } from '$lib/calc/core-config'
+export { ACTION_GROUPS } from '$lib/calc/display-meta'
 
-/** @desc 全部作用定义（顺序 = 界面「添加作用」右栏；与旧 `ZONE_DEFS` 逐项对齐） */
-export const ZONE_DEFS = BUFF_ACTIONS
+/** @desc 全部作用定义（顺序 = 界面「添加作用」右栏；内部作用不暴露） */
+export const ZONE_DEFS = BUFF_ACTIONS.filter((action) => actionMetaOf(action.id)?.internal !== true)
 
-/** @desc 作用 id 联合类型（由注册表推导） */
-export type ZoneId = ActionId
+/** @desc 作用 id（界面层一律用字符串：id 来自 JSON / 语料，内核侧才允许 symbol） */
+export type ZoneId = string
 
 /** @desc 作用定义查询表（key 用宽 string：历史 id / 导入数据可能不在当前清单内，取不到即为 undefined） */
-export const ZONE_MAP: Map<string, BuffActionDef> = new Map(BUFF_ACTIONS.map((a) => [a.id, a]))
+export const ZONE_MAP: Map<string, BuffActionDef> = new Map(ZONE_DEFS.map((a) => [String(a.id), a]))
 
 /** @desc 作用分组（「添加作用」与 Buff 集编辑器按此分区展示；顺序即展示顺序） */
 export const ZONE_SECTIONS: readonly { title: string; ids: readonly string[] }[] = ACTION_GROUPS.map((title) => ({
     title,
-    ids: BUFF_ACTIONS.filter((a) => a.group === title).map((a) => a.id)
+    ids: ZONE_DEFS.filter((a) => actionMetaOf(a.id)?.group === title).map((a) => String(a.id))
 }))
 
 /** @desc 分区后的作用清单（每个分区一组定义，顺序与 `ZONE_SECTIONS` 一致；未列入分区的兜底进「其它」） */
@@ -47,14 +42,14 @@ export const ZONE_SECTION_VIEWS: { title: string; defs: BuffActionDef[] }[] = ((
         title: s.title,
         defs: s.ids.map((id) => ZONE_MAP.get(id)).filter((d): d is BuffActionDef => Boolean(d))
     }))
-    const rest = BUFF_ACTIONS.filter((z) => !listed.has(z.id))
+    const rest = ZONE_DEFS.filter((z) => !listed.has(String(z.id)))
     if (rest.length > 0) views.push({ title: '其它', defs: [...rest] })
     return views
 })()
 
 /** @desc 作用 id → 所属分区标题（界面分组与提示用） */
 export const ZONE_SECTION_OF: Map<string, string> = new Map(
-    ZONE_SECTION_VIEWS.flatMap((s) => s.defs.map((d) => [d.id, s.title] as const))
+    ZONE_SECTION_VIEWS.flatMap((s) => s.defs.map((d) => [String(d.id), s.title] as const))
 )
 
 /** @desc 旧作用 id → 现作用 id 别名表（历史工程 / 工坊 Buff 集 / 分享数据里的旧 id 在归一化时重映射） */
@@ -72,10 +67,10 @@ export const resolveZoneId = (id: string): string => LEGACY_ZONE_IDS[id] ?? id
  *
  * 注意与「能作为引用**来源**」区分：后者是 `REF_SOURCES`（可被读取的面板属性）。
  */
-export const ZONE_NO_REF_IDS = new Set<string>(BUFF_ACTIONS.filter((a) => a.side === 'target').map((a) => a.id))
+export const ZONE_NO_REF_IDS = new Set<string>(ZONE_DEFS.filter((a) => a.side === 'target').map((a) => String(a.id)))
 
 /** @desc 界面不提供「覆盖」写入的作用（引擎侧写模式恒合法，不构成 gate） */
-export const ZONE_NO_OVERRIDE_IDS = new Set<string>(BUFF_ACTIONS.filter((a) => !a.overridable).map((a) => a.id))
+export const ZONE_NO_OVERRIDE_IDS = new Set<string>(ZONE_DEFS.filter((a) => !a.overridable).map((a) => String(a.id)))
 
 /**
  * @desc 目标侧作用：数值挂在**目标/怪物**身上，全队共用一份，没有「某角色的」这一说。
@@ -83,13 +78,17 @@ export const ZONE_NO_OVERRIDE_IDS = new Set<string>(BUFF_ACTIONS.filter((a) => !
  * 引擎聚合这些作用时**不按作用域过滤**（一条「作用域=角色1」的集谐 buff 也照样给全队提供层数），
  * 因此不存在「某某角色的集谐干涉层数」。
  */
-export const TARGET_SIDE_ZONE_IDS = new Set<string>(BUFF_ACTIONS.filter((a) => a.side === 'target').map((a) => a.id))
+export const TARGET_SIDE_ZONE_IDS = new Set<string>(
+    ZONE_DEFS.filter((a) => a.side === 'target').map((a) => String(a.id))
+)
 
 /** @desc 可作为引用（转模）来源的面板属性清单 */
 export const ZONE_REF_DEFS = REF_SOURCES
 
-/** @desc 引用属性的查询 Map（同上，供 ZoneRef 目标查表） */
-export const ZONE_REF_MAP: ReadonlyMap<string, RefSourceDef> = REF_SOURCE_MAP
+/** @desc 引用属性的查询 Map（同上，供 ZoneRef 目标查表；界面层键一律字符串） */
+export const ZONE_REF_MAP: ReadonlyMap<string, RefSourceDef> = new Map(
+    REF_SOURCES.map((source) => [String(source.id), source] as const)
+)
 
 /** @desc 把 "15%" 之类的字符串解析为小数（15% → 0.15） */
 export function parseRatio(r: string): number {

@@ -255,4 +255,18 @@ describe('直伤口径不受影响（面板基类仍以 5%/150% 为基准，追�
         assert.equal(result.critRate, 0.65, '基础 5% + 声骸 10% + 追加 50%')
         assert.equal(result.critDmg, 2.2, '基础 150% + 声骸 20% + 追加 50%')
     })
+
+    it('暴击率超过 100 时结果页给等效 100%，面板原值保留', () => {
+        const { result } = run(directEntry, [critOverrideBuff('all', 150)])
+        assert.equal(result.panel.zones.critRate, 150, '面板原值不裁剪（转模要读 >100 的部分）')
+        assert.equal(result.critRate, 1, '等效暴击率钳到 100%')
+        near(result.expectedPerHit, result.nonCritPerHit * result.critDmg, 1)
+    })
+
+    it('暴击率为负时结果页给等效 0%，期望等于不暴击', () => {
+        const { result } = run(directEntry, [critOverrideBuff('all', -50)])
+        assert.equal(result.panel.zones.critRate, -50, '面板保留负值')
+        assert.equal(result.critRate, 0, '等效暴击率钳到 0%')
+        assert.equal(result.expectedPerHit, result.nonCritPerHit)
+    })
 })

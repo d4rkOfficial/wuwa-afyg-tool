@@ -1,21 +1,14 @@
 import type { CharacterPanel, TargetPanel } from './panel'
-import type { CalculationFormula } from './general-table'
-
-export type MultiplierDisplay =
-    | { mode: 'delta'; pct: number; digits: number }
-    | { mode: 'factor'; digits: number }
-    | { mode: 'deltaWhenActive'; pct: number; active: boolean; activeDigits: number; idleDigits: number }
+import type { ActionId, CalculationFormula } from './general-table'
 
 export interface MultiplierZone {
-    id: string
-    label: string
+    id: ActionId
     value: number
-    display: MultiplierDisplay
 }
 
 export interface BuffContribution {
     buffId: string
-    applyTo: string
+    applyTo: readonly ActionId[]
     deltaExpected: number
     share: number
 }
@@ -27,12 +20,8 @@ export interface DamageResult {
     element: string
     formula: CalculationFormula
     baseValue: number
-    nonCritRaw: number
     expectedRaw: number
-    nonCrit: number
-    crit: number
     expected: number
-    canCrit: boolean
     multipliers: MultiplierZone[]
     panel: CharacterPanel
     target: TargetPanel
@@ -41,9 +30,5 @@ export interface DamageResult {
 
 export interface CoreResult {
     damages: DamageResult[]
-    total: {
-        nonCrit: number
-        crit: number
-        expected: number
-    }
+    total: number
 }

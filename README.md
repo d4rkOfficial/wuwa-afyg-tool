@@ -43,7 +43,7 @@ npm i https://github.com/d4rkOfficial/wuwa-afyg-tool/releases/download/core-v0.1
 | 文档                                                                                     | 内容                                                                     |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | [docs/deployment.md](docs/deployment.md)                                                 | 本地开发、构建预览、Vercel / Cloudflare Pages / GitHub Release、完成检查 |
-| [docs/coconut-core.md](docs/coconut-core.md)                                             | 计算引擎 CoconutCore：安装、注册、输入输出、计算口径与发布               |
+| [docs/coconut-core.md](docs/coconut-core.md)                                             | 计算引擎 CoconutCore：安装、注册、输入输出与计算口径                     |
 | [docs/buff-engine.md](docs/buff-engine.md)                                               | 计算引擎：一切皆 Buff、乘区算子、条件系统、引用转模                      |
 | [docs/agent-harness.md](docs/agent-harness.md)                                           | AI 助手：回合结构、上下文装配、变化队列、自定义 Skill                    |
 | [docs/upstream-integration.md](docs/upstream-integration.md)                             | 接入新数据上游（`DataProvider` 适配器、数据质量验收）                    |
@@ -98,7 +98,7 @@ npm i https://github.com/d4rkOfficial/wuwa-afyg-tool/releases/download/core-v0.1
 
 ```bash
 pnpm test                 # 跑全部（同进程内逐个 import；本环境禁止子进程，故不用 node --test）
-pnpm test:one calc        # 只跑路径含 "calc" 的测试文件
+pnpm test calc            # 只跑路径含 "calc" 的测试文件
 pnpm test:list            # 列出会被跑到的文件
 pnpm test:watch           # 监视重跑
 pnpm test:infer           # 联网的伤害类型推导 TDD 夹具（默认不在 pnpm test 内）

@@ -9,7 +9,7 @@
 import type { BuffCondition, BuffInstance, BuffTreeState, BuffZoneValue, CalcState } from '$lib/calc/calculation.types'
 import { normalizeBuffTree } from '$lib/buff/tree-state'
 import { ZONE_MAP, resolveZoneId } from '$lib/calc/calculation.consts'
-import { actionAllowsCondition } from '$lib/calc/core-config'
+import { actionAllowsCondition } from '$lib/calc/display-meta'
 import { isConditionEmpty, normalizeCondition, normalizeZoneCondition } from '$lib/calc/condition'
 import { normalizeRules, rulesFromLegacyCondition, type LegacyGateCondition } from '$lib/calc/rules'
 import { asRecord, genId, isLegacyAutoGlobal, isRecord, pickNum } from './shared'

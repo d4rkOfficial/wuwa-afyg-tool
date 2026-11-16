@@ -20,7 +20,7 @@ import { REF_SOURCES, refWrittenBy } from '$lib/calc/core-config'
  * 新增一个能改写面板的作用时，影响源识别自动跟上。
  */
 export const PANEL_TO_ZONES: Record<string, string[]> = Object.fromEntries(
-    REF_SOURCES.map((source) => [source.id, refWrittenBy(source.id)])
+    REF_SOURCES.map((source) => [String(source.id), refWrittenBy(source.id).map(String)])
 )
 
 /** @desc 作用域是否作用于给定角色槽位（与引擎 scopeMatches 同口径；charIdx < 0 表示非角色条目/效应伤害） */

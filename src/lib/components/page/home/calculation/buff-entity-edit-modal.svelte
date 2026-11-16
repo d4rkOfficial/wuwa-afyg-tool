@@ -21,6 +21,7 @@
     import BuffEntityEditor from './buff-entity-editor.svelte'
     import BuffEntityRefModal from './buff-entity-ref-modal.svelte'
     import { ZONE_NO_OVERRIDE_IDS, ZONE_SECTION_VIEWS } from '$lib/calc/calculation.consts'
+    import { actionLabel } from '$lib/calc/display-meta'
     import type { BuffEntityType, BuffLibraryBuff, BuffLibraryScope } from '$lib/data/buff-library.svelte'
     import { ENTITY_TYPE_LABELS, updateEntityBuffs } from '$lib/data/buff-library.svelte'
     import type { BuffRule } from '$lib/calc/calculation.types'
@@ -382,10 +383,10 @@
                             </div>
                             <div class="space-y-0.5">
                                 {#each section.defs as def (def.id)}
-                                    {@const count = zoneCounts.get(def.id) ?? 0}
+                                    {@const count = zoneCounts.get(String(def.id)) ?? 0}
                                     <button
-                                        onclick={() => addZone(def.id)}
-                                        title={`添加「${def.label}」${count > 0 ? `（已有 ${count} 条）` : ''}`}
+                                        onclick={() => addZone(String(def.id))}
+                                        title={`添加「${actionLabel(def.id)}」${count > 0 ? `（已有 ${count} 条）` : ''}`}
                                         class={[
                                             'flex w-full items-center gap-1.5 rounded-none px-2 py-1.5 text-left text-xs font-medium transition-colors',
                                             count > 0
@@ -394,7 +395,7 @@
                                         ].join(' ')}
                                     >
                                         <Icon icon="mdi:plus" class="size-3.5 shrink-0" />
-                                        <span class="min-w-0 flex-1 truncate">{def.label}</span>
+                                        <span class="min-w-0 flex-1 truncate">{actionLabel(def.id)}</span>
                                         {#if count > 0}
                                             <span
                                                 class="shrink-0 px-1 text-[10px] tabular-nums"

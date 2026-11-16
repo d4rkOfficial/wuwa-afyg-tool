@@ -8,7 +8,7 @@
 // - 结构字段（`zones` / `traceSegments` 的 id 序列）同时被钉住 —— 这就是阶段 1 的
 //   「compute 与 trace 同口径」闸门（`check-trace-parity`）的落地形态。
 //
-// 更新方式：`$env:UPDATE_GOLDEN=1; pnpm test:one compute-golden`
+// 更新方式：`$env:UPDATE_GOLDEN=1; pnpm test compute-golden`
 // 会把新快照写到 `.tmp/golden-snapshot.json`（**先看 diff 再贴回下面的 GOLDEN**）。
 //
 // 注意：阶段 2 引入「处决」伤害类型（决议 D25）后，本快照的 `damageTypes` 字段需要一次性更新，
@@ -505,7 +505,7 @@ describe('数值基线：工程 fixture 的逐条目快照（重构期间必须�
 })
 
 /**
- * @desc 数值基线（`pnpm test:one compute-golden`，更新方式见文件头）。
+ * @desc 数值基线（`pnpm test compute-golden`，更新方式见文件头）。
  *
  * 这份数据不是「应该等于多少」的手算结果，而是**重构前的实测值**：它的唯一职责是
  * 让任何一次重构都必须显式承认「数值变了」，从而无法悄悄改坏。

@@ -210,33 +210,6 @@ const request = {
     profile: PROFILE
 }
 
-/** @desc 基础数值：调用时传入（角色白值 / 武器白值 / 敌人数值 / 效应虚角色） */
-const basesOf = () => {
-    const characters: Record<string, { atk: number; hp: number; def: number; element: string; coefficient?: number }> =
-        {}
-    for (const [name, info] of Object.entries(charInfoMap)) {
-        characters[name] = { ...info.lv90BaseStats, element: info.element }
-    }
-    for (const entry of entries) {
-        if (entry.formula !== 'effect' || !entry.hitName) continue
-        characters[`效应·${entry.hitName}`] = { atk: 0, hp: 0, def: 0, element: '衍射', coefficient: 3674 }
-    }
-    const weapons: Record<string, { atk: number }> = {}
-    for (const [name, info] of Object.entries(weaponInfoMap)) weapons[name] = { atk: info.lv90BaseAtk }
-    return {
-        characters,
-        weapons,
-        enemy: {
-            type: config.enemy.type,
-            level: config.enemy.level,
-            defense: config.enemy.defense,
-            dmgReduction: config.enemy.dmgReduction,
-            resistances: config.enemy.resistances,
-            coefficient: 10027
-        }
-    } as unknown as Parameters<CoconutCore['compute']>[1]
-}
-
 describe('编译 → 内核 与引擎数值对账', () => {
     const engineResult = computeAll(
         [...entries],
@@ -250,15 +223,11 @@ describe('编译 → 内核 与引擎数值对账', () => {
         PROFILE
     )
     const table = compileGeneralTable(request)
-    const coreResult = new CoconutCore().init(buildCoconutCoreConfig()).compute(table, basesOf())
+    const coreResult = new CoconutCore().init(buildCoconutCoreConfig()).compute(table)
 
-    it('结构：角色/词条/段数都按编译器口径铺开', () => {
-        assert.deepEqual(table.characters, [CHAR, '', '', '效应·光噪效应'])
-        assert.deepEqual(table.weapons, [WEAPON, '', '', ''])
-        assert.ok(
-            table.main_stats[0]!.some((stat) => stat.key === 'atkPct'),
-            '词条键已编译成作用 id'
-        )
+    it('结构：表里只有 buff 目录 + 伤害条目，段数走 hits 字段', () => {
+        assert.deepEqual(Object.keys(table).sort(), ['buffs', 'damage_entries', 'global_buffs'])
+        assert.ok(table.global_buffs.length > 0, '敌人配置等全条目一致的写入提升为全局 buff')
         assert.equal(table.damage_entries.length, 4)
         assert.equal(table.damage_entries[0]!.damages.length, 1, '一条伤害是一段结果，段数走 hits 字段')
         assert.equal(table.damage_entries[0]!.damages[0]!.hits, 3, 'hits 独立传给内核')
@@ -269,19 +238,27 @@ describe('编译 → 内核 与引擎数值对账', () => {
 
     it('条件与转模：链门槛不满足的 buff 不进表，转模折算成字面值', () => {
         const activated = table.damage_entries[0]!.damages[0]!.activated_buffs
-        assert.ok(activated.some((buff) => buff.id === 'b1'))
-        assert.ok(
-            activated.some((buff) => buff.id === 'b4'),
-            '链 2 满足 → 生效'
-        )
-        assert.equal(
-            activated.some((buff) => buff.id === 'b3'),
-            false,
-            '链 5 不满足 → 不生效'
-        )
-        const ref = activated.find((buff) => buff.id === 'b2')
+        assert.ok(activated.includes('b1'))
+        assert.ok(activated.includes('b4'), '链 2 满足 → 生效')
+        assert.equal(activated.includes('b3'), false, '链 5 不满足 → 不生效')
+        const ref = table.buffs.find((buff) => buff.id === 'b2')
         assert.ok(ref, '转模作用应被折算后保留')
-        assert.ok(Number(ref!.effect.value) > 0, '转模折算结果应是正数')
+        assert.ok(Number(ref!.effects[0]!.value) > 0, '转模折算结果应是正数')
+    })
+
+    it('装备与词条都在 buff 里：白值、武器副属性、声骸主/副词条按引擎顺序排列', () => {
+        const equip = table.buffs.find((buff) => buff.id === 'equip:0')
+        assert.ok(equip, '每角色一条装备 buff')
+        const ids = equip!.effects.map((effect) => effect.applyTo)
+        assert.deepEqual(ids.slice(0, 4), ['atkBase', 'hpBase', 'defBase', 'atkBase'], '角色白值 + 武器白值在最前')
+        assert.ok(ids.includes('atkPct'), '声骸/武器词条也在同一条 buff 里')
+        assert.ok(ids.filter((id) => id === 'atkBase').length === 2, '武器白值与角色白值各写一次（内核累加后再取整）')
+        assert.equal(
+            table.buffs.every((buff) => buff.effects.length > 0),
+            true,
+            '不存在空 buff 目录项'
+        )
+        assert.equal(table.buffs.length, new Set(table.buffs.map((buff) => buff.id)).size, '目录 id 唯一')
     })
 
     it('数值：逐条目与引擎完全一致', () => {
@@ -290,16 +267,16 @@ describe('编译 → 内核 与引擎数值对账', () => {
             assert.equal(segments.length, 1, `${expected.displayName} 应产出一段结果`)
             const segment = segments[0]!
             assert.equal(segment.baseValue, expected.baseValue, `${expected.displayName} 基值不一致`)
-            // 不吃暴击的公式（固定值）引擎把「不暴击 / 暴击」两列留空（0），只有期望值有意义
-            if (expected.canCrit) {
-                assert.equal(segment.nonCrit, expected.nonCritPerHit, `${expected.displayName} 不暴击不一致`)
-                assert.equal(segment.crit, expected.critPerHit, `${expected.displayName} 暴击不一致`)
-            }
+            // 「暴击 / 不暴击」两列是门面派生（内核只给期望），在门面层对账
             assert.equal(segment.expected, expected.expectedPerHit, `${expected.displayName} 期望不一致`)
             const engineZones = new Map((expected.multiplierZones ?? []).map((zone) => [zone.id, zone.value] as const))
             const coreZones = new Map(segment.multipliers.map((zone) => [zone.id, zone.value] as const))
             for (const id of new Set([...engineZones.keys(), ...coreZones.keys()])) {
-                assert.equal(coreZones.get(id), engineZones.get(id), `${expected.displayName} 乘区 ${id} 不一致`)
+                assert.equal(
+                    coreZones.get(id),
+                    engineZones.get(String(id)),
+                    `${expected.displayName} 乘区 ${String(id)} 不一致`
+                )
             }
         }
     })

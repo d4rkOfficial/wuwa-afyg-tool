@@ -11,6 +11,7 @@
     import type { ComponentsProps } from '$lib/types'
     import type { BuffZoneValue } from '$lib/calc/calculation.types'
     import { ZONE_SECTION_VIEWS } from '$lib/calc/calculation.consts'
+    import { actionLabel } from '$lib/calc/display-meta'
     import { mergeClass } from '$lib/utils/component-style'
     import { ZONE_BAR_WIDTH } from './buff-modal.utils'
 
@@ -48,9 +49,9 @@
                 </div>
                 <div class="flex flex-col gap-0.5">
                     {#each section.defs as def (def.id)}
-                        {@const count = countOf(def.id)}
+                        {@const count = countOf(String(def.id))}
                         <button
-                            onclick={() => onadd(def.id)}
+                            onclick={() => onadd(String(def.id))}
                             data-press="none"
                             class={[
                                 'w-full text-left rounded-none px-2 py-1.5 text-xs font-medium transition-colors inline-flex items-center gap-1.5 hover:bg-(--theme-modal-text)/5 active:bg-(--theme-accent-bg)/15',
@@ -58,11 +59,11 @@
                                     ? 'text-(--theme-accent-text)'
                                     : 'text-(--theme-modal-text)/50 hover:text-(--theme-accent-text)'
                             ].join(' ')}
-                            title={`添加「${def.label}」${count > 0 ? `（已有 ${count} 个）` : ''}`}
+                            title={`添加「${actionLabel(def.id)}」${count > 0 ? `（已有 ${count} 个）` : ''}`}
                         >
                             <!-- @desc 图标取 currentColor：生效乘区随按钮文字一起走主题色 -->
                             <Icon icon="mdi:plus" class="size-3.5 shrink-0" />
-                            <span class="min-w-0 flex-1 truncate">{def.label}</span>
+                            <span class="min-w-0 flex-1 truncate">{actionLabel(def.id)}</span>
                             {#if count > 0}
                                 <span
                                     class="shrink-0 px-1 text-[10px] tabular-nums"

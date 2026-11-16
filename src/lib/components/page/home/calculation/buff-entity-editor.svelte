@@ -18,8 +18,8 @@
     import type { ComponentsProps } from '$lib/types'
     import ZoneConditionPanel from './zone-condition-panel.svelte'
     import BuffModalRules from './buff-modal-rules.svelte'
-    import { ZONE_MAP, ZONE_NO_OVERRIDE_IDS, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
-    import { actionAllowsCondition } from '$lib/calc/core-config'
+    import { ZONE_NO_OVERRIDE_IDS, ZONE_NO_REF_IDS } from '$lib/calc/calculation.consts'
+    import { actionAllowsCondition, actionRefLabel, actionUnit } from '$lib/calc/display-meta'
     import type { BuffLibraryBuff, BuffLibraryScope } from '$lib/data/buff-library.svelte'
     import type { BuffRule } from '$lib/calc/calculation.types'
     import {
@@ -225,8 +225,8 @@
                                 >
                             {/if}
                             {#if z.ref && !ZONE_NO_REF_IDS.has(z.zoneId)}
-                                {@const refDef =
-                                    ZONE_REF_MAP.get(z.ref.targetZoneId) ?? ZONE_MAP.get(z.ref.targetZoneId as never)}
+                                {@const refLabel = actionRefLabel(z.ref.targetZoneId)}
+                                {@const refUnit = actionUnit(z.ref.targetZoneId)}
                                 {@const refOp = (z.ref.threshold ?? 0) < 0 ? '+' : '-'}
                                 {@const refTh = Math.abs(z.ref.threshold ?? 0)}
                                 {@const refS = simplifyPct(z.ref.pct)}
@@ -235,8 +235,8 @@
                                 {@const hasUpper = z.ref.upper !== undefined}
                                 <span
                                     class="min-w-0 flex-1 truncate text-right text-[10px] text-(--theme-modal-text)/40"
-                                    title="引用: ({refDef?.label ?? '?'}{hasThreshold
-                                        ? ' ' + refOp + ' ' + refTh + (refDef?.unit === '%' ? '%' : '')
+                                    title="引用: ({refLabel}{hasThreshold
+                                        ? ' ' + refOp + ' ' + refTh + (refUnit === '%' ? '%' : '')
                                         : ''}) ÷{refS.divisor}×{refS.multiplier}{hasLower || hasUpper
                                         ? ' clamp(' +
                                           (hasLower ? String(z.ref.lower) : '') +
@@ -245,9 +245,8 @@
                                           ')'
                                         : ''}"
                                 >
-                                    引用: ({refDef?.label ?? '?'}{hasThreshold
-                                        ? refOp + refTh + (refDef?.unit === '%' ? '%' : '')
-                                        : ''}) ÷{refS.divisor}×{refS.multiplier}
+                                    引用: ({refLabel}{hasThreshold ? refOp + refTh + (refUnit === '%' ? '%' : '') : ''})
+                                    ÷{refS.divisor}×{refS.multiplier}
                                     {#if hasLower || hasUpper}
                                         <span class="text-(--theme-modal-text)/30">
                                             ({hasLower ? z.ref.lower : ''}~{hasUpper ? z.ref.upper : ''})
@@ -285,7 +284,7 @@
                                     !!z.ref,
                                     () => onOpenRef?.(zoneIndex),
                                     z.ref
-                                        ? `引${isActiveRefOwner(z.ref.refOwner) ? '出伤者' : '本角色'} ${ZONE_REF_MAP.get(z.ref.targetZoneId)?.label ?? z.ref.targetZoneId} × ${z.ref.pct}%`
+                                        ? `引${isActiveRefOwner(z.ref.refOwner) ? '出伤者' : '本角色'} ${actionRefLabel(z.ref.targetZoneId)} × ${z.ref.pct}%`
                                         : '引用某属性（如 本角色攻击×N%）',
                                     'mdi:link-variant',
                                     z.ref ? '已引用' : '引用'

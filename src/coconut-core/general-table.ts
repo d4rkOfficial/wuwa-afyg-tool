@@ -1,30 +1,22 @@
 import type { PanelDim } from './actions'
 
 export type ElementEnum = string
-export type EnemyTypeEnum = string
 
-export type CalculationFormula = string
+export type ActionId = string | symbol
 
-export type CharacterStatEnum = string
+export type FormulaId = string | symbol
 
-export type EnemyStatEnum = string
+export type BuffId = string
 
-export type MultiEnum = string
-
-export type CritRate = string
-export type CritDMG = string
-
-export type ApplyToEnum = CharacterStatEnum | EnemyStatEnum | MultiEnum | CritRate | CritDMG
-
-export type StatKeyEnum = string
+export type CalculationFormula = FormulaId
 
 export interface Stat {
-    key: StatKeyEnum
+    key: string
     value: string
 }
 
 export interface StatRef {
-    refStat: StatKeyEnum
+    refStat: ActionId
     baseLine: number
     sourceUnit: string
     targetUnit: string
@@ -36,15 +28,22 @@ export type BuffValue = string | StatRef
 
 export type BuffWrite = 'add' | 'override'
 
+export type BuffScope = 'panel'
+
 export interface BuffEffect {
-    applyTo: ApplyToEnum
+    applyTo: ActionId
     value: BuffValue
     write?: BuffWrite
+    only?: BuffScope
+    element?: ElementEnum
 }
 
+export type BuffRole = 'stat'
+
 export interface Buff {
-    id: string
-    effect: BuffEffect
+    id: BuffId
+    effects: readonly BuffEffect[]
+    role?: BuffRole
 }
 
 export interface Damage {
@@ -52,7 +51,7 @@ export interface Damage {
     base?: PanelDim
 
     hits?: number
-    activated_buffs: Buff[]
+    activated_buffs: readonly BuffId[]
     element: ElementEnum
     formula: CalculationFormula
 }
@@ -62,13 +61,8 @@ export interface DamageEntry {
     damages: Damage[]
 }
 
-export type EnemyBaseResistance = readonly number[]
-
 export interface GeneralTable {
-    characters: readonly string[]
-    weapons: readonly string[]
-    main_stats: readonly (readonly Stat[])[]
-    sub_stats: readonly (readonly Stat[])[]
+    global_buffs: readonly BuffId[]
     buffs: readonly Buff[]
     damage_entries: readonly DamageEntry[]
 }

@@ -6,7 +6,6 @@
     "scripts": {
         "dev": "vite dev",
         "build": "vite build",
-        "build:standalone": "node scripts/build-standalone.mjs",
         "package:standalone": "node scripts/build-standalone.mjs",
         "preview": "vite preview",
         "prepare": "svelte-kit sync || echo ''",
@@ -23,7 +22,6 @@
         "format": "prettier --write \"src\" \"test\" \"docs\" \"scripts\" \"*.{js,mjs,cjs,ts,json,md}\"",
         "test": "node --import ./test/preload-runes.mjs --import ./test/preload.mjs test/run-tests.ts",
         "test:watch": "node --import ./test/preload-runes.mjs --import ./test/preload.mjs --watch test/run-tests.ts",
-        "test:one": "node --import ./test/preload-runes.mjs --import ./test/preload.mjs test/run-tests.ts",
         "test:list": "node --import ./test/preload-runes.mjs --import ./test/preload.mjs test/run-tests.ts --list",
         "test:infer": "node --import ./test/preload.mjs test/damage-type-infer.example.ts",
         "download-icons": "node scripts/download-static-icons.mjs",
@@ -32,9 +30,9 @@
         "generate-tools-doc": "node scripts/generate-tools-doc.mjs",
         "collect-icons": "node scripts/collect-mdi-icons.mjs",
         "check:core": "node scripts/check-calc-core.mjs",
-        "build:calc-lib": "node scripts/build-calc-lib.mjs",
         "build:core": "node scripts/build-calc-lib.mjs",
-        "release:core": "node scripts/release-calc-core.mjs"
+        "release:core": "node scripts/release-calc-core.mjs",
+        "release:config": "node scripts/release-calc-config.mjs"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",

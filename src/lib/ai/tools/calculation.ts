@@ -43,6 +43,7 @@ import { getOpBlocks, getRefLines } from '$lib/project/timeline.store.svelte'
 import { renderBuffConfList, renderCalculationDigest, scopeLabel } from '$lib/ai/phase-digest'
 import { asIndex, buffConfsInOrder, damageEntriesInOrder, resolveBuffConf, resolveDamageEntry } from '$lib/ai/refs'
 import { LEGACY_ZONE_IDS, resolveZoneId, ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
+import { actionLabel, actionUnit } from '$lib/calc/display-meta'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import { cyclePathOf, isRuleDraft, normalizeRule } from '$lib/calc/rules'
 import type { BuffRule, ZoneRef } from '$lib/calc/calculation.types'
@@ -254,7 +255,7 @@ defineTool('get_buff_confs', {
         const rawZoneId = str(args.zoneId)
         const zoneFilter = rawZoneId ? normalizeZoneId(rawZoneId) : null
         const zoneId = zoneFilter?.zoneId
-        const zoneLabel = (id: string) => ZONE_MAP.get(id as never)?.label ?? id
+        const zoneLabel = (id: string) => actionLabel(id)
         const formatMatched = (z: {
             zoneId: string
             value: number
@@ -262,7 +263,7 @@ defineTool('get_buff_confs', {
             ref?: { zoneId: string } | null
             condition?: unknown
         }) => {
-            const unit = ZONE_MAP.get(z.zoneId as never)?.unit === '%' ? '%' : ''
+            const unit = actionUnit(z.zoneId) === '%' ? '%' : ''
             const value = z.ref ? `引用:${zoneLabel(z.ref.zoneId)}` : `${z.value}${unit}`
             return `${zoneLabel(z.zoneId)}${z.override ? '(覆盖)' : ''}=${value}`
         }
@@ -631,7 +632,7 @@ defineTool('get_buff_conf_detail', {
         const zoneEntries = set.zones.map((z, index) => ({
             index,
             zoneId: z.zoneId,
-            label: ZONE_MAP.get(z.zoneId)?.label ?? z.zoneId,
+            label: actionLabel(z.zoneId),
             value: z.value,
             override: !!z.override,
             ref: z.ref ?? null,
@@ -746,9 +747,7 @@ defineTool('set_buff_conf_zone_ref', {
             return { cleared: true, ...remapNote(remappedFrom, zoneId) }
         }
         if (ZONE_NO_REF_IDS.has(zoneId)) {
-            throw new Error(
-                `乘区「${ZONE_MAP.get(zoneId as never)?.label ?? zoneId}」只支持填固定层数，不支持引用/转模`
-            )
+            throw new Error(`乘区「${actionLabel(zoneId)}」只支持填固定层数，不支持引用/转模`)
         }
         const o = raw as Record<string, unknown>
         const targetZoneId = str(o.targetZoneId)
@@ -831,7 +830,7 @@ defineTool('get_buff_conf_zone_condition', {
             ...(projectId ? { projectId, projectName: project!.name } : {}),
             buffConf: args.buffConf,
             zoneId,
-            label: ZONE_MAP.get(zoneId)?.label ?? zoneId,
+            label: actionLabel(zoneId),
             condition,
             summary: conditionSummary(condition as Record<string, unknown> | undefined),
             ...remapNote(remappedFrom, zoneId)
@@ -908,7 +907,7 @@ defineTool('set_buff_conf_zone_condition', {
         return {
             buffConf: args.buffConf,
             zoneId,
-            label: ZONE_MAP.get(zoneId)?.label ?? zoneId,
+            label: actionLabel(zoneId),
             condition,
             strippedKeys: stripped,
             note: '类内「或」、类间「与」；不满足时仅该乘区不计入',

@@ -1,16 +1,21 @@
 import type { ActionRegistry } from './actions'
+import type { ConstantDef } from './config'
 import { evaluateFormula } from './evaluate'
-import { formulaAcceptsRef, formulaOfRegistry, type FormulaRegistry } from './formulas'
+import { formulaOfRegistry, readTargetField, type FormulaRegistry } from './formulas'
 import {
     applyZone,
     emptyPanel,
     emptyTargetPanel,
     recomputeTotals,
+    roundPanelBase,
     type CharacterPanel,
     type TargetPanel
 } from './panel'
 import {
     parseRatio,
+    type ActionId,
+    type Buff,
+    type BuffEffect,
     type BuffWrite,
     type CalculationFormula,
     type Damage,
@@ -19,39 +24,22 @@ import {
 } from './general-table'
 import type { BuffContribution, CoreResult, DamageResult } from './result'
 
-export interface CharacterBaseStats {
-    atk: number
-    hp: number
-    def: number
-    element: string
-    level?: number
-    tuneBreakBoost?: number
-    coefficient?: number
-}
-
-export interface WeaponBaseStats {
-    atk: number
-}
-
-export interface EnemyBaseStats {
-    type: string
-    level: number
-    defense: number
-    dmgReduction: number
-    resistances: Readonly<Record<string, number>>
-    coefficient: number
-}
-
-export interface KernelBases {
-    characterOf: (id: string) => CharacterBaseStats | null | undefined
-    weaponOf: (id: string) => WeaponBaseStats | null | undefined
-    enemy: EnemyBaseStats
-}
-
 export interface CoreRegistry {
     actions: ActionRegistry
     formulas: FormulaRegistry
+    constants: readonly ConstantDef[]
+    ratioZone?: ActionId
 }
+
+type BuffIndex = ReadonlyMap<string, Buff>
+
+const buffIndexOf = (table: GeneralTable): BuffIndex => new Map(table.buffs.map((buff) => [buff.id, buff]))
+
+const resolveBuffs = (ids: readonly string[], index: BuffIndex): Buff[] =>
+    ids.flatMap((id) => {
+        const buff = index.get(id)
+        return buff ? [buff] : []
+    })
 
 const num = (value: string | number | undefined): number => {
     if (typeof value === 'number') return Number.isFinite(value) ? value : 0
@@ -80,127 +68,89 @@ export const resolveStatRef = (
 
 const hitsOf = (damage: Damage): number => Math.max(1, Math.trunc(damage.hits ?? 1))
 
-const applyStat = (registry: CoreRegistry, panel: CharacterPanel, key: string, value: string): void => {
-    if (registry.formulas.critActions.includes(key) && panel.zones[key] === undefined) return
-    applyZone(registry.actions, panel, key, num(value))
-}
+const isCoeffBase = (critBase: string): boolean => critBase === 'coefficient'
 
-const basePanelOf = (
-    registry: CoreRegistry,
-    table: GeneralTable,
-    bases: KernelBases,
-    charIndex: number,
-    critBase: string
-): { panel: CharacterPanel; charLevel: number } => {
-    const panel = emptyPanel(registry.actions, critBase)
-    const char = bases.characterOf(table.characters[charIndex] ?? '')
-    const weapon = bases.weaponOf(table.weapons[charIndex] ?? '')
-    if (char) {
-        panel.base.atk = Math.round(char.atk + (weapon?.atk ?? 0))
-        panel.base.hp = Math.round(char.hp)
-        panel.base.def = Math.round(char.def)
-        panel.zones.tuneBreakBoost = Math.round(char.tuneBreakBoost ?? 0)
-        panel.zones.effectCoeff = char.coefficient ?? 0
-    }
-    const skipCrit = critBase === 'coefficient'
-    for (const stat of table.main_stats[charIndex] ?? []) {
-        if (skipCrit && registry.formulas.critActions.includes(stat.key)) continue
-        applyStat(registry, panel, stat.key, stat.value)
-    }
-    for (const stat of table.sub_stats[charIndex] ?? []) {
-        if (skipCrit && registry.formulas.critActions.includes(stat.key)) continue
-        applyStat(registry, panel, stat.key, stat.value)
-    }
-    recomputeTotals(registry.actions, panel)
-    return { panel, charLevel: char?.level ?? 90 }
-}
+const effectEnabled = (effect: BuffEffect, critBase: string): boolean =>
+    !(effect.only === 'panel' && isCoeffBase(critBase))
 
-const targetPanelOf = (
-    registry: CoreRegistry,
-    bases: KernelBases,
-    buffs: readonly { effect: { applyTo: string; value: unknown; write?: BuffWrite } }[]
-): TargetPanel => {
-    const panel = emptyTargetPanel()
-    const enemy = bases.enemy
-    panel.type = enemy.type
-    panel.defense = num(enemy.defense)
-    panel.dmgReduction = num(enemy.dmgReduction)
-    panel.coefficient = num(enemy.coefficient)
-    for (const [element, value] of Object.entries(enemy.resistances)) {
-        panel.resistances[element] = num(value)
-    }
-    const overrides: { applyTo: string; value: number }[] = []
+const planOf = (registry: CoreRegistry, buffs: readonly Buff[], critBase: string) => {
+    const literal: { applyTo: ActionId; value: number; write: BuffWrite }[] = []
+    const refs: { applyTo: ActionId; ref: StatRef }[] = []
+    const targetEffects: BuffEffect[] = []
     for (const buff of buffs) {
-        const def = registry.actions.map.get(buff.effect.applyTo)
-        if (!def || def.side !== 'target') continue
-        const value = typeof buff.effect.value === 'string' ? num(buff.effect.value) : 0
-        if (buff.effect.write === 'override') {
-            overrides.push({ applyTo: def.id, value })
-            continue
+        for (const effect of buff.effects) {
+            if (!effectEnabled(effect, critBase)) continue
+            const def = registry.actions.map.get(effect.applyTo)
+            if (!def) continue
+            if (def.side === 'target') {
+                targetEffects.push(effect)
+                continue
+            }
+            if (typeof effect.value !== 'string') {
+                if ((effect.write ?? 'add') === 'add') refs.push({ applyTo: def.id, ref: effect.value })
+                continue
+            }
+            literal.push({ applyTo: def.id, value: num(effect.value), write: effect.write ?? 'add' })
         }
-        if (def.targetField) {
-            const field = def.targetField as 'dmgReduction' | 'coefficient'
-            panel[field] += value
-        } else panel.zones[def.id] = (panel.zones[def.id] ?? 0) + value
-    }
-    for (const write of overrides) {
-        const def = registry.actions.map.get(write.applyTo)!
-        if (def.combine === 'multiply') panel.zones[write.applyTo] = 1 + write.value / 100
-        else if (def.targetField) {
-            const field = def.targetField as 'dmgReduction' | 'coefficient'
-            panel[field] = write.value
-        } else panel.zones[def.id] = write.value
-    }
-    return panel
-}
-
-const splitBuffs = (registry: CoreRegistry, damage: Damage) => {
-    const literal: { applyTo: string; value: number; write: BuffWrite }[] = []
-    const refs: { applyTo: string; ref: StatRef }[] = []
-    const targetSide: Damage['activated_buffs'] = []
-    for (const buff of damage.activated_buffs) {
-        const def = registry.actions.map.get(buff.effect.applyTo)
-        if (!def) continue
-        if (def.side === 'target') {
-            targetSide.push(buff)
-            continue
-        }
-        const write: BuffWrite = buff.effect.write ?? 'add'
-        if (typeof buff.effect.value === 'string') {
-            literal.push({ applyTo: def.id, value: num(buff.effect.value), write })
-        } else if (write === 'add') refs.push({ applyTo: def.id, ref: buff.effect.value })
     }
     return {
         literal: literal.filter((write) => write.write !== 'override'),
         refs,
         overrides: literal.filter((write) => write.write === 'override'),
-        targetSide
+        targetEffects
     }
+}
+
+const applyTargetEffect = (registry: CoreRegistry, panel: TargetPanel, effect: BuffEffect): void => {
+    const def = registry.actions.map.get(effect.applyTo)
+    if (!def) return
+    const field = def.targetField
+    const kind = field === undefined ? undefined : registry.actions.targetFieldKinds.get(field)
+    if (field === undefined || kind === undefined) {
+        const value = num(typeof effect.value === 'string' ? effect.value : 0)
+        if (effect.write === 'override') panel.zones[def.id] = value
+        else panel.zones[def.id] = (panel.zones[def.id] ?? 0) + value
+        return
+    }
+    if (kind === 'text') {
+        panel.text[field] = String(effect.value ?? '')
+        return
+    }
+    const value = num(typeof effect.value === 'string' ? effect.value : 0)
+    if (kind === 'map') {
+        if (!effect.element) return
+        const bucket = (panel.maps[field] ??= {})
+        bucket[effect.element] = effect.write === 'override' ? value : (bucket[effect.element] ?? 0) + value
+        return
+    }
+    panel.scalars[field] = effect.write === 'override' ? value : (panel.scalars[field] ?? 0) + value
+}
+
+const targetPanelOf = (registry: CoreRegistry, effects: readonly BuffEffect[]): TargetPanel => {
+    const panel = emptyTargetPanel()
+    for (const effect of effects) applyTargetEffect(registry, panel, effect)
+    return panel
 }
 
 const panelOfDamage = (
     registry: CoreRegistry,
-    table: GeneralTable,
-    bases: KernelBases,
-    charIndex: number,
     critBase: string,
-    damage: Damage,
+    buffs: readonly Buff[],
     target: TargetPanel
-): { panel: CharacterPanel; charLevel: number } => {
-    const { panel, charLevel } = basePanelOf(registry, table, bases, charIndex, critBase)
-    const { literal, refs, overrides } = splitBuffs(registry, damage)
+): CharacterPanel => {
+    const panel = emptyPanel(registry.actions, critBase)
+    const { literal, refs, overrides } = planOf(registry, buffs, critBase)
     for (const write of literal) applyZone(registry.actions, panel, write.applyTo, write.value)
+    roundPanelBase(registry.actions, panel)
     recomputeTotals(registry.actions, panel)
-    if (refs.length > 0) {
-        for (const { applyTo, ref } of refs) {
-            applyZone(registry.actions, panel, applyTo, resolveStatRef(registry, ref, panel, target))
-            recomputeTotals(registry.actions, panel)
-        }
+    for (const { applyTo, ref } of refs) {
+        applyZone(registry.actions, panel, applyTo, resolveStatRef(registry, ref, panel, target))
+        recomputeTotals(registry.actions, panel)
     }
     for (const write of overrides) {
         applyZone(registry.actions, panel, write.applyTo, write.value, 'override')
     }
-    return { panel, charLevel }
+    return panel
 }
 
 const baseValueOf = (
@@ -211,55 +161,52 @@ const baseValueOf = (
     target: TargetPanel
 ): number => {
     const hits = hitsOf(damage)
-    const extraRatio = ((panel.zones.extraRatio ?? 0) / 100) * hits
+    const extraRatio = registry.ratioZone === undefined ? 0 : ((panel.zones[registry.ratioZone] ?? 0) / 100) * hits
     if (def.base.kind === 'fixed') return num(damage.value)
     if (def.base.kind === 'targetStat') {
-        return (
-            Number((target as unknown as Record<string, number>)[def.base.field] ?? 0) *
-            (num(damage.value) + extraRatio)
-        )
+        return readTargetField(registry.formulas, def.base.field, target) * (num(damage.value) + extraRatio)
     }
-    if (def.base.dim === 'effectCoeff') {
-        return Math.round((panel.zones.effectCoeff ?? 0) * (num(damage.value) + extraRatio))
+    if (def.base.kind === 'zone') {
+        const value = (panel.zones[def.base.id] ?? 0) * (num(damage.value) + extraRatio)
+        return def.base.round ? Math.round(value) : value
     }
-    const dim = damage.base ?? registry.actions.dims[0]
-    if (!dim) throw new Error('[coconut-core] no panel dimension registered')
-    return panel.total[dim as keyof typeof panel.total] * (parseRatio(damage.value) + extraRatio)
+    const dim = damage.base ?? def.base.dim ?? registry.actions.dims[0]
+    if (dim === undefined) throw new Error('[coconut-core] no panel dimension registered')
+    return (panel.total[dim] ?? 0) * (parseRatio(damage.value) + extraRatio)
 }
 
 const computeDamage = (
     registry: CoreRegistry,
     table: GeneralTable,
-    bases: KernelBases,
+    buffIndex: BuffIndex,
+    globalBuffs: readonly Buff[],
     entryIndex: number,
     damageIndex: number,
-    charIndex: number,
     excludeBuffId?: string
 ): DamageResult => {
     const entry = table.damage_entries[entryIndex]!
-    const raw = entry.damages[damageIndex]!
-    const damage = excludeBuffId
-        ? { ...raw, activated_buffs: raw.activated_buffs.filter((buff) => buff.id !== excludeBuffId) }
-        : raw
+    const damage = entry.damages[damageIndex]!
+    const keep = (buff: Buff): boolean => buff.id !== excludeBuffId
+    const buffs = [...globalBuffs.filter(keep), ...resolveBuffs(damage.activated_buffs, buffIndex).filter(keep)]
     const formula: CalculationFormula = damage.formula
     const def = formulaOfRegistry(registry.formulas, formula)
-    const { targetSide } = splitBuffs(registry, damage)
-    const target = targetPanelOf(registry, bases, targetSide)
-    const { panel, charLevel } = panelOfDamage(registry, table, bases, charIndex, def.critBase, damage, target)
+    const { targetEffects } = planOf(registry, buffs, def.critBase)
+    const target = targetPanelOf(registry, targetEffects)
+    const panel = panelOfDamage(registry, def.critBase, buffs, target)
     const baseValue = baseValueOf(registry, def, damage, panel, target)
+    const consts: Record<string, number> = {}
+    for (const constant of registry.constants) consts[constant.id] = constant.get(panel, target)
     const evaluation = evaluateFormula(registry.formulas, {
         formula,
         baseValue,
         element: damage.element,
         panel,
         target,
-        consts: { charLevel }
+        consts
     })
 
-    const nonCritRaw = baseValue * evaluation.productNoCrit
     const expectedRaw = baseValue * evaluation.product
     const expected = Math.round(expectedRaw)
-    const canCrit = evaluation.canCrit
 
     return {
         entryIndex,
@@ -268,12 +215,8 @@ const computeDamage = (
         element: damage.element,
         formula: def.id,
         baseValue,
-        nonCritRaw,
         expectedRaw,
-        nonCrit: Math.round(nonCritRaw),
-        crit: canCrit ? Math.round(nonCritRaw * evaluation.critDmgRatio) : expected,
         expected,
-        canCrit,
         multipliers: evaluation.multipliers,
         panel,
         target,
@@ -284,23 +227,26 @@ const computeDamage = (
 const contributionsOf = (
     registry: CoreRegistry,
     table: GeneralTable,
-    bases: KernelBases,
+    buffIndex: BuffIndex,
+    globalBuffs: readonly Buff[],
     entryIndex: number,
     damageIndex: number,
-    charIndex: number,
     full: DamageResult
 ): BuffContribution[] => {
     const damage = table.damage_entries[entryIndex]!.damages[damageIndex]!
     const seen = new Set<string>()
     const out: BuffContribution[] = []
-    for (const buff of damage.activated_buffs) {
-        if (seen.has(buff.id)) continue
-        seen.add(buff.id)
-        const without = computeDamage(registry, table, bases, entryIndex, damageIndex, charIndex, buff.id)
+    const ids = [...globalBuffs.map((buff) => buff.id), ...damage.activated_buffs]
+    for (const buffId of ids) {
+        if (seen.has(buffId)) continue
+        seen.add(buffId)
+        const buff = buffIndex.get(buffId)
+        if (!buff || buff.role === 'stat') continue
+        const without = computeDamage(registry, table, buffIndex, globalBuffs, entryIndex, damageIndex, buffId)
         const deltaExpected = full.expected - without.expected
         out.push({
-            buffId: buff.id,
-            applyTo: buff.effect.applyTo,
+            buffId,
+            applyTo: buff.effects.map((effect) => effect.applyTo),
             deltaExpected,
             share: full.expected === 0 ? 0 : deltaExpected / full.expected
         })
@@ -311,22 +257,22 @@ const contributionsOf = (
 export const computeGeneralTable = (
     registry: CoreRegistry,
     table: GeneralTable,
-    bases: KernelBases,
     options?: { trace?: boolean }
 ): CoreResult => {
+    const buffIndex = buffIndexOf(table)
+    const globalBuffs = resolveBuffs(table.global_buffs, buffIndex)
     const damages: DamageResult[] = []
     for (const [entryIndex, entry] of table.damage_entries.entries()) {
-        const charIndex = table.characters.indexOf(entry.source)
         for (const [damageIndex] of entry.damages.entries()) {
-            const damage = computeDamage(registry, table, bases, entryIndex, damageIndex, charIndex)
+            const damage = computeDamage(registry, table, buffIndex, globalBuffs, entryIndex, damageIndex)
             if (options?.trace) {
                 damage.contributions = contributionsOf(
                     registry,
                     table,
-                    bases,
+                    buffIndex,
+                    globalBuffs,
                     entryIndex,
                     damageIndex,
-                    charIndex,
                     damage
                 )
             }
@@ -335,12 +281,6 @@ export const computeGeneralTable = (
     }
     return {
         damages,
-        total: {
-            nonCrit: damages.reduce((sum, d) => sum + d.nonCrit, 0),
-            crit: damages.reduce((sum, d) => sum + d.crit, 0),
-            expected: damages.reduce((sum, d) => sum + d.expected, 0)
-        }
+        total: damages.reduce((sum, damage) => sum + damage.expected, 0)
     }
 }
-
-export { formulaAcceptsRef }

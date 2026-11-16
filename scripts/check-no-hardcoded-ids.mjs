@@ -139,6 +139,7 @@ const ENTITY_IDS = [
 const REGISTRY_SOURCES = [
     'src/lib/calc/stat-writes.ts',
     'src/lib/calc/core-config.ts',
+    'src/lib/calc/display-meta.ts',
     'src/lib/calc/calculation.consts.ts',
     'src/lib/calc/rules.ts',
     'src/lib/consts/game-terms.ts',
@@ -154,6 +155,7 @@ const REGISTRY_SOURCES = [
 const REGISTRY = new Set([
     'src/lib/calc/stat-writes.ts',
     'src/lib/calc/core-config.ts',
+    'src/lib/calc/display-meta.ts',
     'src/lib/calc/calculation.consts.ts',
     'src/lib/calc/calculation.types.ts',
     'src/lib/calc/rules.ts'

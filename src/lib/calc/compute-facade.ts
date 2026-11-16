@@ -1,66 +1,29 @@
 /**
  * @desc 计算门面：**工具箱只做「编译 + 结果物化」，数值全部由内核给**。
  *
- * 流程：工程状态 → `GeneralTable`（编译）+ 基础数值（角色/武器/敌人，调用时传入）
+ * 流程：工程状态 → `GeneralTable`（编译，角色白值 / 武器 / 声骸 / 敌人全部编译成 buff）
  * → `CoconutCore.compute`（内核算面板与数值）→ 用内核产出的面板/乘区物化 `ResultEntry`。
  *
  * 为什么物化还留在工具箱：`ResultEntry` 是界面契约（倍率拆解、溯源辅助、兼容列），
  * 属于 app 的展示需求，不进内核。物化**只搬字段**，不再自己算一遍数值。
  */
-import type { BaseStats, CharacterBaseStats, DamageResult } from '$coconut'
+import type { ActionId, CharacterPanel, DamageResult } from '$coconut'
 import type { ComputeRequest } from '$lib/calc/request.types'
 import type { DamageEntry } from '$lib/calc/calculation.types'
 import type { ResultEntry } from '$lib/calc/result.types'
-import { VIRTUAL_EFFECT_PREFIX, compileProject, type CompiledEntryMeta } from '$lib/calc/compile'
-import { FORMULAS, createCoconutCore, formulaOf } from '$lib/calc/core-config'
+import { compileProject, type CompiledEntryMeta } from '$lib/calc/compile'
+import { CRIT_MULTIPLIER_ID, FORMULAS, createCoconutCore, effectiveCritRate, formulaOf } from '$lib/calc/core-config'
+import { formulaCanCrit, multiplierZoneViewOf } from '$lib/calc/display-meta'
 import {
-    TUNE_COEFF_MAP,
     effectRatioFactors,
     makeStubEntry,
     resolveBase,
     skillRatioFactors,
     withExtraRatioFactor
 } from '$lib/calc/compute'
-import { NON_DIRECT_ELEMENT } from '$lib/consts/game-terms'
-import { EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
-
-/** @desc 工程状态 → 内核要的基础数值（角色 / 武器 / 敌人全部在这里给） */
-export const basesOfRequest = (request: ComputeRequest): BaseStats => {
-    const characters: Record<string, CharacterBaseStats> = {}
-    for (const [name, info] of Object.entries(request.charInfo)) {
-        characters[name] = { ...info.lv90BaseStats, element: info.element }
-    }
-    for (const entry of request.entries) {
-        if (entry.formula !== 'effect' || !entry.hitName) continue
-        // 效应虚角色：只有「效应系数」这一维度（= 效应基础值），不参与三维面板
-        characters[`${VIRTUAL_EFFECT_PREFIX}${entry.hitName}`] = {
-            atk: 0,
-            hp: 0,
-            def: 0,
-            element: (NON_DIRECT_ELEMENT as Record<string, string>)[entry.hitName] ?? '',
-            coefficient: EFFECT_BASE_VALUE
-        }
-    }
-    const weapons: Record<string, { atk: number }> = {}
-    for (const [name, info] of Object.entries(request.weaponInfo)) weapons[name] = { atk: info.lv90BaseAtk }
-
-    const enemy = request.config.enemy
-    return {
-        characters,
-        weapons,
-        enemy: {
-            type: enemy.type,
-            level: enemy.level,
-            defense: enemy.defense,
-            dmgReduction: enemy.dmgReduction,
-            resistances: enemy.resistances,
-            coefficient: TUNE_COEFF_MAP[enemy.type] ?? 716.2
-        }
-    }
-}
 
 /** @desc 乘子数组 → `id → 数值`（物化时按乘子名取值） */
-const multiplierValuesOf = (damage: DamageResult): Map<string, number> =>
+const multiplierValuesOf = (damage: DamageResult): Map<ActionId, number> =>
     new Map(damage.multipliers.map((zone) => [zone.id, zone.value] as const))
 
 /** @desc 乘积（内核已给 `expectedRaw`，这里只为展示列 `totalMultiplier` 复算一份乘区积） */
@@ -76,22 +39,21 @@ const productOf = (damage: DamageResult): number =>
 const materialize = (entry: DamageEntry, damage: DamageResult, meta: CompiledEntryMeta): ResultEntry => {
     const def = FORMULAS[formulaOf(entry)]
     const hits = entry.hits || 1
-    const panel = {
+    const panel: CharacterPanel = {
         base: { ...damage.panel.base },
         total: { ...damage.panel.total },
-        zones: { ...damage.panel.zones },
-        elementBonus: { ...damage.panel.elementBonus },
-        typeBonus: { ...damage.panel.typeBonus }
+        zones: { ...damage.panel.zones }
     }
     const z = (id: string): number => panel.zones[id] ?? 0
     const values = multiplierValuesOf(damage)
-    const base = resolveBase(def, entry, panel, {
+    const ctx = {
         panel: damage.panel,
         target: damage.target,
         element: damage.element,
         damageTypes: meta.damageTypes,
-        consts: { charLevel: damage.panel.zones.charLevel ?? 90 }
-    })
+        consts: { charLevel: damage.panel.zones.charLevel || 90 }
+    }
+    const base = resolveBase(def, entry, panel, ctx)
 
     // ── 固定值条目：内核的乘子链为空，数值就是固定值本身 ──
     if (def.base.kind === 'fixed') {
@@ -110,6 +72,20 @@ const materialize = (entry: DamageEntry, damage: DamageResult, meta: CompiledEnt
 
     const fromPanel = def.base.kind === 'panelStat'
     const critDmgDecimal = z('critDmg') / 100
+    /**
+     * @desc 「暴击 / 不暴击」两列是**界面派生**（内核只给期望伤害）。
+     *
+     * 不暴击 = 把暴击乘子从乘区积里摘掉；必暴 / 不暴由调用方用 buff（覆盖 `critRate`）表达。
+     */
+    const productNoCrit = damage.multipliers.reduce(
+        (product, zone) => (zone.id === CRIT_MULTIPLIER_ID ? product : product * zone.value),
+        1
+    )
+    const nonCritRaw = damage.baseValue * productNoCrit
+    const canCrit = formulaCanCrit(def.id, damage.panel, ctx)
+    const rawPerHit = Math.round(nonCritRaw)
+    const nonCritPerHit = canCrit ? rawPerHit : damage.expected
+    const critPerHit = canCrit ? Math.round(nonCritRaw * critDmgDecimal) : damage.expected
     const unisonZone = values.get('unison')
     const tuneStrainZone = values.get('tuneStrain')
     const tuneBreakZone = values.get('tuneBreak')
@@ -150,7 +126,7 @@ const materialize = (entry: DamageEntry, damage: DamageResult, meta: CompiledEnt
         // 增伤区只属于面板基类（系数基类条目不吃增伤，其词条加成不得出现在结果里）
         dmgBonus: fromPanel ? z('bonusDmg') / 100 : 0,
         deepen: values.has('deepen') ? z('deepenDmg') / 100 : 0,
-        critRate: Math.min(z('critRate'), 100) / 100,
+        critRate: effectiveCritRate(z('critRate')) / 100,
         critDmg: critDmgDecimal,
         defMulti: values.get('defense') ?? 0,
         resMulti: values.get('resist') ?? 0,
@@ -163,15 +139,15 @@ const materialize = (entry: DamageEntry, damage: DamageResult, meta: CompiledEnt
         customMult,
         extraRatio: z('extraRatio'),
         vulnerability: values.has('vuln') ? z('dmgTakenInc') / 100 : 0,
-        rawPerHit: damage.nonCrit,
+        rawPerHit,
         expectedPerHit: damage.expected,
         totalDamage: damage.expected,
         totalDamageRaw: damage.expectedRaw,
         // 不可暴击时「暴击 / 不暴击」两列保持与期望同值，避免下游旧勾选把该段算成 0
-        nonCritPerHit: damage.canCrit ? damage.nonCrit : damage.expected,
-        critPerHit: damage.canCrit ? damage.crit : damage.expected,
-        canCrit: damage.canCrit,
-        multiplierZones: damage.multipliers,
+        nonCritPerHit,
+        critPerHit,
+        canCrit,
+        multiplierZones: damage.multipliers.map((zone) => multiplierZoneViewOf(zone, ctx)),
         damageTypes: meta.damageTypes,
         ...(fromPanel ? { elBonus: meta.elementBonus, typeBonus: meta.typeBonus } : {}),
         ratioFactors
@@ -184,7 +160,7 @@ const core = createCoconutCore()
 /** @desc 编译 + 内核结算，返回表与按条目分组的结算结果 */
 export const computeWithCore = (request: ComputeRequest) => {
     const { table, meta } = compileProject(request)
-    const result = core.compute(table, basesOfRequest(request))
+    const result = core.compute(table)
     return { table, meta, result }
 }
 

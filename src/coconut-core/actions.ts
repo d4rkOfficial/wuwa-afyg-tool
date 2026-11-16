@@ -1,4 +1,5 @@
 import type { CharacterPanel, TargetPanel } from './panel'
+import type { ActionId } from './general-table'
 
 export type ActionSide = 'character' | 'target'
 
@@ -6,49 +7,59 @@ export type ActionCombine = 'sum' | 'multiply'
 
 export type PanelDim = string
 
+export type PanelRounding = 'round' | 'none'
+
+export interface PanelConfig {
+    dims?: readonly PanelDim[]
+    rounding?: PanelRounding
+    aggregate?: (args: { base: number; flat: number; pct: number }) => number
+}
+
+export type TargetFieldKind = 'scalar' | 'map' | 'text'
+
+export interface TargetFieldDef {
+    field: ActionId
+    kind: TargetFieldKind
+}
+
 export interface BuffActionDef {
-    id: string
-    label: string
-    unit: '%' | 'flat'
-    group: string
+    id: ActionId
     side: ActionSide
     combine: ActionCombine
-    panel?: { flat?: PanelDim; pct?: PanelDim; total?: PanelDim }
+    panel?: { base?: PanelDim; flat?: PanelDim; pct?: PanelDim; total?: PanelDim }
     overridable: boolean
-    damageMatchable: boolean
     init: number
     initCoeff?: number
-    ref?: { label: string }
-    targetField?: string
+    targetField?: ActionId
 }
 
 export interface RefSourceDef {
-    id: string
-    label: string
-    unit: '%' | 'flat'
-    side: ActionSide
+    id: ActionId
     get: (panel: CharacterPanel, target: TargetPanel) => number
+    writes?: PanelDim
 }
 
 export interface ActionRegistry {
     list: readonly BuffActionDef[]
-    map: ReadonlyMap<string, BuffActionDef>
+    map: ReadonlyMap<ActionId, BuffActionDef>
 
     refSources: readonly RefSourceDef[]
-    refMap: ReadonlyMap<string, RefSourceDef>
+    refMap: ReadonlyMap<ActionId, RefSourceDef>
 
-    targetScalars: Readonly<Record<string, (target: TargetPanel) => number>>
+    targetFieldKinds: ReadonlyMap<ActionId, TargetFieldKind>
 
-    panelWriters: Readonly<Record<PanelDim, { flat?: string; pct?: string }>>
+    panelWriters: Readonly<Record<PanelDim, { flat?: ActionId; pct?: ActionId }>>
 
     dims: readonly PanelDim[]
+    rounding: PanelRounding
+    aggregate: (args: { base: number; flat: number; pct: number }) => number
 }
 
 const panelDimsOf = (defs: readonly BuffActionDef[]): PanelDim[] => [
     ...new Set(
         defs.flatMap((action) =>
             action.panel
-                ? [action.panel.flat, action.panel.pct, action.panel.total].filter(
+                ? [action.panel.base, action.panel.flat, action.panel.pct, action.panel.total].filter(
                       (d): d is PanelDim => d !== undefined
                   )
                 : []
@@ -58,12 +69,14 @@ const panelDimsOf = (defs: readonly BuffActionDef[]): PanelDim[] => [
 
 export const createActionRegistry = (
     defs: readonly BuffActionDef[],
-    refSources: readonly RefSourceDef[]
+    refSources: readonly RefSourceDef[],
+    options: { panel?: PanelConfig; targetFields?: readonly TargetFieldDef[] } = {}
 ): ActionRegistry => {
     const list = [...defs]
     const map = new Map(list.map((action) => [action.id, action]))
-    const panelWriters: Record<PanelDim, { flat?: string; pct?: string }> = {}
-    for (const dim of panelDimsOf(list)) panelWriters[dim] = {}
+    const dims = options.panel?.dims ? [...options.panel.dims] : panelDimsOf(list)
+    const panelWriters: Record<PanelDim, { flat?: ActionId; pct?: ActionId }> = {}
+    for (const dim of dims) panelWriters[dim] = {}
     for (const action of list) {
         if (!action.panel) continue
         const { flat, pct } = action.panel
@@ -75,44 +88,30 @@ export const createActionRegistry = (
         map,
         refSources,
         refMap: new Map(refSources.map((source) => [source.id, source])),
-        targetScalars: Object.fromEntries(
-            list
-                .filter((action) => action.targetField !== undefined)
-                .map((action) => [
-                    action.id,
-                    (target: TargetPanel) =>
-                        Number((target as unknown as Record<string, unknown>)[action.targetField!] ?? 0)
-                ])
-        ),
+        targetFieldKinds: new Map((options.targetFields ?? []).map((entry) => [entry.field, entry.kind] as const)),
         panelWriters,
-        dims: panelDimsOf(list)
+        dims,
+        rounding: options.panel?.rounding ?? 'round',
+        aggregate: options.panel?.aggregate ?? (({ base, flat, pct }) => base + Math.round(flat + (base * pct) / 100))
     }
 }
 
-export const isTargetSide = (registry: ActionRegistry, id: string): boolean => registry.map.get(id)?.side === 'target'
+export const isTargetSide = (registry: ActionRegistry, id: ActionId): boolean => registry.map.get(id)?.side === 'target'
 
-export const actionAllowsCondition = (registry: ActionRegistry, actionId: string): boolean =>
-    registry.map.get(actionId)?.damageMatchable === true
-
-export const writtenByOf = (registry: ActionRegistry, dim: PanelDim): string[] =>
+export const writtenByOf = (registry: ActionRegistry, dim: PanelDim): ActionId[] =>
     registry.list
         .filter(
             (action) =>
                 action.panel !== undefined &&
-                (action.panel.flat === dim || action.panel.pct === dim || action.panel.total === dim)
+                (action.panel.base === dim ||
+                    action.panel.flat === dim ||
+                    action.panel.pct === dim ||
+                    action.panel.total === dim)
         )
         .map((action) => action.id)
 
-export const refWrittenBy = (registry: ActionRegistry, refId: string): string[] => {
-    const dimOf: Record<string, PanelDim> = {
-        baseAtk: 'atk',
-        totalAtk: 'atk',
-        baseHp: 'hp',
-        totalHp: 'hp',
-        baseDef: 'def',
-        totalDef: 'def'
-    }
-    const dim = dimOf[refId]
-    if (dim) return writtenByOf(registry, dim)
-    return registry.refMap.has(refId) ? [refId] : []
+export const refWrittenBy = (registry: ActionRegistry, refId: ActionId): ActionId[] => {
+    const source = registry.refMap.get(refId)
+    if (source?.writes !== undefined) return writtenByOf(registry, source.writes)
+    return source ? [refId] : []
 }

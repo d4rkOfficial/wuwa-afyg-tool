@@ -1,5 +1,12 @@
-import type { BuffActionDef, RefSourceDef } from './actions'
+import type { BuffActionDef, RefSourceDef, TargetFieldDef, PanelConfig } from './actions'
 import type { FormulaDef, FormulaHandle } from './formulas'
+import type { CharacterPanel, TargetPanel } from './panel'
+import type { ActionId } from './general-table'
+
+export interface ConstantDef {
+    id: string
+    get: (panel: CharacterPanel, target: TargetPanel) => number
+}
 
 export interface CoconutCoreConfig {
     actions: readonly BuffActionDef[]
@@ -8,9 +15,13 @@ export interface CoconutCoreConfig {
 
     multipliers: readonly FormulaHandle[]
 
-    formulas: Readonly<Record<string, FormulaDef>>
+    formulas: readonly FormulaDef[]
 
-    critMultiplier: string
+    panel?: PanelConfig
 
-    critActions: readonly string[]
+    targetFields?: readonly TargetFieldDef[]
+
+    constants?: readonly ConstantDef[]
+
+    ratioZone?: ActionId
 }

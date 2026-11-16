@@ -1,16 +1,27 @@
+import type { PanelDim } from '$coconut'
 import type { CalculationFormulaId } from './calculation.types'
+import type { MultiplierDisplay } from './display-meta'
 
 /**
- * @desc 乘区的展示参数（结构化）：引擎只给**原始量纲**，格式化留给界面层
+ * @desc 乘区的展示参数（结构化）：内核只给**原始量纲**，格式化留给界面层
  * （`result.styles.ts` 的 `formatMultiplierDisplay`）。
  *
  * - `delta`：显示成「1 + x%」形态（加深 / 增伤 / 易伤 / 终伤 / 谐度）；
  * - `factor`：显示成乘数（抗性 / 防御 / 免伤 / 特殊）；
  * - `deltaWhenActive`：生效时显示 delta、未生效时显示乘数（集谐 / 同奏 / 暴击这类值可能恰为 1 的乘区）。
  */
-import type { MultiplierZone } from '$coconut'
+export type { MultiplierDisplay } from './display-meta'
 
-export type { MultiplierDisplay, MultiplierZone } from '$coconut'
+/**
+ * @desc 乘区明细（界面契约）：内核只给 `{ id, value }`，展示名与展示形态在物化时按 id 从
+ * `display-meta.ts` 补齐，因此结果对象上仍然可以直接按 `label` 取列。
+ */
+export interface MultiplierZone {
+    id: string
+    label: string
+    value: number
+    display: MultiplierDisplay
+}
 
 export interface ResultEntry {
     id: string
@@ -32,9 +43,9 @@ export interface ResultEntry {
      * 新代码优先读 `panel`，旧字段逐阶段下线。
      */
     panel: {
-        base: { atk: number; hp: number; def: number }
-        total: { atk: number; hp: number; def: number }
-        zones: Record<string, number>
+        base: Record<PanelDim, number>
+        total: Record<PanelDim, number>
+        zones: Record<PropertyKey, number>
     }
 
     // computed

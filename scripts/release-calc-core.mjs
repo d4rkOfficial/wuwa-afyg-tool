@@ -9,7 +9,8 @@
  * - `index.js`：单文件 ESM（零 import、零 `$coconut` 别名残留），由 `build-calc-lib.mjs` 打包；
  * - `*.d.ts`：由 `tsconfig.core.json` 直出（内核源码内部已改为相对路径，类型说明符天然干净），
  *   并把相对说明符补成 `.js`，让 `moduleResolution: node16/nodenext` 的消费方也能解析；
- * - `package.json` / `README.md` / `LICENSE`：包元数据与许可。
+ * - `package.json` / `README.md` / `LICENSE`：包元数据与许可。`README.md` 取自
+ *   `src/coconut-core/README.md`（面向包使用者），与仓库内的 `docs/coconut-core.md`（面向工具箱开发者）分开维护。
  *
  * 版本真源是 `src/coconut-core/package.json`（与 app 的 `0.0.1` 解耦）。
  *
@@ -90,7 +91,7 @@ writeFileSync(
 )
 
 /** 6) README / LICENSE：随包分发（本引擎自愿放弃版权，与工具箱本体的 MIT 分开） */
-copyFileSync(resolve(root, 'docs/coconut-core.md'), resolve(outDir, 'README.md'))
+copyFileSync(resolve(root, 'src/coconut-core/README.md'), resolve(outDir, 'README.md'))
 copyFileSync(resolve(root, 'src/coconut-core/LICENSE'), resolve(outDir, 'LICENSE'))
 
 /** 7) 打 tarball：用 npm pack（会按 `files` 裁剪，并生成 npm 期望的 `package/` 前缀） */

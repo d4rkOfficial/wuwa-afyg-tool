@@ -10,7 +10,8 @@
  */
 import type { BuffInstance, BuffTreeNode, BuffTreeState, CalcState } from '$lib/calc/calculation.types'
 import type { UnsavedChangeItem } from '$lib/types/unsaved-change'
-import { ZONE_MAP, classifyBuffScope } from '$lib/calc/calculation.consts'
+import { classifyBuffScope } from '$lib/calc/calculation.consts'
+import { actionLabel, actionUnit } from '$lib/calc/display-meta'
 
 // ── 小工具 ──
 
@@ -27,12 +28,12 @@ const leafOf = (name: string): string => {
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
 
 /** @desc 乘区标签（未知乘区回退 id） */
-const zoneLabel = (zoneId: string): string => ZONE_MAP.get(zoneId)?.label ?? zoneId
+const zoneLabel = (zoneId: string): string => actionLabel(zoneId)
 
 /** @desc 乘区条目的一句话值描述（引用/覆盖/数值三种形态） */
 const zoneValueText = (zone: BuffInstance['zones'][number]): string => {
     if (zone.ref) return '引用'
-    const unit = ZONE_MAP.get(zone.zoneId)?.unit === '%' ? '%' : ''
+    const unit = actionUnit(zone.zoneId) === '%' ? '%' : ''
     return `${zone.override ? '覆盖 ' : ''}${zone.value}${unit}`
 }
 

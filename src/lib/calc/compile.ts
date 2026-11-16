@@ -5,7 +5,7 @@
  * - Buff 的作用域 / 链阶 / 精炼 / 伤害名 / 面板 / 敌人类型 / 依赖闭包 → 求值成「哪些 buff 生效」；
  * - 乘区级条件（伤害属性 / 伤害类型）→ 求值成「哪些作用生效」；
  * - 转模（引用）→ 折算成字面数值（内核不知道「引用」怎么读面板）；
- * - 声骸 5 槽的主词条、cost 派生副主词条、副词条、武器副属性 → 压成词条数组；
+ * - 角色白值 / 武器白值与副属性 / 声骸词条 / 敌人配置 → 全部编译成 buff（表里没有「基础数值」）；
  * - 类型 / 属性加成词条（内核没有「伤害类型」字段）→ 折叠成按段挂载的 `bonusDmg` buff。
  *
  * 逐条目的语义解析复用引擎的 `resolveEntry`（同一处实现），因此「编译器压表 → 内核结算」
@@ -13,13 +13,13 @@
  */
 import type { DamageEntry as EngineDamageEntry } from '$lib/calc/calculation.types'
 import type { ComputeRequest } from '$lib/calc/request.types'
-import { DEFAULT_CONDITION_PROFILE, entryStatsOf, resolveEntry } from '$lib/calc/compute'
-import { ELEMENT_BONUS_MAP, NON_DIRECT_ELEMENT, TYPE_BONUS_MAP } from '$lib/consts/game-terms'
-import { getEffectBurstMultiplier, getEffectMultiplier } from '$lib/consts/effect-data'
+import { DEFAULT_CONDITION_PROFILE, TUNE_COEFF_MAP, entryStatsOf, resolveEntry, weaponStatsOf } from '$lib/calc/compute'
+import { ELEMENT_BONUS_MAP, ELEMENTS, NON_DIRECT_ELEMENT, TYPE_BONUS_MAP } from '$lib/consts/game-terms'
+import { EFFECT_BASE_VALUE, getEffectBurstMultiplier, getEffectMultiplier } from '$lib/consts/effect-data'
 import { BONUS_DMG_ACTION, DEFAULT_PANEL_DIM, statActionOf } from '$lib/calc/stat-writes'
 import type { PanelDim } from '$lib/calc/core-config'
-import { PANEL_BASE_TYPES } from '$lib/calc/core-config'
-import type { Buff, Damage, DamageEntry, GeneralTable, Stat } from '$coconut'
+import { CHAR_LEVEL_ACTION, CRIT_ACTION_IDS, PANEL_BASE_TYPES, TUNE_BREAK_BOOST_ACTION } from '$lib/calc/core-config'
+import type { ActionId, Buff, BuffEffect, Damage, DamageEntry, GeneralTable, Stat } from '$coconut'
 
 /** @desc 只读列表 Record → 可变列表 Record（引擎入参是可变形态） */
 const toMutableList = (record: Readonly<Record<string, readonly string[]>> | undefined): Record<string, string[]> =>
@@ -70,7 +70,7 @@ const elementOf = (entry: EngineDamageEntry): string =>
 
 /**
  * @desc 词条数组 → 内核可表达的形态：
- * - 普通词条留在 `sub_stats`；
+ * - 普通词条压成作用写入；
  * - 类型 / 属性加成词条按段挂成 `bonusDmg`（内核没有伤害类型字段）。
  */
 const splitStats = (stats: readonly Stat[]): { plain: Stat[]; typeBonus: Stat[]; elementBonus: Stat[] } => {
@@ -88,8 +88,17 @@ const splitStats = (stats: readonly Stat[]): { plain: Stat[]; typeBonus: Stat[];
     return { plain, typeBonus, elementBonus }
 }
 
+/** @desc 折进增伤区的词条加成（`bonusDmg` 落值 + 归属 buff id） */
+interface BonusEffect {
+    id: string
+    effect: BuffEffect
+}
+
+const numOfEffect = (effect: BuffEffect): number =>
+    typeof effect.value === 'string' ? Number.parseFloat(effect.value) || 0 : 0
+
 /** @desc 类型加成词条 → 命中该伤害类型的段挂 `bonusDmg`（类型名去掉「伤害」后缀） */
-const typeBonusBuffsOf = (stats: readonly Stat[], damageTypes: readonly string[]): Buff[] =>
+const typeBonusBuffsOf = (stats: readonly Stat[], damageTypes: readonly string[]): BonusEffect[] =>
     stats.flatMap((stat) => {
         const type = TYPE_BONUS_MAP[stat.key]
         const hit = damageTypes.some((damageType) => damageType.replace('伤害', '') === type)
@@ -97,7 +106,7 @@ const typeBonusBuffsOf = (stats: readonly Stat[], damageTypes: readonly string[]
     })
 
 /** @desc 属性加成词条 → 命中该伤害属性的段挂 `bonusDmg` */
-const elementBonusBuffsOf = (stats: readonly Stat[], element: string): Buff[] =>
+const elementBonusBuffsOf = (stats: readonly Stat[], element: string): BonusEffect[] =>
     stats.flatMap((stat) =>
         ELEMENT_BONUS_MAP[stat.key] === element
             ? [{ id: `statElement:${stat.key}`, effect: { applyTo: BONUS_DMG_ACTION, value: stat.value } }]
@@ -117,31 +126,87 @@ export interface CompiledEntryMeta {
     stub: boolean
 }
 
+/** @desc 词条 → 内核作用写入（双暴词条标记「只在面板基准生效」，与引擎在系数基准下跳过它们同口径） */
+const statEffectsOf = (plain: readonly Stat[]): BuffEffect[] =>
+    plain.map((stat) => ({
+        applyTo: stat.key,
+        value: stat.value,
+        ...(CRIT_ACTION_IDS.includes(stat.key) ? { only: 'panel' as const } : {})
+    }))
+
+/**
+ * @desc 一位角色的「装备词条」拆分结果（武器副属性 → 声骸主词条 → 声骸副词条，顺序固定）。
+ *
+ * 顺序与引擎 `accumulateEchoes` 逐项一致（浮点累加顺序一致 → 面板落值逐位相等）。
+ */
+interface EquipParts {
+    /** @desc 面板写入（已转成作用 id） */
+    plain: Stat[]
+    /** @desc 折进增伤区的类型加成词条 */
+    typeBonus: Stat[]
+    /** @desc 折进增伤区的属性加成词条 */
+    elementBonus: Stat[]
+}
+
+const equipPartsOf = (request: ComputeRequest, charIndex: number): EquipParts => {
+    const slot = request.team[charIndex]
+    const weaponInfo = slot?.weapon ? request.weaponInfo[slot.weapon] : null
+    const echoes = request.config.characters[charIndex]?.echoes ?? []
+    const weapon = splitStats(weaponStatsOf(weaponInfo))
+    const echoStats = entryStatsOf({ echoes })
+    const mains = splitStats(echoStats.mainStats)
+    const subs = splitStats(echoStats.subStats)
+    return {
+        plain: [...weapon.plain, ...mains.plain, ...subs.plain],
+        typeBonus: [...weapon.typeBonus, ...mains.typeBonus, ...subs.typeBonus],
+        elementBonus: [...weapon.elementBonus, ...mains.elementBonus, ...subs.elementBonus]
+    }
+}
+
+/**
+ * @desc 一位角色的「基础数值 + 装备」→ 一条 buff 的落值序列。
+ *
+ * 顺序与引擎 `computeCharacterStats` 逐项一致：白值 → 谐度破坏增幅 → 等级 → 系数 →
+ * 武器副属性 → 声骸主词条 → 声骸副词条。
+ */
+const equipEffectsOf = (request: ComputeRequest, charIndex: number, parts: EquipParts): BuffEffect[] => {
+    const slot = request.team[charIndex]
+    const charInfo = slot?.character ? request.charInfo[slot.character] : undefined
+    const weaponInfo = slot?.weapon ? request.weaponInfo[slot.weapon] : null
+    const effects: BuffEffect[] = []
+
+    if (charInfo) {
+        const base = charInfo.lv90BaseStats
+        effects.push({ applyTo: 'atkBase', value: String(base.atk) })
+        effects.push({ applyTo: 'hpBase', value: String(base.hp) })
+        effects.push({ applyTo: 'defBase', value: String(base.def) })
+        if (weaponInfo) effects.push({ applyTo: 'atkBase', value: String(weaponInfo.lv90BaseAtk) })
+        effects.push({ applyTo: TUNE_BREAK_BOOST_ACTION, value: String(Math.round(base.tuneBreakBoost)) })
+        effects.push({ applyTo: CHAR_LEVEL_ACTION, value: '90' })
+    }
+
+    effects.push(...statEffectsOf(parts.plain))
+    return effects
+}
+
+/** @desc 敌人配置 → 一条 buff 的落值序列（目标侧） */
+const enemyEffectsOf = (request: ComputeRequest): BuffEffect[] => {
+    const enemy = request.config.enemy
+    const effects: BuffEffect[] = [
+        { applyTo: 'enemyType', value: enemy.type },
+        { applyTo: 'enemyDefense', value: String(enemy.defense) },
+        { applyTo: 'enemyDmgReduction', value: String(enemy.dmgReduction) },
+        { applyTo: 'enemyCoeff', value: String(TUNE_COEFF_MAP[enemy.type] ?? 716.2) }
+    ]
+    for (const element of ELEMENTS) {
+        effects.push({ applyTo: 'resistance', element, value: String(enemy.resistances[element] ?? 0) })
+    }
+    return effects
+}
+
 /** @desc 工程状态 → 一张 `GeneralTable` + 逐条目展示语义 */
 export const compileProject = (request: ComputeRequest): { table: GeneralTable; meta: CompiledEntryMeta[] } => {
     const profile = request.profile ?? DEFAULT_CONDITION_PROFILE
-    const characters = request.team.map((slot) => slot.character ?? '')
-    const weapons = request.team.map((slot) => slot.weapon ?? '')
-
-    const statsPerChar = request.team.map((slot, index) =>
-        entryStatsOf({
-            weaponInfo: request.weaponInfo[slot.weapon ?? ''] ?? null,
-            echoes: request.config.characters[index]?.echoes ?? []
-        })
-    )
-
-    const mainStats: Stat[][] = []
-    const subStats: Stat[][] = []
-    const typeBonusStats: Stat[][] = []
-    const elementBonusStats: Stat[][] = []
-    for (const stats of statsPerChar) {
-        // 装备词条按引擎的累加顺序整串写进 `main_stats`（顺序会体现在面板落值的浮点末位）
-        const parts = splitStats(stats.stats)
-        mainStats.push(parts.plain)
-        subStats.push([])
-        typeBonusStats.push(parts.typeBonus)
-        elementBonusStats.push(parts.elementBonus)
-    }
 
     const ctx = {
         buffSets: [...request.buffs],
@@ -155,41 +220,97 @@ export const compileProject = (request: ComputeRequest): { table: GeneralTable; 
         ...(request.echoSkillText ? { echoSkillText: { ...request.echoSkillText } } : {})
     }
 
-    /** @desc 效应虚角色（无源角色）→ 承载「效应系数」面板属性 */
-    const virtualChars = new Map<string, string>()
+    /**
+     * @desc 表内 Buff 目录：`activated_buffs` 只放 id，落值明细集中在这里。
+     *
+     * 同一个 buff 在不同条目上生效的落值可能不同（乘区条件、转模数值随条目面板变化），
+     * 所以按「id + 落值内容」去重：首个用原 id，内容不同的变体加 `#2` / `#3`。
+     */
+    const directory = new Map<string, Buff>()
+    const idOfContent = new Map<string, string>()
+    /** @desc 作用 id → 落值签名里的稳定文本（symbol 的 `String()` 可能重名，按首次出现编号） */
+    const symbolText = new Map<symbol, string>()
+    const idText = (id: ActionId): string => {
+        if (typeof id === 'string') return id
+        const known = symbolText.get(id)
+        if (known) return known
+        const text = `#${symbolText.size + 1}`
+        symbolText.set(id, text)
+        return text
+    }
+    const effectSignature = (effects: readonly BuffEffect[]): string =>
+        effects
+            .map((effect) => {
+                const value = typeof effect.value === 'string' ? effect.value : JSON.stringify(effect.value)
+                return `${idText(effect.applyTo)}|${effect.element ?? ''}|${value}|${effect.write ?? 'add'}|${effect.only ?? ''}`
+            })
+            .join(';')
+    const registerBuff = (buffId: string, effects: readonly BuffEffect[], role?: 'stat'): string => {
+        const signature = `${buffId}\u0000${effectSignature(effects)}`
+        const known = idOfContent.get(signature)
+        if (known) return known
+        let id = buffId
+        let n = 1
+        while (directory.has(id)) {
+            n += 1
+            id = `${buffId}#${n}`
+        }
+        directory.set(id, { id, effects: [...effects], ...(role ? { role } : {}) })
+        idOfContent.set(signature, id)
+        return id
+    }
+
+    /** @desc 敌人配置对所有伤害一致 → 只登记一次，作为每条伤害的第一个 buff（`role: 'stat'` 不进贡献溯源） */
+    const enemyBuffId = registerBuff('enemy:setup', enemyEffectsOf(request), 'stat')
+    const equipParts = request.team.map((_, index) => equipPartsOf(request, index))
+    const equipIds = request.team.map((_, index) =>
+        registerBuff(`equip:${index}`, equipEffectsOf(request, index, equipParts[index]!), 'stat')
+    )
+
     const meta: CompiledEntryMeta[] = []
     const damageEntries: DamageEntry[] = request.entries.map((entry) => {
         const resolved = resolveEntry(entry, ctx)
-        const charIndex = characters.indexOf(entry.character ?? '')
+        const charIndex = request.team.findIndex((slot) => (slot.character ?? '') === (entry.character ?? ''))
         const element = elementOf(entry)
         const isEffect = entry.formula === 'effect'
         const source = isEffect ? `${VIRTUAL_EFFECT_PREFIX}${entry.hitName}` : (entry.character ?? '')
-        if (isEffect && !virtualChars.has(source)) virtualChars.set(source, element)
+        const parts = charIndex >= 0 ? equipParts[charIndex]! : { plain: [], typeBonus: [], elementBonus: [] }
 
-        const typeBuffs = typeBonusBuffsOf(typeBonusStats[charIndex] ?? [], resolved.damageTypes)
-        const elementBuffs = elementBonusBuffsOf(elementBonusStats[charIndex] ?? [], element)
-        const sumOf = (buffs: readonly Buff[]): number =>
-            buffs.reduce((sum, buff) => sum + Number.parseFloat(buff.effect.value as string), 0)
+        const typeBuffs = typeBonusBuffsOf(parts.typeBonus, resolved.damageTypes)
+        const elementBuffs = elementBonusBuffsOf(parts.elementBonus, element)
+        const sumOf = (bonuses: readonly { effect: BuffEffect }[]): number =>
+            bonuses.reduce((sum, bonus) => sum + numOfEffect(bonus.effect), 0)
 
-        const writeBuff = (write: {
-            buffId: string
-            applyTo: string
-            value: number
-            write: 'add' | 'override'
-        }): Buff => ({
-            id: write.buffId,
-            effect: {
-                applyTo: write.applyTo,
-                value: String(write.value),
-                ...(write.write === 'override' ? { write: 'override' as const } : {})
-            }
+        /** 同一 buff 的多个落点收拢成一条目录项 */
+        const effectsByBuff = new Map<string, BuffEffect[]>()
+        const pushEffect = (buffId: string, effect: BuffEffect): void => {
+            const list = effectsByBuff.get(buffId)
+            if (list) list.push(effect)
+            else effectsByBuff.set(buffId, [effect])
+        }
+        const toEffect = (write: { applyTo: string; value: number; write: 'add' | 'override' }): BuffEffect => ({
+            applyTo: write.applyTo,
+            value: String(write.value),
+            ...(write.write === 'override' ? { write: 'override' as const } : {})
         })
 
-        const activated_buffs: Buff[] = [
-            ...resolved.writes.map(writeBuff),
-            ...resolved.targetWrites.map(writeBuff),
-            ...typeBuffs,
-            ...elementBuffs
+        for (const write of resolved.writes) pushEffect(write.buffId, toEffect(write))
+        for (const write of resolved.targetWrites) pushEffect(write.buffId, toEffect(write))
+        for (const bonus of typeBuffs) pushEffect(bonus.id, bonus.effect)
+        for (const bonus of elementBuffs) pushEffect(bonus.id, bonus.effect)
+
+        // 顺序：敌人配置 → 本角色装备 → 本段生效 buff → 效应系数（效应条目无装备，系数最后写）
+        const activated_buffs = [
+            enemyBuffId,
+            ...(charIndex >= 0 ? [equipIds[charIndex]!] : []),
+            ...[...effectsByBuff.entries()].map(([buffId, effects]) => registerBuff(buffId, effects)),
+            ...(isEffect
+                ? [
+                      registerBuff(`effect:${entry.hitName}`, [
+                          { applyTo: 'effectCoeff', value: String(EFFECT_BASE_VALUE) }
+                      ])
+                  ]
+                : [])
         ]
 
         const damage: Damage = {
@@ -211,20 +332,33 @@ export const compileProject = (request: ComputeRequest): { table: GeneralTable; 
         return { source, damages: [damage] }
     })
 
-    for (const [id] of virtualChars) {
-        characters.push(id)
-        weapons.push('')
-        mainStats.push([])
-        subStats.push([])
-        // 虚角色的「效应系数」由基础数值给出（见 `basesOfRequest`）
+    /**
+     * @desc 全局 Buff：所有伤害的 `activated_buffs` 的**公共前缀**。
+     *
+     * 只有「在每条伤害里都排在最前且完全一致」的 id 才能提到全局（顺序不变 →
+     * 浮点累加顺序与原来完全一致）。敌人配置天然满足；同队多角色时装备 per-角色，前缀会停在装备处。
+     */
+    const allLists = damageEntries.flatMap((entry) => entry.damages.map((damage) => damage.activated_buffs))
+    const globalBuffIds: string[] = []
+    if (allLists.length > 0) {
+        for (let i = 0; ; i++) {
+            const candidate = allLists[0]![i]
+            if (candidate === undefined) break
+            if (!allLists.every((list) => list[i] === candidate)) break
+            globalBuffIds.push(candidate)
+        }
+    }
+    if (globalBuffIds.length > 0) {
+        for (const entry of damageEntries) {
+            for (const damage of entry.damages) {
+                damage.activated_buffs = damage.activated_buffs.slice(globalBuffIds.length)
+            }
+        }
     }
 
     const table: GeneralTable = {
-        characters,
-        weapons,
-        main_stats: mainStats,
-        sub_stats: subStats,
-        buffs: damageEntries.flatMap((entry) => entry.damages.flatMap((damage) => damage.activated_buffs)),
+        global_buffs: globalBuffIds,
+        buffs: [...directory.values()],
         damage_entries: damageEntries
     }
     return { table, meta }

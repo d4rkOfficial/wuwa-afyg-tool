@@ -17,8 +17,8 @@
     import type { CharSlot } from '$lib/types/project'
     import type { BuffCondition, BuffConf, BuffRule, BuffZoneValue } from '$lib/calc/calculation.types'
     import { buffLeafName } from '$lib/buff/name'
-    import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
-    import { actionAllowsCondition } from '$lib/calc/core-config'
+    import { ZONE_MAP, ZONE_NO_REF_IDS } from '$lib/calc/calculation.consts'
+    import { actionAllowsCondition, actionLabel, actionRefLabel, actionUnit } from '$lib/calc/display-meta'
     import { describeCondition, describeZoneConditionBadge } from '$lib/calc/condition'
     import { describeRules } from '$lib/calc/rules'
     import { fallbackIcon } from '$lib/utils/icons'
@@ -252,12 +252,13 @@
         <!-- @desc 乘区列表：已配置乘区的数值输入/引用展示/追加覆盖切换/引用配置入口 -->
         <div class="theme-scrollbar flex-1 overflow-y-auto p-3 space-y-1">
             {#each selectedZones as zone, zoneIndex (zoneIndex)}
-                {@const def = ZONE_MAP.get(zone.zoneId)}
+                {@const def = ZONE_MAP.has(zone.zoneId) ? { id: zone.zoneId } : undefined}
                 {@const zoneKey = zone.zoneId as string}
                 {@const overridden = !zone.override && overrideZoneIds.has(zoneKey)}
                 {@const external = externalOverrides[zoneKey] ?? []}
                 {@const condBadge = describeZoneConditionBadge(zone.condition)}
-                {@const zoneLabel = def?.label ?? zoneKey}
+                {@const zoneLabel = actionLabel(zoneKey)}
+                {@const zoneUnitText = actionUnit(zoneKey) === '%' ? '%' : ''}
                 {#if def}
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
@@ -299,7 +300,8 @@
                             >
                         {/if}
                         {#if zone.ref && !ZONE_NO_REF_IDS.has(zone.zoneId)}
-                            {@const refDef = ZONE_REF_MAP.get(zone.ref.zoneId) ?? ZONE_MAP.get(zone.ref.zoneId)}
+                            {@const refLabel = actionRefLabel(zone.ref.zoneId)}
+                            {@const refUnit = actionUnit(zone.ref.zoneId)}
                             {@const refName =
                                 zone.ref.characterIdx < 0 ? '出伤者' : (teamNames[zone.ref.characterIdx] ?? '?')}
                             {@const refOp = zone.ref.threshold < 0 ? '+' : '-'}
@@ -310,8 +312,8 @@
                             {@const hasUpper = zone.ref.upper !== undefined}
                             <span
                                 class="flex-1 text-[10px] text-(--theme-modal-text)/40 truncate min-w-0 text-right"
-                                title="({refName}.{refDef?.label ?? '?'}{hasThreshold
-                                    ? ' ' + refOp + ' ' + refTh + (refDef?.unit === '%' ? '%' : '')
+                                title="({refName}.{refLabel}{hasThreshold
+                                    ? ' ' + refOp + ' ' + refTh + (refUnit === '%' ? '%' : '')
                                     : ''}) ÷{refS.divisor}×{refS.multiplier}{hasLower || hasUpper
                                     ? ' clamp(' +
                                       (hasLower ? String(zone.ref.lower) : '') +
@@ -320,8 +322,8 @@
                                       ')'
                                     : ''}"
                             >
-                                引用: ({refName}.{refDef?.label ?? '?'}{hasThreshold
-                                    ? refOp + refTh + (refDef?.unit === '%' ? '%' : '')
+                                引用: ({refName}.{refLabel}{hasThreshold
+                                    ? refOp + refTh + (refUnit === '%' ? '%' : '')
                                     : ''}) ÷{refS.divisor}×{refS.multiplier}
                                 {#if hasLower || hasUpper}
                                     <span class="text-(--theme-modal-text)/30">
@@ -341,9 +343,7 @@
                                     class="w-14 h-6 rounded-none border bg-transparent px-1.5 text-xs text-right tabular-nums text-(--theme-modal-text) outline-none"
                                     style="border-color: var(--theme-divider-border);"
                                 />
-                                <span class="text-[10px] text-(--theme-modal-text)/40 w-3"
-                                    >{def?.unit === '%' ? '%' : ''}</span
-                                >
+                                <span class="text-[10px] text-(--theme-modal-text)/40 w-3">{zoneUnitText}</span>
                             </div>
                         {/if}
                         {#if zone.zoneId !== 'atkPct' && zone.zoneId !== 'hpPct' && zone.zoneId !== 'defPct' && zone.zoneId !== 'extraRatio'}

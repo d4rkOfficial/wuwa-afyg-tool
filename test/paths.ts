@@ -58,7 +58,7 @@ export const selectTestFiles = (files: readonly string[], only: string): string[
     return q ? files.filter((f) => f.includes(q)) : [...files]
 }
 
-/** @desc 从 argv 解析「只跑哪些」：支持 `--only=x` / `--only x` / 位置参数（`pnpm test:one calc`） */
+/** @desc 从 argv 解析「只跑哪些」：支持 `--only=x` / `--only x` / 位置参数（`pnpm test calc`） */
 export const onlyFromArgv = (argv: readonly string[] = process.argv.slice(2)): string => {
     const eq = argv.find((a) => a.startsWith('--only='))
     if (eq) return eq.slice('--only='.length)

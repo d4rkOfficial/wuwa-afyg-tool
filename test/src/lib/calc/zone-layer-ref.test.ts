@@ -14,6 +14,7 @@ import {
     ZONE_REF_MAP,
     ZONE_SECTION_OF
 } from '$lib/calc/calculation.consts'
+import { actionLabel } from '$lib/calc/display-meta'
 import { computeOneEntry, DEFAULT_CONDITION_PROFILE } from '$lib/calc/compute'
 import { paneEffectSourcesOf } from '$lib/buff/pane-effects'
 import { dedupeImportItems } from '$lib/buff/import-utils'
@@ -86,7 +87,7 @@ describe('层数类乘区：清单与可引用性', () => {
             assert.equal(ZONE_REF_MAP.has(id), false, `${id} 不应再是可引用来源`)
         }
         assert.equal(
-            ZONE_DEFS.some((z) => z.label.includes('自定义层数')),
+            ZONE_DEFS.some((z) => actionLabel(z.id).includes('自定义层数')),
             false
         )
         assert.equal([...ZONE_SECTION_OF.values()].includes('自定义层数'), false, '「自定义层数」栏目应一并移除')

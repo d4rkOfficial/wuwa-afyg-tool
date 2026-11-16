@@ -19,7 +19,8 @@ import {
     FORMULAS,
     type CritBase
 } from '$lib/calc/core-config'
-import { DAMAGE_TYPE_SHORT, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
+import { DAMAGE_TYPE_SHORT } from '$lib/calc/calculation.consts'
+import { actionRefLabel } from '$lib/calc/display-meta'
 import type { BuffConf, BuffZoneValue, DamageEntry } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 
@@ -98,8 +99,7 @@ export const inferredDamageTypeText = (types: readonly string[]): string =>
     types.length > 0 ? `自动推导：${types.map(damageTypeShort).join('/')}` : ''
 
 /** @desc 面板乘区键 → 展示标签（查不到时回落键名，与引擎的引用定义表同源） */
-export const zoneLabelsOf = (zoneIds: readonly string[]): string[] =>
-    zoneIds.map((z) => ZONE_REF_MAP.get(z)?.label ?? z)
+export const zoneLabelsOf = (zoneIds: readonly string[]): string[] => zoneIds.map((z) => actionRefLabel(z))
 
 /**
  * @desc 「影响源」提示文案：该 Buff 作用于「被本段伤害引用的角色」，会改写那个角色的面板乘区。

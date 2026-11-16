@@ -10,7 +10,6 @@ import assert from 'node:assert/strict'
 import { formatMultiplierDisplay } from '$lib/result/styles'
 import {
     BUFF_ACTIONS,
-    DISPLAY_ONLY_ACTIONS,
     FORMULAS,
     MULTIPLIER_ORDER,
     MULTIPLIERS,
@@ -19,19 +18,27 @@ import {
     emptyTargetPanel,
     formulaActionClosure
 } from '$lib/calc/core-config'
+import { DISPLAY_ONLY_ACTIONS, MULTIPLIER_META, formulaMetaOf } from '$lib/calc/display-meta'
 
 const ALL_FORMULAS = ['direct', 'tune', 'effect', 'fixed'] as const
 
 describe('公式注册表：作用覆盖', () => {
-    it('每个作用都被某条公式链读到、或参与三维派生、或登记为「仅展示」', () => {
+    it('每个作用都被某条公式链读到、或参与三维派生、或写目标侧、或登记为「仅展示」', () => {
         const consumed = new Set<string>()
         for (const id of ALL_FORMULAS) {
             for (const action of formulaActionClosure(id)) consumed.add(action)
         }
+        // `charLevel` 由内核以 `const.charLevel` 读取（防御区用），不在乘子 inputs 里
+        const KERNEL_CONST = new Set(['charLevel'])
         const missing = BUFF_ACTIONS.filter(
-            (action) => !consumed.has(action.id) && action.panel === undefined && !DISPLAY_ONLY_ACTIONS.has(action.id)
-        ).map((action) => action.id)
-        assert.deepEqual(missing, [], '这些作用既没被公式读、也不参与三维派生、也没登记仅展示 → 接线漏了')
+            (action) =>
+                !consumed.has(String(action.id)) &&
+                action.panel === undefined &&
+                action.targetField === undefined &&
+                !KERNEL_CONST.has(String(action.id)) &&
+                !DISPLAY_ONLY_ACTIONS.has(String(action.id))
+        ).map((action) => String(action.id))
+        assert.deepEqual(missing, [], '这些作用既没被公式读、也不参与三维派生、也不写目标侧、也没登记仅展示 → 接线漏了')
     })
 
     it('「仅展示」登记的项都真实存在，且确实没被公式读', () => {
@@ -39,7 +46,7 @@ describe('公式注册表：作用覆盖', () => {
         for (const id of ALL_FORMULAS) {
             for (const action of formulaActionClosure(id)) consumed.add(action)
         }
-        const known = new Set(BUFF_ACTIONS.map((a) => a.id))
+        const known = new Set(BUFF_ACTIONS.map((a) => String(a.id)))
         for (const [id, reason] of DISPLAY_ONLY_ACTIONS) {
             assert.ok(known.has(id), `仅展示登记里有不存在的作用：${id}（理由：${reason}）`)
             assert.ok(!consumed.has(id), `${id} 已被公式读取，应从仅展示名单移除（理由：${reason}）`)
@@ -47,15 +54,20 @@ describe('公式注册表：作用覆盖', () => {
     })
 
     it('公式里的输入名都指向真实作用或保留输入', () => {
-        const known = new Set(BUFF_ACTIONS.map((a) => a.id))
+        const known = new Set(BUFF_ACTIONS.map((a) => String(a.id)))
         const reserved = new Set(['const.charLevel', 'target.defense', 'v'])
         for (const id of ALL_FORMULAS) {
             for (const handle of FORMULAS[id].chain) {
                 for (const input of handle.inputs) {
-                    const bare = input.startsWith('target.') ? input.slice('target.'.length) : input
+                    const bare =
+                        typeof input === 'string'
+                            ? input.startsWith('target.')
+                                ? input.slice('target.'.length)
+                                : input
+                            : input
                     assert.ok(
-                        known.has(bare) || reserved.has(input),
-                        `公式 ${id} 的乘子 ${handle.id} 声明了未知输入 ${input}`
+                        known.has(String(bare)) || reserved.has(String(input)),
+                        `公式 ${id} 的乘子 ${String(handle.id)} 声明了未知输入 ${String(input)}`
                     )
                 }
             }
@@ -64,7 +76,7 @@ describe('公式注册表：作用覆盖', () => {
 
     it('引用来源都能真正读到值', () => {
         for (const source of REF_SOURCES) {
-            assert.equal(typeof source.get, 'function', `${source.id} 缺少 get`)
+            assert.equal(typeof source.get, 'function', `${String(source.id)} 缺少 get`)
         }
     })
 })
@@ -81,9 +93,9 @@ describe('公式注册表：乘区展示', () => {
             consts: { charLevel: 90 }
         }
         for (const id of MULTIPLIER_ORDER) {
-            const handle = MULTIPLIERS[id]
+            const meta = MULTIPLIER_META[id]
             for (const value of [1, 1.25]) {
-                const text = formatMultiplierDisplay(value, handle.display(value, ctx))
+                const text = formatMultiplierDisplay(value, meta.display(value, ctx))
                 assert.ok(text.length > 0, `乘子 ${id} 在 value=${value} 时没有展示文案`)
             }
         }
@@ -95,9 +107,9 @@ describe('公式注册表：链顺序与清单', () => {
         for (const id of ALL_FORMULAS) {
             let last = -1
             for (const handle of FORMULAS[id].chain) {
-                const at = MULTIPLIER_ORDER.indexOf(handle.id as (typeof MULTIPLIER_ORDER)[number])
-                assert.ok(at >= 0, `${id} 的链里有未知乘子 ${handle.id}`)
-                assert.ok(at > last, `${id} 的链顺序与 MULTIPLIER_ORDER 不一致（${handle.id}）`)
+                const at = MULTIPLIER_ORDER.indexOf(String(handle.id) as (typeof MULTIPLIER_ORDER)[number])
+                assert.ok(at >= 0, `${id} 的链里有未知乘子 ${String(handle.id)}`)
+                assert.ok(at > last, `${id} 的链顺序与 MULTIPLIER_ORDER 不一致（${String(handle.id)}）`)
                 last = at
             }
         }
@@ -119,13 +131,15 @@ describe('公式注册表：链顺序与清单', () => {
                         base: def.base.kind,
                         baseAttr:
                             def.base.kind === 'panelStat'
-                                ? def.base.dim
-                                : def.base.kind === 'targetStat'
-                                  ? def.base.field
-                                  : null,
+                                ? (def.base.dim ?? 'auto')
+                                : def.base.kind === 'zone'
+                                  ? String(def.base.id)
+                                  : def.base.kind === 'targetStat'
+                                    ? String(def.base.field)
+                                    : null,
                         critBase: def.critBase,
-                        reportsDamageTypes: def.reportsDamageTypes,
-                        chain: def.chain.map((handle) => handle.id)
+                        reportsDamageTypes: formulaMetaOf(id)?.reportsDamageTypes ?? false,
+                        chain: def.chain.map((handle) => String(handle.id))
                     }
                 ]
             })
@@ -178,7 +192,7 @@ const FORMULA_MANIFEST = {
         ]
     },
     effect: {
-        base: 'panelStat',
+        base: 'zone',
         baseAttr: 'effectCoeff',
         critBase: 'coefficient',
         reportsDamageTypes: true,

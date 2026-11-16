@@ -1,5 +1,6 @@
-// ── CoconutCore：注册基础属性 + 吃 GeneralTable 出结果 ─────────────────────
-// 覆盖内核的公开契约：词条落点、buff 数值/引用、四条公式的基值与乘子链、暴击三列。
+// ── CoconutCore：注册动作 + 吃自描述的 GeneralTable 出结果 ─────────────────
+// 覆盖内核的公开契约：一切皆 buff（白值 / 词条 / 敌人都由表写入）、
+// buff 数值与引用、四条公式的基值与乘子链、暴击三列。
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -9,65 +10,101 @@ import { buildCoconutCoreConfig } from '$lib/calc/core-config'
 /** @desc 注册层：内核零内置，结算前必须 init 一份配置 */
 const registered = () => new CoconutCore().init(buildCoconutCoreConfig())
 
-/** @desc 基础数值：全部调用时传入（角色 / 武器 / 敌人） */
-const BASES = {
-    characters: {
-        A: { atk: 400, hp: 10000, def: 500, element: '冷凝', tuneBreakBoost: 100 }
-    },
-    weapons: { W: { atk: 500 } },
-    enemy: {
-        type: 'BOSS',
-        level: 90,
-        defense: 1000,
-        dmgReduction: 0,
-        resistances: { 物理: 10, 冷凝: 40, 热熔: 10, 导电: 10, 气动: 10, 衍射: 10, 湮灭: 10 },
-        coefficient: 10027
-    }
-} as const
-
-const compute = (table: GeneralTable, options?: { trace?: boolean }) =>
-    registered().compute(table, BASES as unknown as Parameters<CoconutCore['compute']>[1], options)
+const compute = (table: GeneralTable, options?: { trace?: boolean }) => registered().compute(table, options)
 
 const tableOf = (table: Partial<GeneralTable>): GeneralTable => ({
-    characters: ['A'],
-    weapons: ['W'],
-    main_stats: [],
-    sub_stats: [],
+    global_buffs: [],
     buffs: [],
     damage_entries: [],
     ...table
 })
 
-const directDamage = (value: string, activated_buffs: GeneralTable['buffs'] = []) =>
-    tableOf({
+type Effect = GeneralTable['buffs'][number]['effects'][number]
+
+/** @desc 测试里用 `{ id, effect }` 的简写描述单个 buff，落到表里转成目录项 */
+type SingleEffectBuff = { id: string; effect: Effect }
+
+const catalogOf = (buffs: readonly SingleEffectBuff[], role?: 'stat'): GeneralTable['buffs'] =>
+    buffs.map((buff) => ({ id: buff.id, effects: [buff.effect], ...(role ? { role } : {}) }))
+
+/** @desc 角色 A 的基础数值与装备（测试里同样以 buff 形式给） */
+const EQUIP: SingleEffectBuff[] = [
+    { id: 'atkBase', effect: { applyTo: 'atkBase', value: '400' } },
+    { id: 'weaponAtk', effect: { applyTo: 'atkBase', value: '500' } },
+    { id: 'hpBase', effect: { applyTo: 'hpBase', value: '10000' } },
+    { id: 'defBase', effect: { applyTo: 'defBase', value: '500' } },
+    { id: 'tune', effect: { applyTo: 'tuneBreakBoost', value: '100' } },
+    { id: 'level', effect: { applyTo: 'charLevel', value: '90' } }
+]
+
+/** @desc 敌人配置（同样以 buff 形式给，`role: 'stat'` 不进贡献溯源） */
+const ENEMY: SingleEffectBuff[] = [
+    { id: 'enemy:defense', effect: { applyTo: 'enemyDefense', value: '1000' } },
+    { id: 'enemy:type', effect: { applyTo: 'enemyType', value: 'BOSS' } }
+]
+
+/** @desc 造一张带「角色 A 装备」的表，`extra` 是额外 buff（按 id 覆盖同名） */
+const tableWith = (extra: readonly SingleEffectBuff[] = [], overrides: Partial<GeneralTable> = {}): GeneralTable => {
+    const merged = new Map<string, SingleEffectBuff>()
+    for (const buff of [...EQUIP, ...extra]) merged.set(buff.id, buff)
+    const equipIds = new Set(EQUIP.map((buff) => buff.id))
+    const statBuffs = [...ENEMY, ...EQUIP]
+    const buffs = [...merged.values()].filter((buff) => !equipIds.has(buff.id))
+    const table = tableOf({
+        // 装备与敌人配置按编译器的做法进 global_buffs，并标记 role: 'stat'（不参与贡献溯源）
+        global_buffs: statBuffs.map((buff) => buff.id),
+        buffs: [...catalogOf(statBuffs, 'stat'), ...catalogOf(buffs)],
         damage_entries: [
             {
                 source: 'A',
-                damages: [{ value, activated_buffs: [...activated_buffs], element: '冷凝', formula: 'direct' }]
+                damages: [
+                    {
+                        value: '100%',
+                        activated_buffs: buffs.map((buff) => buff.id),
+                        element: '冷凝',
+                        formula: 'direct'
+                    }
+                ]
             }
         ]
     })
+    const next = { ...table, ...overrides }
+    if (overrides.buffs) {
+        const keep = new Map<string, GeneralTable['buffs'][number]>()
+        for (const buff of [...table.buffs, ...overrides.buffs]) keep.set(buff.id, buff)
+        next.buffs = [...keep.values()]
+    }
+    return next
+}
+
+const directDamage = (value: string, activated: readonly SingleEffectBuff[] = []) => {
+    const table = tableWith(activated)
+    const damage = table.damage_entries[0]!.damages[0]!
+    damage.value = value
+    return table
+}
+
+const equipTable = (overrides: Partial<GeneralTable> = {}): GeneralTable => tableWith([], overrides)
 
 describe('CoconutCore：注册 + 面板', () => {
-    it('白值 = 角色白值 + 武器白值；词条写进面板落点', () => {
-        const result = compute(
-            tableOf({
-                main_stats: [[{ key: 'atkPct', value: '12' }]],
-                sub_stats: [
-                    [
-                        { key: 'critRate', value: '10' },
-                        { key: 'critDmg', value: '20' }
-                    ]
-                ],
-                damage_entries: [
-                    {
-                        source: 'A',
-                        damages: [{ value: '100%', activated_buffs: [], element: '冷凝', formula: 'direct' }]
-                    }
-                ]
-            })
-        )
-        const panel = result.damages[0]!.panel
+    it('白值 = 角色白值 + 武器白值；作用写入面板落点', () => {
+        const table = equipTable({
+            buffs: [
+                ...catalogOf(EQUIP),
+                ...catalogOf([
+                    { id: 'atkPct', effect: { applyTo: 'atkPct', value: '12' } },
+                    { id: 'crit', effect: { applyTo: 'critRate', value: '10' } },
+                    { id: 'critDmg', effect: { applyTo: 'critDmg', value: '20' } }
+                ])
+            ]
+        })
+        table.damage_entries[0]!.damages[0]!.activated_buffs = [
+            ...table.damage_entries[0]!.damages[0]!.activated_buffs,
+            'atkPct',
+            'crit',
+            'critDmg'
+        ]
+        const panel = compute(table).damages[0]!.panel
         assert.equal(panel.base.atk, 900)
         assert.equal(panel.zones.atkPct, 12)
         assert.equal(panel.total.atk, 900 + Math.round((900 * 12) / 100))
@@ -78,7 +115,13 @@ describe('CoconutCore：注册 + 面板', () => {
 
     it('激活 buff 直接写面板（无条件的「一切皆 buff」）', () => {
         const buff = { id: 'b1', effect: { applyTo: 'atkPct', value: '20' } }
-        const result = compute(directDamage('100%', [buff]))
+        const table = equipTable()
+        table.buffs = [...table.buffs, ...catalogOf([buff])]
+        table.damage_entries[0]!.damages[0]!.activated_buffs = [
+            ...table.damage_entries[0]!.damages[0]!.activated_buffs,
+            buff.id
+        ]
+        const result = compute(table)
         assert.equal(result.damages[0]!.panel.zones.atkPct, 20)
         assert.equal(result.damages[0]!.panel.total.atk, 900 + 180)
     })
@@ -86,13 +129,55 @@ describe('CoconutCore：注册 + 面板', () => {
     it('目标侧 buff 落在敌人面板（免伤走 enemyDmgReduction）', () => {
         const buffs = [
             { id: 'defDown', effect: { applyTo: 'defDown', value: '20' } },
-            { id: 'red', effect: { applyTo: 'enemyDmgReduction', value: '10' } }
+            { id: 'red', effect: { applyTo: 'enemyDmgReduction', value: '10' } },
+            { id: 'res', effect: { applyTo: 'resistance', element: '冷凝', value: '40' } }
         ]
-        const result = compute(directDamage('100%', buffs))
-        const target = result.damages[0]!.target
-        assert.equal(target.defense, 1000)
-        assert.equal(target.dmgReduction, 10)
-        assert.equal(target.resistances['冷凝'], 40)
+        const table = equipTable({ buffs: [...catalogOf(buffs)] })
+        table.damage_entries[0]!.damages[0]!.activated_buffs = [
+            ...table.damage_entries[0]!.damages[0]!.activated_buffs,
+            ...buffs.map((buff) => buff.id)
+        ]
+        const target = compute(table).damages[0]!.target
+        assert.equal(target.scalars.defense, 1000)
+        assert.equal(target.scalars.dmgReduction, 10)
+        assert.equal(target.maps.resistance?.['冷凝'], 40)
+    })
+})
+
+describe('CoconutCore：全局 buff', () => {
+    it('global_buffs 对每条伤害生效，且顺序在条目 buff 之前', () => {
+        const table = tableWith([{ id: 'b1', effect: { applyTo: 'bonusDmg', value: '30' } }], {
+            global_buffs: [...ENEMY.map((buff) => buff.id), ...EQUIP.map((buff) => buff.id), 'g1'],
+            buffs: [
+                ...catalogOf(ENEMY, 'stat'),
+                ...catalogOf(EQUIP, 'stat'),
+                ...catalogOf([
+                    { id: 'g1', effect: { applyTo: 'bonusDmg', value: '20' } },
+                    { id: 'b1', effect: { applyTo: 'bonusDmg', value: '30' } }
+                ])
+            ]
+        })
+        const withGlobal = compute(table).damages[0]!
+        const withoutGlobal = compute({
+            ...table,
+            global_buffs: [...ENEMY.map((buff) => buff.id), ...EQUIP.map((buff) => buff.id)]
+        }).damages[0]!
+        assert.ok(withGlobal.expected > withoutGlobal.expected, '全局 buff 应参与结算')
+    })
+
+    it('全局 buff 也进贡献溯源', () => {
+        const table = tableOf({
+            global_buffs: ['g1'],
+            buffs: catalogOf([{ id: 'g1', effect: { applyTo: 'bonusDmg', value: '20' } }]),
+            damage_entries: [
+                { source: 'A', damages: [{ value: '100%', activated_buffs: [], element: '冷凝', formula: 'direct' }] }
+            ]
+        })
+        const result = compute(table, { trace: true })
+        assert.deepEqual(
+            result.damages[0]!.contributions.map((item) => item.buffId),
+            ['g1']
+        )
     })
 })
 
@@ -112,20 +197,28 @@ describe('CoconutCore：引用（转模）', () => {
                 }
             }
         }
-        const result = compute(directDamage('100%', [buff]))
-        assert.equal(result.damages[0]!.panel.zones.atkFlat, 1000)
+        const table = equipTable({ buffs: [...catalogOf(EQUIP), ...catalogOf([buff])] })
+        table.damage_entries[0]!.damages[0]!.activated_buffs = [
+            ...table.damage_entries[0]!.damages[0]!.activated_buffs,
+            buff.id
+        ]
+        assert.equal(compute(table).damages[0]!.panel.zones.atkFlat, 1000)
 
-        const withBaseLine = {
-            ...buff,
-            effect: { ...buff.effect, value: { ...buff.effect.value, baseLine: 8000 } }
-        }
-        assert.equal(compute(directDamage('100%', [withBaseLine])).damages[0]!.panel.zones.atkFlat, 1000)
+        const withBaseLine = { ...buff, effect: { ...buff.effect, value: { ...buff.effect.value, baseLine: 8000 } } }
+        const table2 = equipTable({ buffs: [...catalogOf(EQUIP), ...catalogOf([withBaseLine])] })
+        table2.damage_entries[0]!.damages[0]!.activated_buffs = [
+            ...table2.damage_entries[0]!.damages[0]!.activated_buffs,
+            withBaseLine.id
+        ]
+        assert.equal(compute(table2).damages[0]!.panel.zones.atkFlat, 1000)
 
-        const lower = {
-            ...buff,
-            effect: { ...buff.effect, value: { ...buff.effect.value, baseLine: 9500 } }
-        }
-        assert.equal(compute(directDamage('100%', [lower])).damages[0]!.panel.zones.atkFlat, 500)
+        const lower = { ...buff, effect: { ...buff.effect, value: { ...buff.effect.value, baseLine: 9500 } } }
+        const table3 = equipTable({ buffs: [...catalogOf(EQUIP), ...catalogOf([lower])] })
+        table3.damage_entries[0]!.damages[0]!.activated_buffs = [
+            ...table3.damage_entries[0]!.damages[0]!.activated_buffs,
+            lower.id
+        ]
+        assert.equal(compute(table3).damages[0]!.panel.zones.atkFlat, 500)
     })
 
     it('单位换算：% → 数值按 ×100 折算', () => {
@@ -143,15 +236,17 @@ describe('CoconutCore：引用（转模）', () => {
                 }
             }
         }
-        const table = tableOf({
-            main_stats: [[{ key: 'recharge', value: '150' }]],
-            damage_entries: [
-                {
-                    source: 'A',
-                    damages: [{ value: '100%', activated_buffs: [buff], element: '冷凝', formula: 'direct' }]
-                }
+        const table = equipTable({
+            buffs: [
+                ...catalogOf(EQUIP),
+                ...catalogOf([{ id: 'recharge', effect: { applyTo: 'recharge', value: '150' } }, buff])
             ]
         })
+        table.damage_entries[0]!.damages[0]!.activated_buffs = [
+            ...table.damage_entries[0]!.damages[0]!.activated_buffs,
+            'recharge',
+            buff.id
+        ]
         // 共鸣效率初值 100 + 词条 150 = 250（%）→ 归一成 2.5 → 目标单位 '' 保持 2.5
         assert.equal(compute(table).damages[0]!.panel.zones.atkFlat, 2.5)
     })
@@ -159,7 +254,8 @@ describe('CoconutCore：引用（转模）', () => {
 
 describe('CoconutCore：公式与暴击三列', () => {
     it('直伤：基值 = 面板三维 × 倍率，乘子链顺序固定', () => {
-        const table = directDamage('200%')
+        const table = equipTable()
+        table.damage_entries[0]!.damages[0]!.value = '200%'
         table.damage_entries[0]!.damages[0]!.base = 'hp'
         const result = compute(table)
         const damage = result.damages[0]!
@@ -196,49 +292,36 @@ describe('CoconutCore：公式与暴击三列', () => {
             })
         )
         const damage = result.damages[0]!
-        assert.equal(damage.nonCrit, 5000)
-        assert.equal(damage.crit, 5000)
         assert.equal(damage.expected, 5000)
         assert.deepEqual(damage.multipliers, [])
     })
 
-    it('处决：基值 = 敌人类型系数 × 倍率', () => {
-        const result = compute(
-            tableOf({
-                damage_entries: [
-                    { source: 'A', damages: [{ value: '10', activated_buffs: [], element: '物理', formula: 'tune' }] }
-                ]
-            })
-        )
-        assert.equal(result.damages[0]!.baseValue, 10027 * 10)
+    it('处决：基值 = 敌人面板系数 × 倍率', () => {
+        const table = tableOf({
+            buffs: catalogOf([{ id: 'coeff', effect: { applyTo: 'enemyCoeff', value: '10027' } }]),
+            damage_entries: [
+                {
+                    source: 'A',
+                    damages: [{ value: '10', activated_buffs: ['coeff'], element: '物理', formula: 'tune' }]
+                }
+            ]
+        })
+        assert.equal(compute(table).damages[0]!.baseValue, 10027 * 10)
     })
 
-    it('效应：基值 = 虚角色面板的「效应系数」× 该段层数倍率', () => {
-        // 虚角色：效应基础值挂在「效应系数」这一维度上，不混进攻击
-        const result = registered().compute(
-            tableOf({
-                characters: ['A', '效应·电磁效应'],
-                weapons: ['', ''],
-                main_stats: [[], []],
-                sub_stats: [[], []],
-                damage_entries: [
-                    {
-                        source: '效应·电磁效应',
-                        damages: [{ value: '1.5', activated_buffs: [], element: '导电', formula: 'effect' }]
-                    }
-                ]
-            }),
-            {
-                ...BASES,
-                characters: {
-                    ...BASES.characters,
-                    '效应·电磁效应': { atk: 0, hp: 0, def: 0, element: '导电', coefficient: 3674 }
+    it('效应：基值 = 面板「效应系数」× 该段层数倍率', () => {
+        const table = tableOf({
+            buffs: catalogOf([{ id: 'eff', effect: { applyTo: 'effectCoeff', value: '3674' } }]),
+            damage_entries: [
+                {
+                    source: '效应·电磁效应',
+                    damages: [{ value: '1.5', activated_buffs: ['eff'], element: '导电', formula: 'effect' }]
                 }
-            } as unknown as Parameters<CoconutCore['compute']>[1]
-        )
-        const damage = result.damages[0]!
-        assert.equal(damage.panel.zones.effectCoeff, 3674, '效应系数来自虚角色注册')
-        assert.equal(damage.panel.total.atk, 0, '虚角色没有攻击面板')
+            ]
+        })
+        const damage = compute(table).damages[0]!
+        assert.equal(damage.panel.zones.effectCoeff, 3674)
+        assert.equal(damage.panel.total.atk, 0)
         assert.equal(damage.baseValue, 3674 * 1.5)
     })
 
@@ -258,7 +341,7 @@ describe('CoconutCore：公式与暴击三列', () => {
         )
         assert.equal(result.damages.length, 2)
         assert.equal(
-            result.total.expected,
+            result.total,
             result.damages.reduce((sum, d) => sum + d.expected, 0)
         )
     })
@@ -266,7 +349,6 @@ describe('CoconutCore：公式与暴击三列', () => {
 
 describe('CoconutCore：倍率串', () => {
     it('倍率串只认数字与 %，基准维度由字段给出', () => {
-        const buff = { id: 'b', effect: { applyTo: 'atkPct', value: '0' } }
         const cases: [string, 'atk' | 'hp' | 'def' | undefined, number][] = [
             ['100%', undefined, 900],
             ['1', undefined, 900],
@@ -275,7 +357,8 @@ describe('CoconutCore：倍率串', () => {
             ['0.5', 'def', 250]
         ]
         for (const [value, base, expected] of cases) {
-            const table = directDamage(value, [buff])
+            const table = equipTable()
+            table.damage_entries[0]!.damages[0]!.value = value
             if (base) table.damage_entries[0]!.damages[0]!.base = base
             assert.equal(compute(table).damages[0]!.baseValue, expected, `value=${value} base=${base}`)
         }

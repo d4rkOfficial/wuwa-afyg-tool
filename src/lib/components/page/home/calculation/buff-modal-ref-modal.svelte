@@ -19,6 +19,7 @@
     import { ZONE_REF_DEFS } from '$lib/calc/calculation.consts'
     import { fallbackIcon } from '$lib/utils/icons'
     import { refTargetDefOf, zoneUnitLabel, type RefModalState } from './buff-modal.utils'
+    import { actionLabel, actionUnit } from '$lib/calc/display-meta'
 
     interface Props extends ComponentsProps {
         /** @desc 是否打开（父组件传 `ui.zoneIndex >= 0`） */
@@ -139,19 +140,19 @@
                         {#each ZONE_REF_DEFS.filter((d) => d.id !== zoneId) as def (def.id)}
                             <button
                                 onclick={() => {
-                                    ui.targetZoneId = def.id
+                                    ui.targetZoneId = String(def.id)
                                     ui.zoneMenuOpen = false
                                 }}
                                 class={[
                                     'flex w-full items-center gap-2 px-3 py-2 text-xs text-left transition-colors',
-                                    ui.targetZoneId === def.id
+                                    ui.targetZoneId === String(def.id)
                                         ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
                                         : 'text-(--theme-modal-text) hover:bg-(--theme-modal-text)/5'
                                 ].join(' ')}
                             >
-                                <span class="flex-1">{def.label}</span>
+                                <span class="flex-1">{actionLabel(def.id)}</span>
                                 <span class="text-[10px] text-(--theme-modal-text)/40"
-                                    >{def.unit === '%' ? '%' : ''}</span
+                                    >{actionUnit(def.id) === '%' ? '%' : ''}</span
                                 >
                             </button>
                         {/each}

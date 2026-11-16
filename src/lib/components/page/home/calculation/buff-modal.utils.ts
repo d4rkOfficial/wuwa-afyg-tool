@@ -6,6 +6,7 @@
  * 纯函数住同目录 `*.utils.ts`，落进 ESLint 的「纯逻辑层」享受函数式约束。
  */
 import { ZONE_REF_DEFS, ZONE_REF_MAP, ZONE_MAP, classifyBuffScope, groupBuffSets } from '$lib/calc/calculation.consts'
+import { actionRefLabel, actionUnit } from '$lib/calc/display-meta'
 import type { GroupedBuffConfItem, ZoneId } from '$lib/calc/calculation.consts'
 import type { BuffTreeNode } from '$lib/buff/tree'
 import type { BuffConf, ZoneRef } from '$lib/calc/calculation.types'
@@ -29,8 +30,11 @@ export const simplifyPct = (pct: number): { divisor: number; multiplier: number 
 
 // ── 引用配置（引用乘区 id 解析 / 默认值 / 草稿 → ZoneRef）──
 
-/** @desc 解析引用属性定义（先查可引用表，再兜底查全部乘区） */
-export const refTargetDefOf = (id: string) => ZONE_REF_MAP.get(id) ?? ZONE_MAP.get(id) ?? null
+/** @desc 解析引用属性定义（只关心展示名与单位：注册表不再带这些字段，统一从 `display-meta` 取） */
+export const refTargetDefOf = (id: string): { id: string; label: string; unit: '%' | 'flat' } | null => {
+    const known = ZONE_REF_MAP.has(id) || ZONE_MAP.has(id)
+    return known ? { id, label: actionRefLabel(id), unit: actionUnit(id) } : null
+}
 
 /** @desc 乘区单位：`%` 或 `点` */
 export const zoneUnitLabel = (unit: string | undefined): string => (unit === '%' ? '%' : '点')
@@ -87,7 +91,7 @@ export const refDraftFromRef = (ref: ZoneRef): RefDraft => {
 /** @desc 引用属性不能是自身：目标恒等于当前乘区时换成第一个可引用属性（无可选项则空串） */
 export const resolveRefTarget = (draft: RefDraft, zoneId: string): string => {
     if (draft.targetZoneId !== zoneId) return draft.targetZoneId
-    return ZONE_REF_DEFS.find((d) => d.id !== zoneId)?.id ?? ''
+    return String(ZONE_REF_DEFS.find((d) => d.id !== zoneId)?.id ?? '')
 }
 
 /** @desc 草稿 → 待写入的 ZoneRef（阈值关 → 0；上下限关或 NaN → undefined） */

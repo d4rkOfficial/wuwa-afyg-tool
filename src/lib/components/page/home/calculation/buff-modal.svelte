@@ -582,7 +582,7 @@
         }
         if (refModal.targetZoneId === zone.zoneId) {
             const fallback = ZONE_REF_DEFS.find((d) => d.id !== zone.zoneId)
-            refModal.targetZoneId = fallback?.id ?? ''
+            refModal.targetZoneId = String(fallback?.id ?? '')
         }
     }
 

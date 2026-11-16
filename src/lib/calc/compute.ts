@@ -12,7 +12,8 @@ import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { ResultEntry, MultiplierZone, RatioFactor } from './result.types'
 import type { CharSlot } from '$lib/types/project'
 import { TARGET_SIDE_ZONE_IDS, ZONE_NO_REF_IDS } from './calculation.consts'
-import type { CharacterPanel, TargetPanel } from '$coconut'
+import type { ActionId, CharacterPanel, TargetPanel } from '$coconut'
+import type { AppPanel } from '$lib/calc/panel-ops'
 import {
     ACTION_MAP,
     EFFECT_COEFF_ACTION,
@@ -30,14 +31,19 @@ import {
     formulaOf,
     formulaAcceptsRef,
     CRIT_ACTION_IDS,
+    CRIT_MULTIPLIER_ID,
+    DEFAULT_CHAR_LEVEL,
+    effectiveCritRate,
     type CritBase,
     PANEL_BASE_DEFAULT,
     PANEL_BASE_TYPES,
     MULTIPLIERS,
+    RATIO_ZONE,
     usesCoefficientFormula,
     type FormulaCtx,
     type FormulaDef
 } from '$lib/calc/core-config'
+import { formulaCanCrit, formulaMetaOf, multiplierZoneViewOf } from '$lib/calc/display-meta'
 
 /** @desc 条目是否走系数基类口径（双暴基准 0/100）—— 由公式注册表推导，引擎与界面共用 */
 export { usesCoefficientFormula }
@@ -64,7 +70,7 @@ import { buildEchoDescByEntry } from './skill-infer'
  * `ZoneRef` 的语义：读到的面板值减去 `threshold` 后的部分，按 `pct`（线性）或
  * `divisor`/`multiplier`（离散取整）折算，最后按 `lower`/`upper` 截断。
  */
-function resolveRefValue(ref: ZoneRef, panel: CharacterPanel, target: TargetPanel): number {
+function resolveRefValue(ref: ZoneRef, panel: AppPanel, target: TargetPanel): number {
     const source = REF_SOURCE_MAP.get(ref.zoneId)
     if (!source) return 0
     const statValue = source.get(panel, target)
@@ -112,12 +118,7 @@ export function resolveDamageTypes(
  * 落点由 `registry/stats.ts` 的 `STAT_WRITES` 决定；系数口径（`critBase === 'coefficient'`）时
  * 丢弃装备双暴 —— 系数基类条目的双暴是它自己临时的一份（决议 D1）。
  */
-const applyEntryStatToAccum = (
-    label: string,
-    value: number,
-    acc: CharacterPanel,
-    critBase: CritBase = 'panel'
-): void => {
+const applyEntryStatToAccum = (label: string, value: number, acc: AppPanel, critBase: CritBase = 'panel'): void => {
     const write = STAT_WRITES[label]
     if (!write) return
     if (write.kind === 'elementBonus') {
@@ -141,12 +142,14 @@ function accumulateEchoes(
     echoes: EchoSlotConfig[],
     weaponSubstatValue: number,
     weaponSubstatLabel: string | undefined,
-    acc: CharacterPanel,
+    acc: AppPanel,
     critBase: CritBase = 'panel'
 ) {
     if (weaponSubstatLabel) {
         applyEntryStatToAccum(weaponSubstatLabel, weaponSubstatValue, acc, critBase)
     }
+    // 先全部主词条（含 cost 派生副主词条）、再全部副词条：与 GeneralTable 的
+    // `main_stats` / `sub_stats` 两组写入顺序严格一致（浮点累加顺序也一致）
     for (const echo of echoes) {
         if (echo.mainStat) {
             applyEntryStatToAccum(echo.mainStat.type, echo.mainStat.value, acc, critBase)
@@ -161,6 +164,8 @@ function accumulateEchoes(
                 else if (secData.label === '生命') applyZone(acc, 'hpFlat', secData.value)
             }
         }
+    }
+    for (const echo of echoes) {
         for (const sub of echo.substats) {
             applyEntryStatToAccum(sub.type, sub.value, acc, critBase)
         }
@@ -207,7 +212,7 @@ interface PanelContext {
 }
 
 /** @desc 把角色面板压成规则可读的「无条件部分」数值（单位与面板显示一致） */
-const ruleStatsOf = (stats: CharacterPanel): RuleStats => ({
+const ruleStatsOf = (stats: AppPanel): RuleStats => ({
     atk: Math.round(stats.total.atk),
     hp: Math.round(stats.total.hp),
     def: Math.round(stats.total.def),
@@ -256,7 +261,7 @@ const panelBuffsOf = (
 }
 
 /** @desc 由「面板可计入 Buff 列表」算出角色面板（装备 + 这些 Buff 的不带条件/引用的乘区条目） */
-const panelStatsOf = (charIdx: number, plain: BuffInstance[], deps: RuleEvalDeps): CharacterPanel | undefined => {
+const panelStatsOf = (charIdx: number, plain: BuffInstance[], deps: RuleEvalDeps): AppPanel | undefined => {
     const slot = deps.team[charIdx]
     const charInfo = slot?.character ? deps.charInfoMap[slot.character] : undefined
     if (!slot || !charInfo) return undefined
@@ -281,7 +286,7 @@ const subtractSafeOf = (zone: BuffZoneValue): boolean =>
     !zone.override && ACTION_MAP.get(zone.zoneId)?.combine !== 'multiply'
 
 /** @desc 从面板里摘掉自己：拷贝后逐条减法写回，再重算三维面板 */
-const panelStatsWithoutZones = (base: CharacterPanel, zones: readonly BuffZoneValue[]): RuleStats => {
+const panelStatsWithoutZones = (base: AppPanel, zones: readonly BuffZoneValue[]): RuleStats => {
     const stats = clonePanel(base)
     for (const zone of zones) applyZone(stats, zone.zoneId, -zone.value)
     recomputeTotals(stats)
@@ -309,7 +314,7 @@ const entryRuleDepsOf = (
         ...(deps.enemyType !== undefined ? { enemyType: deps.enemyType } : {})
     }
     const plainCache = new Map<number, BuffInstance[]>()
-    const baseCache = new Map<number, CharacterPanel | undefined>()
+    const baseCache = new Map<number, AppPanel | undefined>()
     const statsCache = new Map<string, RuleStats | undefined>()
 
     /** @desc 某槽位的面板可计入 Buff 列表（按槽位缓存） */
@@ -322,7 +327,7 @@ const entryRuleDepsOf = (
     }
 
     /** @desc 基准面板（含全部可计入 Buff） */
-    const baseOf = (charIdx: number): CharacterPanel | undefined => {
+    const baseOf = (charIdx: number): AppPanel | undefined => {
         if (!baseCache.has(charIdx)) baseCache.set(charIdx, panelStatsOf(charIdx, plainOf(charIdx), deps))
         return baseCache.get(charIdx)
     }
@@ -333,7 +338,7 @@ const entryRuleDepsOf = (
      * 只有「面板真的把它算进去了」才需要摘：加算条目按 `activeZonesOf` 同口径过滤后直接减法，
      * 覆盖写入（改 `totalAtk/…`）与 `specialFinal2` 连乘则退回「重算一份不含它的面板」。
      */
-    const statsWithout = (charIdx: number, base: CharacterPanel, excludeBuffId: string): RuleStats => {
+    const statsWithout = (charIdx: number, base: AppPanel, excludeBuffId: string): RuleStats => {
         const own = plainOf(charIdx).find((buff) => buff.id === excludeBuffId)
         const ownZones = own?.zones.filter((zone) => !zone.ref && zone.value !== 0) ?? []
         const ownAdds = ownZones.filter((zone) => !zone.override)
@@ -521,35 +526,45 @@ export function entryActiveBuffs(args: {
 }
 
 /**
- * @desc 编译侧入口：某角色的**词条**（武器副属性 + 声骸主词条 + cost 派生副主词条 + 副词条）。
+ * @desc 编译侧入口：某角色的**声骸词条**，按 `main_stats` / `sub_stats` 两组给出。
  *
- * 顺序与 `accumulateEchoes` 逐项一致（浮点累加顺序会体现在面板落值末位上），编译侧按序写入即可复现面板。
+ * - `mainStats`：各声骸主词条（含 cost 派生副主词条）
+ * - `subStats`：各声骸副词条
+ *
+ * 武器副属性属于「基础数值」，走 `BaseStats.weapons[].substats`，不混进声骸词条。
+ * 顺序与 `accumulateEchoes` 逐项一致（浮点累加顺序会体现在面板落值末位上）。
  */
-export function entryStatsOf(args: { weaponInfo: WeaponInfo | null; echoes: readonly EchoSlotConfig[] }): {
-    stats: { key: string; value: string }[]
+export function entryStatsOf(args: { echoes: readonly EchoSlotConfig[] }): {
+    mainStats: { key: string; value: string }[]
+    subStats: { key: string; value: string }[]
 } {
-    const stats: { key: string; value: string }[] = []
-
-    const weaponSubstat = args.weaponInfo?.substat
-    if (weaponSubstat) {
-        const raw = parseFloat(weaponSubstat.value)
-        const canonical = WEAPON_SUBSTAT_NAME_MAP[weaponSubstat.name] ?? weaponSubstat.name
-        const value = SUBSTAT_DECIMAL_TO_PCT.has(canonical) && raw < 1 ? raw * 100 : raw
-        stats.push({ key: canonical, value: String(value) })
-    }
+    const mainStats: { key: string; value: string }[] = []
+    const subStats: { key: string; value: string }[] = []
 
     for (const echo of args.echoes) {
-        if (echo.mainStat) stats.push({ key: echo.mainStat.type, value: String(echo.mainStat.value) })
+        if (echo.mainStat) mainStats.push({ key: echo.mainStat.type, value: String(echo.mainStat.value) })
         if (echo.secondMainStat) {
-            stats.push({ key: echo.secondMainStat.type, value: String(echo.secondMainStat.value) })
+            mainStats.push({ key: echo.secondMainStat.type, value: String(echo.secondMainStat.value) })
         } else {
             const derived = SECOND_MAIN_STAT[echo.cost as keyof typeof SECOND_MAIN_STAT]
-            if (derived) stats.push({ key: derived.label, value: String(derived.value) })
+            if (derived) mainStats.push({ key: derived.label, value: String(derived.value) })
         }
-        for (const sub of echo.substats) stats.push({ key: sub.type, value: String(sub.value) })
+    }
+    for (const echo of args.echoes) {
+        for (const sub of echo.substats) subStats.push({ key: sub.type, value: String(sub.value) })
     }
 
-    return { stats }
+    return { mainStats, subStats }
+}
+
+/** @desc 武器副属性 → 词条（与声骸词条同构的 label 形态，归入 `BaseStats.weapons[].substats`） */
+export function weaponStatsOf(weaponInfo: WeaponInfo | null): { key: string; value: string }[] {
+    const substat = weaponInfo?.substat
+    if (!substat) return []
+    const raw = parseFloat(substat.value)
+    const canonical = WEAPON_SUBSTAT_NAME_MAP[substat.name] ?? substat.name
+    const value = SUBSTAT_DECIMAL_TO_PCT.has(canonical) && raw < 1 ? raw * 100 : raw
+    return [{ key: canonical, value: String(value) }]
 }
 
 /** @desc 计算某个角色槽位某条目可见的完整贡献（装备 + 绑定且生效的 Buff 条目）。
@@ -567,11 +582,12 @@ function computeCharacterStats(
     boundBuffs: BuffInstance[],
     ctx?: ZoneCtx,
     critBase: CritBase = 'panel'
-): CharacterPanel {
+): AppPanel {
     const panel = emptyPanel(critBase)
     panel.base.atk = Math.round(charInfo.lv90BaseStats.atk + (weaponInfo?.lv90BaseAtk ?? 0))
     panel.base.hp = Math.round(charInfo.lv90BaseStats.hp)
     panel.base.def = Math.round(charInfo.lv90BaseStats.def)
+    panel.zones.charLevel = DEFAULT_CHAR_LEVEL
     panel.zones.tuneBreakBoost = Math.round(charInfo.lv90BaseStats.tuneBreakBoost)
 
     const wSubValue = weaponInfo?.substat ? parseFloat(weaponInfo.substat.value) : 0
@@ -732,11 +748,13 @@ export const buildTargetPanel = (
     deps: EntryRuleDeps = {}
 ): TargetPanel => {
     const panel: TargetPanel = {
-        type: enemy.type,
-        defense: enemy.defense,
-        dmgReduction: enemy.dmgReduction,
-        coefficient: TUNE_COEFF_MAP[enemy.type] ?? 716.2,
-        resistances: enemy.resistances,
+        scalars: {
+            defense: enemy.defense,
+            dmgReduction: enemy.dmgReduction,
+            coefficient: TUNE_COEFF_MAP[enemy.type] ?? 716.2
+        },
+        maps: { resistance: { ...enemy.resistances } },
+        text: { type: enemy.type },
         zones: {}
     }
     for (const { zoneId, value } of targetSideZonesOf(candidates, profile, zoneCtx, deps)) {
@@ -922,14 +940,14 @@ export const TUNE_COEFF_MAP: Record<string, number> = {
 
 /** @desc 是否「系数来自面板属性」的效应条目（内核 `panelStat / effectCoeff` 配方） */
 export const isEffectBase = (def: FormulaDef): boolean =>
-    def.base.kind === 'panelStat' && def.base.dim === 'effectCoeff'
+    def.base.kind === 'zone' && def.base.id === EFFECT_COEFF_ACTION
 
 /**
  * @desc 效应条目的「效应系数」是它自己的面板属性（基准值 = 效应基础值），与 buff 写入相加。
  *
  * 内核口径一致（`系数是面板属性`）：效应条目没有源角色，系数由虚角色带进来；引擎这边同样写进面板落值。
  */
-const withEffectBaseCoeff = (entry: DamageEntry, panel: CharacterPanel): void => {
+const withEffectBaseCoeff = (entry: DamageEntry, panel: AppPanel): void => {
     if (!isEffectEntry(entry)) return
     panel.zones[EFFECT_COEFF_ACTION] = (panel.zones[EFFECT_COEFF_ACTION] ?? 0) + EFFECT_BASE_VALUE
 }
@@ -946,7 +964,7 @@ interface EntryBonus {
 
 /** @desc 组装公式求值上下文：把元素/类型加成**折进面板的 `bonusDmg`**（内核只认这一个作用） */
 const formulaCtxOf = (
-    panel: CharacterPanel,
+    panel: AppPanel,
     entry: DamageEntry,
     damageTypes: string[],
     element: string,
@@ -985,7 +1003,7 @@ export const resolveBase = (
     ctx: FormulaCtx
 ): ResolvedBase => {
     const hits = entry.hits || 1
-    const extraRatio = panel.zones.extraRatio ?? 0
+    const extraRatio = panel.zones[RATIO_ZONE] ?? 0
 
     if (def.base.kind === 'fixed') {
         return {
@@ -1019,7 +1037,7 @@ export const resolveBase = (
     const effectiveRatio = ratio + (extraRatio / 100) * hits
 
     if (def.base.kind === 'targetStat') {
-        const coeff = TUNE_COEFF_MAP[ctx.target.type] ?? 716.2
+        const coeff = TUNE_COEFF_MAP[ctx.target.text.type ?? ''] ?? 716.2
         return {
             baseUnit: '偏谐系数',
             baseAtkField: coeff,
@@ -1036,7 +1054,7 @@ export const resolveBase = (
         baseAtkField: panel.base.atk,
         effectiveRatio,
         reportedRatio: ratio,
-        baseValue: panel.total[mapped.dim as keyof typeof panel.total] * effectiveRatio
+        baseValue: (panel.total[mapped.dim] ?? 0) * effectiveRatio
     }
 }
 
@@ -1047,7 +1065,7 @@ export const resolveBase = (
 const runChain = (
     def: FormulaDef,
     ctx: FormulaCtx
-): { values: Map<string, number>; parts: MultiplierZone[]; product: number; productNoCrit: number } => {
+): { values: Map<ActionId, number>; parts: MultiplierZone[]; product: number; productNoCrit: number } => {
     const evaluation = evaluateFormula({
         formula: def.id as ResultEntry['formula'],
         baseValue: 0,
@@ -1056,11 +1074,16 @@ const runChain = (
         target: ctx.target
     })
     const values = new Map(evaluation.multipliers.map((zone) => [zone.id, zone.value] as const))
+    /** @desc 「不暴击」链路是界面展示派生：把暴击乘子从乘区积里摘掉 */
+    const productNoCrit = evaluation.multipliers.reduce(
+        (product, zone) => (zone.id === CRIT_MULTIPLIER_ID ? product : product * zone.value),
+        1
+    )
     return {
         values,
-        parts: evaluation.multipliers,
+        parts: evaluation.multipliers.map((zone) => multiplierZoneViewOf(zone, ctx)),
         product: evaluation.product,
-        productNoCrit: evaluation.productNoCrit
+        productNoCrit
     }
 }
 
@@ -1093,7 +1116,7 @@ export const effectRatioFactors = (effect: NonNullable<ResolvedBase['effect']>, 
  */
 export const computeFormulaEntry = (
     entry: DamageEntry,
-    panel: CharacterPanel,
+    panel: AppPanel,
     target: TargetPanel,
     damageTypes: string[]
 ): ResultEntry => {
@@ -1121,7 +1144,7 @@ export const computeFormulaEntry = (
     }
 
     const critDmgDecimal = z('critDmg') / 100
-    const canCrit = def.canCrit(panel, ctx)
+    const canCrit = formulaCanCrit(def.id, panel, ctx)
     const fromPanel = def.base.kind === 'panelStat'
 
     const nonCritRaw = base.baseValue * productNoCrit
@@ -1171,7 +1194,7 @@ export const computeFormulaEntry = (
         // 增伤区只属于面板基类（系数基类条目不吃增伤，其词条加成不得出现在结果里）
         dmgBonus: fromPanel ? z('bonusDmg') / 100 : 0,
         deepen: values.has(MULTIPLIERS.deepen.id) ? z('deepenDmg') / 100 : 0,
-        critRate: Math.min(z('critRate'), 100) / 100,
+        critRate: effectiveCritRate(z('critRate')) / 100,
         critDmg: critDmgDecimal,
         defMulti: values.get(MULTIPLIERS.defense.id) ?? 0,
         resMulti: values.get(MULTIPLIERS.resist.id) ?? 0,
@@ -1193,7 +1216,7 @@ export const computeFormulaEntry = (
         critPerHit: canCrit ? critPerHit : expectedPerHit,
         canCrit,
         multiplierZones: parts,
-        damageTypes: def.reportsDamageTypes ? damageTypes : [],
+        damageTypes: formulaMetaOf(def.id)?.reportsDamageTypes ? damageTypes : [],
         ...(fromPanel ? { elBonus: bonus.elementBonus, typeBonus: bonus.typeBonus } : {}),
         ratioFactors
     }
@@ -1267,8 +1290,8 @@ export function makeStubEntry(entry: DamageEntry): ResultEntry {
  * 系数口径下双暴的引用写入被 `refZonesOf` 剔除（`formulaAcceptsRef`）。
  */
 function resolveRefsForEntry(
-    stats: CharacterPanel,
-    panelOf: (charIdx: number) => CharacterPanel,
+    stats: AppPanel,
+    panelOf: (charIdx: number) => AppPanel,
     target: TargetPanel,
     boundBuffs: BuffInstance[],
     ctx?: ZoneCtx,
@@ -1291,7 +1314,7 @@ function resolveRefsForEntry(
  */
 function buildEntryPanel(
     refIdx: number,
-    ownStats: CharacterPanel,
+    ownStats: AppPanel,
     charIndex: number,
     entry: DamageEntry,
     candidates: BuffInstance[],
@@ -1302,7 +1325,7 @@ function buildEntryPanel(
     charInfoMap: Record<string, CharacterInfo>,
     weaponInfoMap: Record<string, WeaponInfo>,
     deps: EntryRuleDeps = {}
-): CharacterPanel {
+): AppPanel {
     if (refIdx === charIndex) return ownStats
     const slot = team[refIdx]
     if (!slot?.character || !charInfoMap[slot.character]) return emptyPanel('panel')
@@ -1383,7 +1406,7 @@ export interface EntryResolution {
     /** @desc 对出伤角色槽位真正生效的 Buff */
     boundBuffs: BuffInstance[]
     /** @desc 本条目可见的角色面板（含装备、词条、生效 Buff、转模写入与覆盖） */
-    panel: CharacterPanel
+    panel: AppPanel
     /** @desc 本条目可见的目标面板 */
     target: TargetPanel
     /** @desc 角色侧落值（含引用与覆盖，带 Buff id） */
@@ -1435,7 +1458,7 @@ export function resolveEntry(entry: DamageEntry, ctx: RefResolveContext): EntryR
     )
     const charInfo = charName ? ctx.charInfoMap[charName] : undefined
 
-    let partialStats: CharacterPanel
+    let partialStats: AppPanel
     if (charInfo) {
         partialStats = computeCharacterStats(charInfo, weaponName, weaponInfo, echoes, boundBuffs, zoneCtx, critBase)
     } else {
@@ -1450,8 +1473,8 @@ export function resolveEntry(entry: DamageEntry, ctx: RefResolveContext): EntryR
     const target = buildTargetPanel(candidates, ctx.conditionProfile, zoneCtx, ctx.configState.enemy, ruleDeps)
 
     // 被引用角色面板：与 computeAll 同一套「按需现算 + 缓存」；引用一律读**回写前**的面板
-    const panelCache = new Map<number, CharacterPanel>()
-    const panelOf = (refIdx: number): CharacterPanel => {
+    const panelCache = new Map<number, AppPanel>()
+    const panelOf = (refIdx: number): AppPanel => {
         const idx = refIdx < 0 ? charIndex : refIdx
         if (idx === charIndex) return partialStats
         const cached = panelCache.get(idx)
@@ -1601,8 +1624,8 @@ export function computeOneEntry(
     withEffectBaseCoeff(entry, partialStats)
 
     // 被引用角色面板：按需现算（同一槽位只算一次）
-    const panelCache = new Map<number, CharacterPanel>()
-    const panelOf = (refIdx: number): CharacterPanel => {
+    const panelCache = new Map<number, AppPanel>()
+    const panelOf = (refIdx: number): AppPanel => {
         // 出伤者（`characterIdx = -1`）= 本条目所属角色；其余按槽位
         const idx = refIdx < 0 ? charIndex : refIdx
         if (idx === charIndex) return partialStats

@@ -73,6 +73,15 @@ jobs:
                       --latest
                   fi
 
+            - name: Package coconut config
+              run: pnpm run release:config
+
+            - name: Attach coconut config to toolbox release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  TAG: toolbox-${{ github.sha }}
+              run: gh release upload "$TAG" dist/d4rkofficial-coconut-config-*.tgz --clobber
+
             - name: Prune old toolbox releases
               env:
                   GH_TOKEN: ${{ github.token }}

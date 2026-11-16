@@ -150,7 +150,7 @@
   （本环境禁止子进程，故不能用 `node --test`）。新增测试只要按镜像规则放对位置就会被跑到
 - **加载失败必须响**：入口对每个文件单独 `try/catch`，抛错会打 `[test] ✖ 加载失败：<文件>` 并让退出码为 1
   （失败模式：手写清单漏登记 ⇒ 用例永远不跑；加载期抛错 ⇒ 用例静默消失，只有 `tests` 计数变小）
-- **命令**：`pnpm test`（全部）· `pnpm test:one calc`（只跑路径含 `calc` 的文件）· `pnpm test:list`（只列文件）·
+- **命令**：`pnpm test`（全部）· `pnpm test calc`（只跑路径含 `calc` 的文件）· `pnpm test:list`（只列文件）·
   `pnpm test:watch` · 单文件 `node --import ./test/preload-runes.mjs --import ./test/preload.mjs <test 文件>`
 - **别名**：`$lib` → `src/lib`（SvelteKit 自带）· `$src` → `src`（测试 import 路由模块用，避免 7 层相对路径）。
   `$src` 由 `svelte.config.js` 的 `kit.alias` 定义（喂 Vite 与 `.svelte-kit/tsconfig.json`），

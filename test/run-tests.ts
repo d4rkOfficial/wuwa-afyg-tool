@@ -4,7 +4,7 @@
  * 用法（`pnpm test` 就是下面第一条）：
  *   node --import ./test/preload-runes.mjs --import ./test/preload.mjs test/run-tests.ts
  *   node --import ./test/preload-runes.mjs --import ./test/preload.mjs test/run-tests.ts --only=calc
- *   pnpm test:one calc                      # 等价于上面那条（只跑路径含 "calc" 的测试文件）
+ *   pnpm test calc                          # 等价于上面那条（只跑路径含 "calc" 的测试文件）
  *   pnpm test:list                          # 只列出会被跑到的文件，不执行
  * 单个文件直接跑：
  *   node --import ./test/preload-runes.mjs --import ./test/preload.mjs test/test/src/coconut-core/engine/coeff-crit.test.ts

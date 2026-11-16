@@ -1,5 +1,6 @@
 // 提示词渲染：注入乘区白名单/引用白名单/生效条件（按实体类型裁剪）/用户命名规则
 import { ZONE_DEFS, ZONE_REF_DEFS } from '$lib/calc/calculation.consts'
+import { actionLabel, actionRefLabel, actionUnit } from '$lib/calc/display-meta'
 import {
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_INITIAL_TASK_PROMPT,
@@ -15,12 +16,12 @@ import {
 
 // 乘区白名单表（保留在 system，作为 zoneId 校验边界）
 export const ZONE_LIST_TEXT = ZONE_DEFS.map(
-    (z) => `- ${z.id}（${z.label}，单位：${z.unit === '%' ? '百分数' : '固定值'}）`
+    (z) => `- ${String(z.id)}（${actionLabel(z.id)}，单位：${actionUnit(z.id) === '%' ? '百分数' : '固定值'}）`
 ).join('\n')
 
 // 引用乘区表（保留在 system，作为 ref.targetZoneId 校验边界）
 export const REF_ZONE_LIST_TEXT = ZONE_REF_DEFS.map(
-    (z) => `- ${z.id}（${z.label}，单位：${z.unit === '%' ? '百分数' : '固定值'}）`
+    (z) => `- ${String(z.id)}（${actionRefLabel(z.id)}，单位：${actionUnit(z.id) === '%' ? '百分数' : '固定值'}）`
 ).join('\n')
 
 /** @desc 生成目标：工程 Buff 配置 / 主页 Buff 集（决定槽位口径） */

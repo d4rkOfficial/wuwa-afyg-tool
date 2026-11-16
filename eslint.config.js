@@ -19,6 +19,7 @@ export default tseslint.config(
             'node_modules/**',
             '.svelte-kit/**',
             'build/**',
+            'dist/**',
             '.vercel/**',
             '.cloudflare/**',
             'static/**',

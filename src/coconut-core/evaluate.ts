@@ -16,9 +16,6 @@ export interface FormulaEvaluationInput {
 export interface FormulaEvaluation {
     multipliers: MultiplierZone[]
     product: number
-    productNoCrit: number
-    canCrit: boolean
-    critDmgRatio: number
 }
 
 export const formulaCtxOf = (input: FormulaEvaluationInput): FormulaCtx => ({
@@ -34,18 +31,10 @@ export const evaluateFormula = (registry: FormulaRegistry, input: FormulaEvaluat
     const ctx = formulaCtxOf(input)
     const multipliers: MultiplierZone[] = []
     let product = 1
-    let productNoCrit = 1
     for (const handle of def.chain) {
         const value = evaluateHandle(registry, handle, ctx)
         product *= value
-        if (handle.id !== registry.critMultiplier) productNoCrit *= value
-        multipliers.push({ id: handle.id, label: handle.label, value, display: handle.display(value, ctx) })
+        multipliers.push({ id: handle.id, value })
     }
-    return {
-        multipliers,
-        product,
-        productNoCrit,
-        canCrit: def.canCrit(input.panel, ctx),
-        critDmgRatio: (input.panel.zones.critDmg ?? 0) / 100
-    }
+    return { multipliers, product }
 }

@@ -13,6 +13,7 @@ import { providerQuery } from '$lib/api/provider'
 import { getBuffEntities } from '$lib/data/buff-library.svelte'
 import { getAllBuffConfs } from '$lib/project/calculation.store.svelte'
 import { ZONE_DEFS, ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
+import { actionLabel, actionUnit } from '$lib/calc/display-meta'
 import { normalizeRules, rulesFromLegacyCondition, type LegacyGateCondition } from '$lib/calc/rules'
 import { EFFECTS_TEXT, SCOPE_RULES_TEXT, EXAMPLES_TEXT, REF_RULES_TEXT } from './prompts.config'
 import { renderConditionRules } from './prompts'
@@ -431,7 +432,7 @@ export async function executeGenerateTool(
                 const known = [...ZONE_DEFS.map((z) => z.id), ...ZONE_REF_DEFS.map((z) => z.id)]
                 return JSON.stringify({ error: `未知乘区：${zoneId}`, knownZones: known })
             }
-            return JSON.stringify({ zoneId: def.id, label: def.label, unit: def.unit })
+            return JSON.stringify({ zoneId: def.id, label: actionLabel(def.id), unit: actionUnit(def.id) })
         }
         case 'get_effects':
             return EFFECTS_TEXT

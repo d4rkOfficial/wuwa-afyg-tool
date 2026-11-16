@@ -6,7 +6,7 @@ import type {
     CharBuffAnalysis
 } from '$lib/calc/result.types'
 import { getBoundBuffSets, getTargetSideSourceBuffs, type RuleEvalDeps } from '$lib/calc/compute'
-import { ZONE_MAP } from '$lib/calc/calculation.consts'
+import { actionLabel } from '$lib/calc/display-meta'
 import { BUFF_PATH_SEP, buffFolderPath } from '$lib/buff/name'
 import { diffTotals, pctOf, type AnalysisInputs, type CharacterDamageContext } from './shared'
 
@@ -121,7 +121,7 @@ const buffsWithoutZone = (inputs: AnalysisInputs, buffId: string, zoneIndex: num
         buff.id === buffId ? { ...buff, zones: buff.zones.filter((_, i) => i !== zoneIndex) } : buff
     )
 
-const zoneLabelOf = (zoneId: string): string => ZONE_MAP.get(zoneId)?.label ?? zoneId
+const zoneLabelOf = (zoneId: string): string => actionLabel(zoneId)
 
 /** @desc 单乘区贡献：多乘区 Buff 逐乘区移除求损失，单乘区 Buff 直接等于总贡献 */
 const zoneContributionsOf = (

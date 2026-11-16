@@ -19,7 +19,8 @@
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
     import Tabs from '$lib/components/ui/tabs.svelte'
-    import { ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
+    import { ZONE_REF_DEFS } from '$lib/calc/calculation.consts'
+    import { actionLabel, actionRefLabel, actionUnit } from '$lib/calc/display-meta'
     import type { BuffEntityType, BuffLibraryZoneRef } from '$lib/data/buff-library.svelte'
     import {
         LIBRARY_REF_OWNER_TABS,
@@ -129,15 +130,15 @@
             }
             if (refTargetZoneId === zoneId) {
                 const fallback = ZONE_REF_DEFS.find((d) => d.id !== zoneId)
-                refTargetZoneId = fallback?.id ?? 'baseAtk'
+                refTargetZoneId = String(fallback?.id ?? 'baseAtk')
             }
         })
     })
 
-    let refTargetDef = $derived(ZONE_REF_MAP.get(refTargetZoneId) ?? ZONE_MAP.get(refTargetZoneId as never) ?? null)
-    let refTargetDefUnit = $derived(refTargetDef?.unit === '%' ? '%' : '点')
-    let currentZoneDef = $derived(ZONE_MAP.get(zoneId as never) ?? null)
-    let currentZoneUnit = $derived(currentZoneDef?.unit === '%' ? '%' : '点')
+    let refTargetLabel = $derived(actionRefLabel(refTargetZoneId))
+    let refTargetDefUnit = $derived(actionUnit(refTargetZoneId) === '%' ? '%' : '点')
+    let currentZoneLabel = $derived(actionLabel(zoneId))
+    let currentZoneUnit = $derived(actionUnit(zoneId) === '%' ? '%' : '点')
 
     /** @desc 确认引用：由 除数/乘数 反算百分比并交给父组件（设引用即清覆盖） */
     const confirmRef = () => {
@@ -215,7 +216,7 @@
                     class="w-full flex items-center justify-between rounded-none border px-3 py-2 text-xs text-(--theme-modal-text) transition-colors hover:bg-(--theme-modal-text)/5"
                     style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
                 >
-                    <span class="truncate">{refTargetDef?.label ?? refTargetZoneId}</span>
+                    <span class="truncate">{refTargetLabel}</span>
                     <Icon icon="mdi:chevron-down" class="size-3.5 shrink-0 text-(--theme-modal-text)/40" />
                 </button>
                 {#if showRefZoneMenu}
@@ -227,19 +228,19 @@
                         {#each ZONE_REF_DEFS.filter((d) => d.id !== zoneId) as def (def.id)}
                             <button
                                 onclick={() => {
-                                    refTargetZoneId = def.id
+                                    refTargetZoneId = String(def.id)
                                     showRefZoneMenu = false
                                 }}
                                 class={[
                                     'flex w-full items-center gap-2 px-3 py-2 text-xs text-left transition-colors',
-                                    refTargetZoneId === def.id
+                                    refTargetZoneId === String(def.id)
                                         ? 'text-(--theme-accent-text) bg-(--theme-accent-bg)/15'
                                         : 'text-(--theme-modal-text) hover:bg-(--theme-modal-text)/5'
                                 ].join(' ')}
                             >
-                                <span class="flex-1">{def.label}</span>
+                                <span class="flex-1">{actionLabel(def.id)}</span>
                                 <span class="text-[10px] text-(--theme-modal-text)/40"
-                                    >{def.unit === '%' ? '%' : ''}</span
+                                    >{actionUnit(def.id) === '%' ? '%' : ''}</span
                                 >
                             </button>
                         {/each}
@@ -249,14 +250,14 @@
         </div>
 
         <!-- Conversion rule card -->
-        {#if refTargetDef && currentZoneDef}
+        {#if refTargetZoneId && zoneId}
             <div
                 transition:slide|local={slideParams(MOTION_MS.base)}
                 class="rounded-none border px-4 py-3.5 space-y-3"
                 style="border-color: var(--theme-divider-border); background: var(--theme-input-bg);"
             >
                 <div class="text-xs text-(--theme-modal-text)/60">
-                    <span class="font-medium text-(--theme-modal-text)/80">{refTargetDef.label}</span>
+                    <span class="font-medium text-(--theme-modal-text)/80">{refTargetLabel}</span>
                 </div>
 
                 <!-- Line 1: 超过 [threshold] unit1 的部分 -->
@@ -328,7 +329,7 @@
                 <!-- Footer: 的 targetName -->
                 <div class="flex justify-end text-sm text-(--theme-modal-text)/60">
                     <span class="text-(--theme-modal-text)/30">的</span>
-                    <span class="font-medium text-(--theme-accent-text) ml-1">{currentZoneDef.label}</span>
+                    <span class="font-medium text-(--theme-accent-text) ml-1">{currentZoneLabel}</span>
                 </div>
             </div>
         {/if}
