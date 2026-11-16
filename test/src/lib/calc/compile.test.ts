@@ -5,7 +5,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { CoconutCore } from '$coconut'
-import { computeAll, DEFAULT_CONDITION_PROFILE } from '$coconut/engine/compute'
+import { computeAll } from '$coconut/engine/compute'
 import type { BuffInstance, DamageEntry } from '$coconut/engine/calculation.types'
 import type { ConfigState, EchoSlotConfig } from '$coconut/engine/config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
@@ -162,6 +162,8 @@ const entries: DamageEntry[] = [
 const bindings: Record<string, string[]> = { e1: ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'], e2: ['b1'] }
 const damageTypes: Record<string, string[]> = { e1: ['共鸣解放伤害'], e2: [] }
 
+const PROFILE = { chains: [2, 0, 0], refinements: [1, 1, 1] }
+
 const request = {
     entries,
     buffs,
@@ -171,7 +173,7 @@ const request = {
     team,
     charInfo: charInfoMap,
     weaponInfo: weaponInfoMap,
-    profile: { chains: [2, 0, 0], refinements: [1, 1, 1] }
+    profile: PROFILE
 }
 
 /** @desc 内核注册表：直接吃 fixture 里的角色/武器白值 */
@@ -200,7 +202,7 @@ describe('编译 → 内核 与引擎数值对账', () => {
         [...team],
         { ...charInfoMap },
         { ...weaponInfoMap },
-        DEFAULT_CONDITION_PROFILE
+        PROFILE
     )
     const table = compileGeneralTable(request)
     const coreResult = coreOf().compute(table)
@@ -232,14 +234,27 @@ describe('编译 → 内核 与引擎数值对账', () => {
         assert.ok(Number(ref!.effect.value) > 0, '转模折算结果应是正数')
     })
 
-    it('数值：基值逐条目与引擎一致（乘子链差异待收）', () => {
-        // 已对齐：词条/声骸/转模折算后的**基值**两侧逐条目相同。
-        // 待收：乘子链乘积仍有约 13% 差异（引擎侧增伤/防御口径），故这里只钉基值。
+    it('数值：逐条目与引擎完全一致', () => {
         for (const [index, expected] of engineResult.entries()) {
-            const segment = coreResult.damages.find((damage) => damage.entryIndex === index)
-            assert.ok(segment, `条目 ${index} 未产出结果`)
-            assert.equal(segment!.baseValue, expected.baseValue, `${expected.displayName} 基值不一致`)
+            const segments = coreResult.damages.filter((damage) => damage.entryIndex === index)
+            assert.ok(segments.length > 0, `条目 ${index} 未产出结果`)
+            assert.equal(segments.length, expected.hits, `${expected.displayName} 段数不一致`)
+            for (const segment of segments) {
+                assert.equal(segment.baseValue, expected.baseValue, `${expected.displayName} 基值不一致`)
+                // 不吃暴击的公式（固定值）引擎把「不暴击 / 暴击」两列留空（0），只有期望值有意义
+                if (expected.canCrit) {
+                    assert.equal(segment.nonCrit, expected.nonCritPerHit, `${expected.displayName} 不暴击不一致`)
+                    assert.equal(segment.crit, expected.critPerHit, `${expected.displayName} 暴击不一致`)
+                }
+                assert.equal(segment.expected, expected.expectedPerHit, `${expected.displayName} 期望不一致`)
+                const engineZones = new Map(
+                    (expected.multiplierZones ?? []).map((zone) => [zone.id, zone.value] as const)
+                )
+                const coreZones = new Map(segment.multipliers.map((zone) => [zone.id, zone.value] as const))
+                for (const id of new Set([...engineZones.keys(), ...coreZones.keys()])) {
+                    assert.equal(coreZones.get(id), engineZones.get(id), `${expected.displayName} 乘区 ${id} 不一致`)
+                }
+            }
         }
-        assert.ok(engineResult.length > 0 && coreResult.damages.length > 0)
     })
 })

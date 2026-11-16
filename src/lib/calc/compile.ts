@@ -91,6 +91,12 @@ const typeBonusBuffsOf = (stats: readonly Stat[], ctx: ZoneCtx): Buff[] =>
         return hit ? [{ id: `statBonus:${stat.key}`, effect: { applyTo: 'bonusDmg', value: stat.value } }] : []
     })
 
+/** @desc 敌人配置里「不属于表元组」的部分：免伤（内核用目标侧作用表达，故按段挂一条 buff） */
+const enemyBuffsOf = (enemy: ComputeRequest['config']['enemy']): Buff[] =>
+    enemy.dmgReduction === 0
+        ? []
+        : [{ id: 'enemy:dmgReduction', effect: { applyTo: 'enemyDmgReduction', value: String(enemy.dmgReduction) } }]
+
 /** @desc 工程状态 → 一张 `GeneralTable` */
 export const compileGeneralTable = (request: ComputeRequest): GeneralTable => {
     const profile = request.profile ?? DEFAULT_CONDITION_PROFILE
@@ -146,6 +152,7 @@ export const compileGeneralTable = (request: ComputeRequest): GeneralTable => {
 
         const refValues = charIndex >= 0 ? resolveRefZoneValues(entry, refContext) : new Map<string, number>()
         const buffs: Buff[] = [
+            ...enemyBuffsOf(request.config.enemy),
             ...effectsOf(active, ctx, refValues),
             ...typeBonusBuffsOf(typeBonusStats[charIndex] ?? [], ctx)
         ]
