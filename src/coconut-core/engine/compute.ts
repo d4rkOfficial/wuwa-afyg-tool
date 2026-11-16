@@ -505,6 +505,50 @@ function boundBuffs(
     )
 }
 
+/** @desc 编译侧入口：某条目在某角色槽位下真正生效的 Buff（作用域 + Buff 级规则 + 依赖闭包都算完） */
+export function entryActiveBuffs(args: {
+    entry: DamageEntry
+    charIndex: number
+    buffSets: readonly BuffInstance[]
+    bindings: Readonly<Record<string, readonly string[]>>
+    damageTypes: Readonly<Record<string, readonly string[]>>
+    profile: ConditionProfile
+}): BuffInstance[] {
+    const bindings = Object.fromEntries(Object.entries(args.bindings).map(([key, ids]) => [key, [...ids]]))
+    const damageTypes = Object.fromEntries(Object.entries(args.damageTypes).map(([key, ids]) => [key, [...ids]]))
+    return boundBuffs(args.entry, args.charIndex, [...args.buffSets], bindings, damageTypes, args.profile)
+}
+
+/** @desc 编译侧入口：某角色的**词条**（声骸主词条 + cost 派生副主词条 + 副词条 + 武器副属性） */
+export function entryStatsOf(args: { weaponInfo: WeaponInfo | null; echoes: readonly EchoSlotConfig[] }): {
+    mainStats: { key: string; value: string }[]
+    subStats: { key: string; value: string }[]
+} {
+    const mainStats: { key: string; value: string }[] = []
+    const subStats: { key: string; value: string }[] = []
+
+    const weaponSubstat = args.weaponInfo?.substat
+    if (weaponSubstat) {
+        const raw = parseFloat(weaponSubstat.value)
+        const canonical = WEAPON_SUBSTAT_NAME_MAP[weaponSubstat.name] ?? weaponSubstat.name
+        const value = SUBSTAT_DECIMAL_TO_PCT.has(canonical) && raw < 1 ? raw * 100 : raw
+        subStats.push({ key: canonical, value: String(value) })
+    }
+
+    for (const echo of args.echoes) {
+        if (echo.mainStat) mainStats.push({ key: echo.mainStat.type, value: String(echo.mainStat.value) })
+        if (echo.secondMainStat) {
+            mainStats.push({ key: echo.secondMainStat.type, value: String(echo.secondMainStat.value) })
+        } else {
+            const derived = SECOND_MAIN_STAT[echo.cost as keyof typeof SECOND_MAIN_STAT]
+            if (derived) mainStats.push({ key: derived.label, value: String(derived.value) })
+        }
+        for (const sub of echo.substats) subStats.push({ key: sub.type, value: String(sub.value) })
+    }
+
+    return { mainStats, subStats }
+}
+
 /** @desc 计算某个角色槽位某条目可见的完整贡献（装备 + 绑定且生效的 Buff 条目）。
  *  门槛判定（作用域 + 实例级硬性条件）由调用方先完成，此处只做乘区写入（含每条目自身的乘区条件）。
  *
