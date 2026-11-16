@@ -18,7 +18,7 @@
     import type { BuffCondition, BuffConf, BuffRule, BuffZoneValue } from '$coconut/engine/calculation.types'
     import { buffLeafName } from '$lib/buff/name'
     import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$coconut/engine/calculation.consts'
-    import { actionAllowsCondition } from '$coconut/engine/registry/actions'
+    import { actionAllowsCondition } from '$coconut/actions'
     import { describeCondition, describeZoneConditionBadge } from '$coconut/engine/condition'
     import { describeRules } from '$coconut/engine/rules'
     import { fallbackIcon } from '$lib/utils/icons'

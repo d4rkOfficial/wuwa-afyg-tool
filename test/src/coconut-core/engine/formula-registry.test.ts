@@ -7,8 +7,8 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { BUFF_ACTIONS, DISPLAY_ONLY_ACTIONS, REF_SOURCES } from '$coconut/engine/registry/actions'
-import { emptyPanel, emptyTargetPanel } from '$coconut/engine/zone-ops'
+import { BUFF_ACTIONS, DISPLAY_ONLY_ACTIONS, REF_SOURCES } from '$coconut/actions'
+import { emptyPanel, emptyTargetPanel } from '$coconut/panel'
 import { formatMultiplierDisplay } from '$lib/result/styles'
 import {
     FORMULAS,
@@ -16,7 +16,7 @@ import {
     MULTIPLIER_ORDER,
     MULTIPLIERS,
     type CalculationFormulaId
-} from '$coconut/engine/registry/formulas'
+} from '$coconut/formulas'
 
 const ALL_FORMULAS: CalculationFormulaId[] = ['direct', 'tune', 'effect', 'fixed']
 
@@ -46,18 +46,13 @@ describe('公式注册表：作用覆盖', () => {
 
     it('公式里的输入名都指向真实作用或保留输入', () => {
         const known = new Set(BUFF_ACTIONS.map((a) => a.id))
-        const reserved = new Set([
-            'const.charLevel',
-            'target.defense',
-            'target.dmgReduction',
-            'target.tuneStrainLayer',
-            'v'
-        ])
+        const reserved = new Set(['const.charLevel', 'target.defense', 'v'])
         for (const id of ALL_FORMULAS) {
             for (const handle of FORMULAS[id].chain) {
                 for (const input of handle.inputs) {
+                    const bare = input.startsWith('target.') ? input.slice('target.'.length) : input
                     assert.ok(
-                        known.has(input) || reserved.has(input),
+                        known.has(bare) || reserved.has(input),
                         `公式 ${id} 的乘子 ${handle.id} 声明了未知输入 ${input}`
                     )
                 }

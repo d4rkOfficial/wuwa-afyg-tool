@@ -137,9 +137,9 @@ const ENTITY_IDS = [
 
 /** @desc ① 自检的搜索范围：这些文件里必须能找到 ENTITY_IDS 的每一项 */
 const REGISTRY_SOURCES = [
-    'src/coconut-core/engine/registry/actions.ts',
-    'src/coconut-core/engine/registry/formulas.ts',
-    'src/coconut-core/engine/registry/stats.ts',
+    'src/coconut-core/actions.ts',
+    'src/coconut-core/formulas.ts',
+    'src/coconut-core/stats.ts',
     'src/coconut-core/engine/calculation.consts.ts',
     'src/coconut-core/engine/rules.ts',
     'src/lib/consts/game-terms.ts',
@@ -153,9 +153,9 @@ const REGISTRY_SOURCES = [
  * 后续阶段会收敛成 `src/coconut-core/engine/registry/**` 下的若干注册域。
  */
 const REGISTRY = new Set([
-    'src/coconut-core/engine/registry/actions.ts',
-    'src/coconut-core/engine/registry/formulas.ts',
-    'src/coconut-core/engine/registry/stats.ts',
+    'src/coconut-core/actions.ts',
+    'src/coconut-core/formulas.ts',
+    'src/coconut-core/stats.ts',
     'src/coconut-core/engine/calculation.consts.ts',
     'src/coconut-core/engine/calculation.types.ts',
     'src/coconut-core/engine/rules.ts'

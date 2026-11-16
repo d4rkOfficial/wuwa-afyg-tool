@@ -56,7 +56,7 @@ import {
 import { ownerIdxOfItem, rewriteOwnerInRules } from '$lib/buff/owner'
 import { resolveImportTarget } from '$lib/buff/import-target'
 import { libraryRefCharacterIdx } from '$lib/buff/library-condition'
-import { isEffectEntry } from '$coconut/engine/registry/formulas'
+import { isEffectEntry } from '$coconut/formulas'
 
 let _entries = $state<DamageEntry[]>([])
 let _buffSets = $state<BuffConf[]>([])

@@ -12,9 +12,16 @@ import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { ResultEntry, MultiplierZone, RatioFactor } from './result.types'
 import type { CharSlot } from '$lib/types/project'
 import { TARGET_SIDE_ZONE_IDS, ZONE_NO_REF_IDS } from './calculation.consts'
-import { applyZone, clonePanel, emptyPanel, recomputeTotals, type CharacterPanel, type TargetPanel } from './zone-ops'
-import { ACTION_MAP, REF_SOURCE_MAP } from '$coconut/engine/registry/actions'
-import { STAT_WRITES } from '$coconut/engine/registry/stats'
+import {
+    applyZone,
+    clonePanel,
+    emptyPanel,
+    recomputeTotals,
+    type CharacterPanel,
+    type TargetPanel
+} from '$coconut/panel'
+import { ACTION_MAP, REF_SOURCE_MAP } from '$coconut/actions'
+import { STAT_WRITES } from '$coconut/stats'
 import {
     isEffectEntry,
     evaluateHandle,
@@ -29,7 +36,7 @@ import {
     usesCoefficientFormula,
     type FormulaCtx,
     type FormulaDef
-} from '$coconut/engine/registry/formulas'
+} from '$coconut/formulas'
 
 /** @desc 条目是否走系数基类口径（双暴基准 0/100）—— 由公式注册表推导，引擎与界面共用 */
 export { usesCoefficientFormula }

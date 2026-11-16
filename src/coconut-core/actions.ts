@@ -15,7 +15,7 @@
  *
  * 「乘区」一词从此只指公式链上的**乘子**（增伤区 / 防御区 / 暴击区…），本表是「作用」。
  */
-import type { CharacterPanel, TargetPanel } from '$coconut/engine/zone-ops'
+import type { CharacterPanel, TargetPanel } from '$coconut/panel'
 
 /** @desc 值落在哪一侧面板 */
 export type ActionSide = 'character' | 'target'
@@ -64,6 +64,8 @@ export interface BuffActionDef {
         /** @desc 引用下拉里的显示名（与作用名可能不同，如「攻击固定值」→「攻击白值」这类三维来源在 `REF_SOURCES`） */
         label: string
     }
+    /** @desc 目标面板上的**标量**字段（不落 `zones` 的那种）：目前只有免伤 */
+    targetField?: 'dmgReduction'
 }
 
 /**
@@ -356,6 +358,19 @@ const ACTION_TABLE = [
 
     // ── 层数相关独立终伤 ──
     {
+        id: 'enemyDmgReduction',
+        label: '敌人免伤',
+        unit: '%',
+        group: '使目标',
+        side: 'target',
+        combine: 'sum',
+        overridable: true,
+        damageMatchable: true,
+        init: 0,
+        ref: { label: '敌人免伤' },
+        targetField: 'dmgReduction'
+    },
+    {
         id: 'tuneStrainLayer',
         label: '集谐干涉层数',
         unit: 'flat',
@@ -445,7 +460,7 @@ export const REF_SOURCES: RefSourceDef[] = [
     { side: 'character', id: 'totalHp', label: '生命上限', unit: 'flat', get: (p) => p.total.hp },
     { side: 'character', id: 'baseDef', label: '防御白值', unit: 'flat', get: (p) => p.base.def },
     { side: 'character', id: 'totalDef', label: '当前防御', unit: 'flat', get: (p) => p.total.def },
-    ...BUFF_ACTIONS.filter((a) => a.ref !== undefined).map((a): RefSourceDef => ({
+    ...BUFF_ACTIONS.filter((a) => a.ref !== undefined && a.targetField === undefined).map((a): RefSourceDef => ({
         side: a.side === 'target' ? 'target' : 'character',
         id: a.id,
         label: a.ref!.label,
@@ -453,10 +468,25 @@ export const REF_SOURCES: RefSourceDef[] = [
         get: (p, t) => (a.side === 'target' ? (t.zones[a.id] ?? 0) : (p.zones[a.id] ?? 0))
     })),
     { side: 'target', id: 'enemyDefense', label: '敌人防御', unit: 'flat', get: (_p, t) => t.defense },
-    { side: 'target', id: 'enemyDmgReduction', label: '敌人免伤', unit: '%', get: (_p, t) => t.dmgReduction }
+    // 免伤是目标面板上的标量字段（非 `zones`），单独登记
+    ...BUFF_ACTIONS.filter((a) => a.targetField !== undefined).map((a): RefSourceDef => ({
+        side: 'target',
+        id: a.id,
+        label: a.ref?.label ?? a.label,
+        unit: a.unit,
+        get: (_p, t) => t[a.targetField!]
+    }))
 ]
 
 export const REF_SOURCE_MAP: Map<string, RefSourceDef> = new Map(REF_SOURCES.map((s) => [s.id, s]))
+
+/**
+ * @desc 目标面板上的**标量**输入（不落 `zones` 的那种）：公式里写 `target.<作用 id>` 时，
+ * 由这张表决定读目标面板的哪个字段。
+ */
+export const TARGET_SCALARS: Record<string, (target: TargetPanel) => number> = Object.fromEntries(
+    BUFF_ACTIONS.filter((a) => a.targetField !== undefined).map((a) => [a.id, (t: TargetPanel) => t[a.targetField!]])
+)
 
 /** @desc 三维维度 → 会改写它的作用 id（影响源分析用；由 `panel` 声明推导） */
 export const writtenByOf = (dim: PanelDim): string[] =>

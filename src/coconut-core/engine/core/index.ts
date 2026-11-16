@@ -41,7 +41,7 @@ export {
     refWrittenBy,
     writtenByOf,
     type BuffActionDef
-} from '$coconut/engine/registry/actions'
+} from '$coconut/actions'
 export {
     FORMULAS,
     MULTIPLIER_ORDER,
@@ -52,7 +52,7 @@ export {
     type CalculationFormulaId as FormulaId,
     type FormulaDef,
     type MultiplierId
-} from '$coconut/engine/registry/formulas'
+} from '$coconut/formulas'
 
 // ── 交换格式（字符串值只在导出边界出现）──
 export {
@@ -78,4 +78,4 @@ export {
 } from '$coconut/engine/damage-trace'
 
 // ── 面板（两侧）──
-export type { CharacterPanel, PanelTriple, TargetPanel } from '$coconut/engine/zone-ops'
+export type { CharacterPanel, PanelTriple, TargetPanel } from '$coconut/panel'

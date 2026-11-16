@@ -7,21 +7,14 @@ import {
     type ActionId,
     type BuffActionDef,
     type RefSourceDef
-} from '$coconut/engine/registry/actions'
+} from '$coconut/actions'
 
 /**
  * @desc 界面与迁移共用的兼容层：作用注册表（`registry/actions.ts`）派生出的
  * 「乘区形态」视图。命名沿用旧口径（`ZONE_*`），语义已改为「Buff 作用」——
  * 「乘区」一词现在只指公式链上的乘子（增伤区 / 防御区 / 暴击区…），不再是这里的实体。
  */
-export type {
-    ActionId,
-    ActionCombine,
-    ActionSide,
-    BuffActionDef,
-    PanelDim,
-    RefSourceDef
-} from '$coconut/engine/registry/actions'
+export type { ActionId, ActionCombine, ActionSide, BuffActionDef, PanelDim, RefSourceDef } from '$coconut/actions'
 export {
     ACTION_GROUPS,
     ACTION_MAP,
@@ -30,7 +23,7 @@ export {
     REF_SOURCE_MAP,
     refWrittenBy,
     writtenByOf
-} from '$coconut/engine/registry/actions'
+} from '$coconut/actions'
 
 /** @desc 全部作用定义（顺序 = 界面「添加作用」右栏；与旧 `ZONE_DEFS` 逐项对齐） */
 export const ZONE_DEFS = BUFF_ACTIONS

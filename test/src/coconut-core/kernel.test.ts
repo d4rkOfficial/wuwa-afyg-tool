@@ -1,0 +1,256 @@
+// ── CoconutCore：注册基础属性 + 吃 GeneralTable 出结果 ─────────────────────
+// 覆盖内核的公开契约：词条落点、buff 数值/引用、四条公式的基值与乘子链、暴击三列。
+import { describe, it } from 'node:test'
+import assert from 'node:assert/strict'
+
+import { CoconutCore, type GeneralTable } from '$coconut'
+
+const coreOf = () => {
+    const core = new CoconutCore()
+    core.registerCharacterBaseStats({
+        A: { atk: 400, hp: 10000, def: 500, element: '冷凝', tuneBreakBoost: 100 }
+    })
+    core.registerWeaponBaseStats({ W: { atk: 500 } })
+    core.registerEnemyCoefficients({ BOSS: 10027, 小怪: 716.2 })
+    return core
+}
+
+/** @desc 敌人：BOSS / 90 级 / 防御 1000 / 各属性抗性按 `ELEMENTS` 顺序（冷凝 40%） */
+const ENEMY: GeneralTable['enemy'] = ['BOSS', 90, 1000, [10, 40, 10, 10, 10, 10, 10]]
+
+const tableOf = (table: Partial<GeneralTable>): GeneralTable => ({
+    characters: ['A'],
+    weapons: ['W'],
+    main_stats: [],
+    sub_stats: [],
+    buffs: [],
+    damage_entries: [],
+    enemy: ENEMY,
+    ...table
+})
+
+const directDamage = (value: string, activated_buffs: GeneralTable['buffs'] = []) =>
+    tableOf({
+        damage_entries: [
+            {
+                source: 'A',
+                damages: [{ value, activated_buffs: [...activated_buffs], element: '冷凝', formula: 'direct' }]
+            }
+        ]
+    })
+
+describe('CoconutCore：注册 + 面板', () => {
+    it('白值 = 角色白值 + 武器白值；词条写进面板落点', () => {
+        const result = coreOf().compute(
+            tableOf({
+                main_stats: [[{ key: '攻击%', value: '12' }]],
+                sub_stats: [
+                    [
+                        { key: '暴击率', value: '10' },
+                        { key: '暴击伤害', value: '20' }
+                    ]
+                ],
+                damage_entries: [
+                    {
+                        source: 'A',
+                        damages: [{ value: '100%', activated_buffs: [], element: '冷凝', formula: 'direct' }]
+                    }
+                ]
+            })
+        )
+        const panel = result.damages[0]!.panel
+        assert.equal(panel.base.atk, 900)
+        assert.equal(panel.zones.atkPct, 12)
+        assert.equal(panel.total.atk, 900 + Math.round((900 * 12) / 100))
+        assert.equal(panel.zones.critRate, 5 + 10)
+        assert.equal(panel.zones.critDmg, 150 + 20)
+        assert.equal(panel.zones.tuneBreakBoost, 100)
+    })
+
+    it('激活 buff 直接写面板（无条件的「一切皆 buff」）', () => {
+        const buff = { id: 'b1', effect: { applyTo: 'atkPct', value: '20' } }
+        const result = coreOf().compute(directDamage('100%', [buff]))
+        assert.equal(result.damages[0]!.panel.zones.atkPct, 20)
+        assert.equal(result.damages[0]!.panel.total.atk, 900 + 180)
+    })
+
+    it('目标侧 buff 落在敌人面板（免伤走 enemyDmgReduction）', () => {
+        const buffs = [
+            { id: 'defDown', effect: { applyTo: 'defDown', value: '20' } },
+            { id: 'red', effect: { applyTo: 'enemyDmgReduction', value: '10' } }
+        ]
+        const result = coreOf().compute(directDamage('100%', buffs))
+        const target = result.damages[0]!.target
+        assert.equal(target.defense, 1000)
+        assert.equal(target.dmgReduction, 10)
+        assert.equal(target.resistances['冷凝'], 40)
+    })
+})
+
+describe('CoconutCore：引用（转模）', () => {
+    it('引用生命上限：减去起算线后夹进上下限，写进目标作用', () => {
+        const buff = {
+            id: 'ref',
+            effect: {
+                applyTo: 'atkFlat',
+                value: {
+                    refStat: 'totalHp',
+                    baseLine: 0,
+                    sourceUnit: '',
+                    targetUnit: '',
+                    lowerLimit: 0,
+                    Upperlimit: 1000
+                }
+            }
+        }
+        const result = coreOf().compute(directDamage('100%', [buff]))
+        assert.equal(result.damages[0]!.panel.zones.atkFlat, 1000)
+
+        const withBaseLine = {
+            ...buff,
+            effect: { ...buff.effect, value: { ...buff.effect.value, baseLine: 8000 } }
+        }
+        assert.equal(coreOf().compute(directDamage('100%', [withBaseLine])).damages[0]!.panel.zones.atkFlat, 1000)
+
+        const lower = {
+            ...buff,
+            effect: { ...buff.effect, value: { ...buff.effect.value, baseLine: 9500 } }
+        }
+        assert.equal(coreOf().compute(directDamage('100%', [lower])).damages[0]!.panel.zones.atkFlat, 500)
+    })
+
+    it('单位换算：% → 数值按 ×100 折算', () => {
+        const buff = {
+            id: 'ref',
+            effect: {
+                applyTo: 'atkFlat',
+                value: {
+                    refStat: 'recharge',
+                    baseLine: 0,
+                    sourceUnit: '%',
+                    targetUnit: '',
+                    lowerLimit: 0,
+                    Upperlimit: 1000
+                }
+            }
+        }
+        const table = tableOf({
+            main_stats: [[{ key: '共鸣效率', value: '150' }]],
+            damage_entries: [
+                {
+                    source: 'A',
+                    damages: [{ value: '100%', activated_buffs: [buff], element: '冷凝', formula: 'direct' }]
+                }
+            ]
+        })
+        // 共鸣效率初值 100 + 词条 150 = 250（%）→ 归一成 2.5 → 目标单位 '' 保持 2.5
+        assert.equal(coreOf().compute(table).damages[0]!.panel.zones.atkFlat, 2.5)
+    })
+})
+
+describe('CoconutCore：公式与暴击三列', () => {
+    it('直伤：基值 = 面板三维 × 倍率串，乘子链顺序固定', () => {
+        const result = coreOf().compute(directDamage('200%生命'))
+        const damage = result.damages[0]!
+        assert.equal(damage.baseValue, 20000)
+        assert.deepEqual(
+            damage.multipliers.map((m) => m.id),
+            [
+                'deepen',
+                'bonus',
+                'vuln',
+                'resist',
+                'defense',
+                'dmgRed',
+                'tuneStrain',
+                'unison',
+                'final',
+                'special',
+                'crit'
+            ]
+        )
+        const product = damage.multipliers.reduce((acc, m) => acc * m.value, 1)
+        assert.equal(damage.expected, Math.round(20000 * product))
+    })
+
+    it('暴击列：不吃暴击的公式回填期望值', () => {
+        const result = coreOf().compute(
+            tableOf({
+                damage_entries: [
+                    {
+                        source: 'A',
+                        damages: [{ value: '5000', activated_buffs: [], element: '物理', formula: 'fixed' }]
+                    }
+                ]
+            })
+        )
+        const damage = result.damages[0]!
+        assert.equal(damage.nonCrit, 5000)
+        assert.equal(damage.crit, 5000)
+        assert.equal(damage.expected, 5000)
+        assert.deepEqual(damage.multipliers, [])
+    })
+
+    it('处决：基值 = 敌人类型系数 × 倍率', () => {
+        const result = coreOf().compute(
+            tableOf({
+                damage_entries: [
+                    { source: 'A', damages: [{ value: '10', activated_buffs: [], element: '物理', formula: 'tune' }] }
+                ]
+            })
+        )
+        assert.equal(result.damages[0]!.baseValue, 10027 * 10)
+    })
+
+    it('效应：基值 = 效应基础值 × 系数', () => {
+        const result = coreOf().compute(
+            tableOf({
+                damage_entries: [
+                    {
+                        source: 'A',
+                        damages: [{ value: '1.5', activated_buffs: [], element: '热熔', formula: 'effect' }]
+                    }
+                ]
+            })
+        )
+        assert.equal(result.damages[0]!.baseValue, 3674 * 1.5)
+    })
+
+    it('合计 = 各段之和', () => {
+        const result = coreOf().compute(
+            tableOf({
+                damage_entries: [
+                    {
+                        source: 'A',
+                        damages: [
+                            { value: '100%', activated_buffs: [], element: '冷凝', formula: 'direct' },
+                            { value: '200%', activated_buffs: [], element: '冷凝', formula: 'direct' }
+                        ]
+                    }
+                ]
+            })
+        )
+        assert.equal(result.damages.length, 2)
+        assert.equal(
+            result.total.expected,
+            result.damages.reduce((sum, d) => sum + d.expected, 0)
+        )
+    })
+})
+
+describe('CoconutCore：倍率串', () => {
+    it('百分号 / 基准后缀都按约定解析', () => {
+        const buff = { id: 'b', effect: { applyTo: 'atkPct', value: '0' } }
+        const cases: [string, number][] = [
+            ['100%', 900],
+            ['1', 900],
+            ['2', 1800],
+            ['100%生命', 10000],
+            ['0.5防御', 250]
+        ]
+        for (const [value, expected] of cases) {
+            const result = coreOf().compute(directDamage(value, [buff]))
+            assert.equal(result.damages[0]!.baseValue, expected, `value=${value}`)
+        }
+    })
+})

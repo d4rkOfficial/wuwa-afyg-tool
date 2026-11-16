@@ -10,7 +10,8 @@
  * - 拉表可用作用白名单（哪些作用能被某类条目吃）
  */
 import { CHAR_LEVEL } from '$lib/consts/game-terms'
-import type { CharacterPanel, TargetPanel } from '$coconut/engine/zone-ops'
+import { TARGET_SCALARS } from '$coconut/actions'
+import type { CharacterPanel, TargetPanel } from '$coconut/panel'
 import type { CalculationFormulaId, DamageEntry } from '$coconut/engine/calculation.types'
 import type { MultiplierDisplay } from '$coconut/engine/result.types'
 
@@ -95,7 +96,8 @@ export const readInput = (name: Readonly<NumericInput>, ctx: FormulaCtx): number
     if (name.startsWith('target.')) {
         const key = name.slice('target.'.length)
         if (key === 'defense') return ctx.target.defense
-        if (key === 'dmgReduction') return ctx.target.dmgReduction
+        const scalar = TARGET_SCALARS[key]
+        if (scalar) return scalar(ctx.target)
         return ctx.target.zones[key] ?? 0
     }
     if (name === 'const.charLevel') return CHAR_LEVEL
@@ -144,6 +146,9 @@ export const computeResMulti = (baseResist: number, resPen: number, resDown: num
 
 /** @desc 面板基类条目的伤害基值类型 → 三维维度 + 展示单位（未列出的类型按 `PANEL_BASE_DEFAULT` 结算） */
 export const PANEL_BASE_DEFAULT = '攻击'
+
+/** @desc 偏谐系数的兜底值：调用方没给该敌人类型的系数时用它 */
+export const FORMULAS_DEFAULT_COEFF = 716.2
 
 export const PANEL_BASE_TYPES: Record<string, { dim: 'atk' | 'hp' | 'def'; unit: string }> = {
     攻击: { dim: 'atk', unit: '攻击' },
@@ -230,16 +235,16 @@ export const defenseMultiplier = defineFormula(
     (r) => computeDefMulti(r['target.defense'], r.defPen, r.defDown)
 )
 
-/** @desc 免伤区（跨侧：角色侧穿免 × 目标免伤） */
+/** @desc 免伤区（跨侧：角色侧穿免 × 目标免伤作用） */
 export const dmgRedMultiplier = defineFormula(
     {
         id: 'dmgRed',
         label: '免伤区',
-        inputs: ['dmgRedPen', 'target.dmgReduction'] as const,
+        inputs: ['dmgRedPen', 'target.enemyDmgReduction'] as const,
         version: 1,
         display: () => ({ mode: 'factor', digits: 4 })
     },
-    (r) => 1 - r['target.dmgReduction'] / 100 - r.dmgRedPen / 100
+    (r) => 1 - r['target.enemyDmgReduction'] / 100 - r.dmgRedPen / 100
 )
 
 /** @desc 集谐区：`1 + 0.12% × 该角色谐度破坏增幅 × 目标侧集谐·干涉层数` */
@@ -376,6 +381,9 @@ export type CritBase = 'panel' | 'coefficient'
 
 /** @desc 暴击区读取的作用 id（由注册表推导） */
 export const CRIT_ACTION_IDS: readonly string[] = MULTIPLIERS.crit.inputs
+
+/** @desc 暴击区读取的作用 id 的字面类型（由乘子声明推导，不在别处重写） */
+export type CritActionId = (typeof MULTIPLIERS)['crit']['inputs'][number]
 
 /**
  * @desc 某公式是否接受某作用的**引用写入**。

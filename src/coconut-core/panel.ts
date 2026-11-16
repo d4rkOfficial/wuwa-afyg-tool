@@ -18,8 +18,8 @@
  * 旧实现里它表现为 `addOnly`（overridable=false 的乘区把 override 当 add）。
  */
 
-import { ACTION_MAP, BUFF_ACTIONS, type ActionId, type PanelDim } from '$coconut/engine/registry/actions'
-import type { CritBase } from '$coconut/engine/registry/formulas'
+import { ACTION_MAP, BUFF_ACTIONS, type ActionId, type PanelDim } from '$coconut/actions'
+import type { CritBase } from '$coconut/formulas'
 
 export interface PanelTriple {
     atk: number

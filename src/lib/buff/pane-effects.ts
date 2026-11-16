@@ -11,7 +11,7 @@
 import type { BuffInstance, BuffZoneValue } from '$coconut/engine/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 import { parseValueString } from '$lib/utils/parse-value-string'
-import { REF_SOURCES, refWrittenBy } from '$coconut/engine/registry/actions'
+import { REF_SOURCES, refWrittenBy } from '$coconut/actions'
 
 /**
  * @desc 引用来源 id → 会改写该面板属性的作用 id。

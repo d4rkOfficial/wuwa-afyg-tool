@@ -14,9 +14,9 @@ import {
     type ZoneCtx
 } from './compute'
 import { describeZoneConditionBadge } from './condition'
-import { isEffectEntry, formulaAcceptsRef, type CritBase } from '$coconut/engine/registry/formulas'
+import { isEffectEntry, formulaAcceptsRef, type CritBase } from '$coconut/formulas'
 import { buildEchoDescByEntry } from './skill-infer'
-import { FORMULAS, formulaOf, type MultiplierId } from '$coconut/engine/registry/formulas'
+import { FORMULAS, formulaOf, type MultiplierId } from '$coconut/formulas'
 import { ELEMENT_BONUS_MAP, TYPE_BONUS_MAP, WEAPON_SUBSTAT_NAME_MAP } from '$lib/consts/game-terms'
 
 /** @desc 溯源所需上下文（结果页可直接提供的输入，与 computeAll 同源） */

@@ -52,7 +52,7 @@ import {
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import { cyclePathOf, isRuleDraft, normalizeRule } from '$coconut/engine/rules'
 import type { BuffRule, ZoneRef } from '$coconut/engine/calculation.types'
-import { isEffectEntry } from '$coconut/engine/registry/formulas'
+import { isEffectEntry } from '$coconut/formulas'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 

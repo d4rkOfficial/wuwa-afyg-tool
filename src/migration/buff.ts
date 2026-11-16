@@ -15,7 +15,7 @@ import type {
 } from '$coconut/engine/calculation.types'
 import { normalizeBuffTree } from '$lib/buff/tree-state'
 import { ZONE_MAP, resolveZoneId } from '$coconut/engine/calculation.consts'
-import { actionAllowsCondition } from '$coconut/engine/registry/actions'
+import { actionAllowsCondition } from '$coconut/actions'
 import { isConditionEmpty, normalizeCondition, normalizeZoneCondition } from '$coconut/engine/condition'
 import { normalizeRules, rulesFromLegacyCondition, type LegacyGateCondition } from '$coconut/engine/rules'
 import { asRecord, genId, isLegacyAutoGlobal, isRecord, pickNum } from './shared'

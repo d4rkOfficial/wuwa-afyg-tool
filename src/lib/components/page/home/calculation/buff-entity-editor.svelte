@@ -19,7 +19,7 @@
     import ZoneConditionPanel from './zone-condition-panel.svelte'
     import BuffModalRules from './buff-modal-rules.svelte'
     import { ZONE_MAP, ZONE_NO_OVERRIDE_IDS, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$coconut/engine/calculation.consts'
-    import { actionAllowsCondition } from '$coconut/engine/registry/actions'
+    import { actionAllowsCondition } from '$coconut/actions'
     import type { BuffLibraryBuff, BuffLibraryScope } from '$lib/data/buff-library.svelte'
     import type { BuffRule } from '$coconut/engine/calculation.types'
     import {

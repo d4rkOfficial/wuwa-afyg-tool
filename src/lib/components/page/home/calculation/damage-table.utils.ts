@@ -18,7 +18,7 @@ import {
     formulaOf,
     FORMULAS,
     type CritBase
-} from '$coconut/engine/registry/formulas'
+} from '$coconut/formulas'
 import { DAMAGE_TYPE_SHORT, ZONE_REF_MAP } from '$coconut/engine/calculation.consts'
 import type { BuffConf, BuffZoneValue, DamageEntry } from '$coconut/engine/calculation.types'
 import type { CharSlot } from '$lib/types/project'

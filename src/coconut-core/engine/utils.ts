@@ -2,7 +2,7 @@ import type { ResultEntry } from './result.types'
 import type { DamageEntry } from './calculation.types'
 import type { CharacterInfo } from '$lib/api/types'
 import { inferFromSkillText, matchHitNamePrefix } from './skill-infer'
-import { isEffectEntry } from '$coconut/engine/registry/formulas'
+import { isEffectEntry } from '$coconut/formulas'
 
 /**
  * @desc 自动推导伤害类型（优先级从高到低）：

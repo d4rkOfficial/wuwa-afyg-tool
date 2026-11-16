@@ -4,7 +4,7 @@
      * 三列结构：倍率名 / 伤害类型多选 / 同步到所有同名伤害；顶部标题右侧为帮助按钮
      */
     import Icon from '@iconify/svelte'
-    import { isEffectEntry } from '$coconut/engine/registry/formulas'
+    import { isEffectEntry } from '$coconut/formulas'
     import { fade, slide } from 'svelte/transition'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import type { ComponentsProps } from '$lib/types'

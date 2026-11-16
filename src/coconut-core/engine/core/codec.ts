@@ -9,7 +9,7 @@
  * （`ZONE_MAP` 的 `unit` 与字符串里的 `%`）。这份编解码只服务「表格 / JSON 交换」这一侧。
  */
 import type { BuffCondition, BuffInstance, BuffZoneValue, ZoneRef } from '$coconut/engine/calculation.types'
-import { ACTION_MAP, REF_SOURCE_MAP } from '$coconut/engine/registry/actions'
+import { ACTION_MAP, REF_SOURCE_MAP } from '$coconut/actions'
 
 /** @desc 单位：百分比 / 固定值 */
 export type ValueUnit = '%' | 'flat'

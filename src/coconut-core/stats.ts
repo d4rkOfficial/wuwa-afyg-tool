@@ -5,6 +5,7 @@
  * 面板作用直接写 `zones`，元素 / 类型加成写进面板的两份加成分组（增伤区按条目属性 / 类型取用）。
  */
 import { ELEMENT_BONUS_MAP, TYPE_BONUS_MAP } from '$lib/consts/game-terms'
+import type { PanelDim } from '$coconut/actions'
 
 export type StatWrite =
     | { kind: 'action'; action: string }
@@ -12,6 +13,20 @@ export type StatWrite =
     | { kind: 'typeBonus' }
     /** @desc 不进伤害公式的词条（如治疗加成） */
     | { kind: 'none' }
+
+/**
+ * @desc 倍率串的基准后缀 → 面板三维维度（`'200%生命'` 读生命上限）。
+ *
+ * 这张表放在注册域：倍率串的**书写协议**属于数据，计算代码里不出现基准名字。
+ */
+export const BASE_SUFFIXES: readonly (readonly [string, PanelDim])[] = [
+    ['生命', 'hp'],
+    ['防御', 'def'],
+    ['攻击', 'atk']
+]
+
+/** @desc 倍率串不带基准后缀时读哪一维（缺省攻击） */
+export const DEFAULT_PANEL_DIM: PanelDim = 'atk'
 
 /** @desc 只由单个面板作用承载的词条 */
 const ACTION_STATS: Record<string, string> = {
