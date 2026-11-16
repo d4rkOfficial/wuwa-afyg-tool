@@ -21,10 +21,10 @@ import {
     type TargetPanel
 } from '$coconut/panel'
 import { ACTION_MAP, REF_SOURCE_MAP } from '$coconut/actions'
+import { evaluateFormula } from '$coconut/evaluate'
 import { STAT_WRITES } from '$coconut/stats'
 import {
     isEffectEntry,
-    evaluateHandle,
     FORMULAS,
     formulaOf,
     formulaAcceptsRef,
@@ -992,23 +992,30 @@ const resolveBase = (def: FormulaDef, entry: DamageEntry, panel: CharacterPanel,
     }
 }
 
-/** @desc 逐条乘子求值：按公式链（唯一规范顺序）产出数值与明细 */
+/**
+ * @desc 逐条乘子求值：**委托给内核的唯一实现**（`evaluateFormula`），这里只把结果转成引擎侧的
+ * 输出形状（`values` 供后续按乘子名取值）。工具箱不再自己算乘子。
+ */
 const runChain = (
     def: FormulaDef,
     ctx: FormulaCtx
 ): { values: Map<string, number>; parts: MultiplierZone[]; product: number; productNoCrit: number } => {
-    const values = new Map<string, number>()
-    const parts: MultiplierZone[] = []
-    let product = 1
-    let productNoCrit = 1
-    for (const handle of def.chain) {
-        const value = evaluateHandle(handle, ctx)
-        values.set(handle.id, value)
-        product *= value
-        if (handle !== MULTIPLIERS.crit) productNoCrit *= value
-        parts.push({ id: handle.id, label: handle.label, value, display: handle.display(value, ctx) })
+    const evaluation = evaluateFormula({
+        formula: def.id,
+        baseValue: 0,
+        element: ctx.element,
+        panel: ctx.panel,
+        target: ctx.target,
+        elementBonus: ctx.elementBonus,
+        typeBonus: ctx.typeBonus
+    })
+    const values = new Map(evaluation.multipliers.map((zone) => [zone.id, zone.value] as const))
+    return {
+        values,
+        parts: evaluation.multipliers,
+        product: evaluation.product,
+        productNoCrit: evaluation.productNoCrit
     }
-    return { values, parts, product, productNoCrit }
 }
 
 /** @desc 效应条目的倍率因子（层数倍率 + 爆发倍率，两者相加构成总倍率） */

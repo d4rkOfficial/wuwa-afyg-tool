@@ -7,14 +7,8 @@
 import { ELEMENTS, ELEMENT_BONUS_MAP } from '$lib/consts/game-terms'
 import { EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
 import { ACTION_MAP, REF_SOURCE_MAP } from '$coconut/actions'
-import {
-    CRIT_ACTION_IDS,
-    FORMULAS,
-    FORMULAS_DEFAULT_COEFF,
-    type FormulaCtx,
-    evaluateHandle,
-    type FormulaDef
-} from '$coconut/formulas'
+import { CRIT_ACTION_IDS, FORMULAS, FORMULAS_DEFAULT_COEFF, type FormulaDef } from '$coconut/formulas'
+import { evaluateFormula } from '$coconut/evaluate'
 import {
     applyZone,
     emptyPanel,
@@ -31,7 +25,7 @@ import {
     type GeneralTable,
     type StatRef
 } from '$coconut/general-table'
-import type { BuffContribution, CoreResult, DamageResult, MultiplierZone } from '$coconut/result'
+import type { BuffContribution, CoreResult, DamageResult } from '$coconut/result'
 
 /** @desc 角色基础属性（由调用方注册；数值为 90 级白值） */
 export interface CharacterBaseStats {
@@ -229,35 +223,17 @@ const computeDamage = (
     const damage = excludeBuffId
         ? { ...raw, activated_buffs: raw.activated_buffs.filter((buff) => buff.id !== excludeBuffId) }
         : raw
-    const def = FORMULAS[formulaOfDamage(damage)]
+    const formula = formulaOfDamage(damage)
+    const def = FORMULAS[formula]
     const critBase = def.critBase
     const { targetSide } = splitBuffs(damage)
     const target = targetPanelOf(table, targetSide)
     const panel = panelOfDamage(table, registries, charIndex, critBase, damage, target)
-    const ctx: FormulaCtx = {
-        panel,
-        target,
-        element: damage.element,
-        damageTypes: [],
-        elementBonus: panel.elementBonus[damage.element] ?? 0,
-        typeBonus: 0
-    }
     const baseValue = baseValueOf(def, damage, panel, target, registries)
+    const evaluation = evaluateFormula({ formula, baseValue, element: damage.element, panel, target })
 
-    const multipliers: MultiplierZone[] = []
-    let product = 1
-    let productNoCrit = 1
-    for (const handle of def.chain) {
-        const value = evaluateHandle(handle, ctx)
-        product *= value
-        if (handle.id !== 'crit') productNoCrit *= value
-        multipliers.push({ id: handle.id, label: handle.label, value, display: handle.display(value, ctx) })
-    }
-
-    const nonCritRaw = baseValue * productNoCrit
-    const expectedRaw = baseValue * product
-    const critDmg = (panel.zones.critDmg ?? 0) / 100
-    const canCrit = def.canCrit(panel, ctx)
+    const nonCritRaw = baseValue * evaluation.productNoCrit
+    const expectedRaw = baseValue * evaluation.product
     const expected = Math.round(expectedRaw)
 
     return {
@@ -268,9 +244,9 @@ const computeDamage = (
         formula: def.id,
         baseValue,
         nonCrit: Math.round(nonCritRaw),
-        crit: canCrit ? Math.round(nonCritRaw * critDmg) : expected,
+        crit: evaluation.canCrit ? Math.round(nonCritRaw * evaluation.critDmgRatio) : expected,
         expected,
-        multipliers,
+        multipliers: evaluation.multipliers,
         panel,
         target,
         contributions: []

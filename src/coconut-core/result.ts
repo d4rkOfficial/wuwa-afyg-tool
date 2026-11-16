@@ -6,16 +6,17 @@
 import type { CharacterPanel, TargetPanel } from '$coconut/panel'
 import type { CalculationFormula } from '$coconut/general-table'
 
-/** @desc 乘区的展示参数（格式化在调用方） */
-export interface MultiplierDisplay {
-    /** @desc `delta`：展示为「+x%」；`factor`：展示为「×x」；`deltaWhenActive`：生效时展示 `+x%`、未生效展示 `×x` */
-    mode: 'delta' | 'factor' | 'deltaWhenActive'
-    pct?: number
-    digits?: number
-    active?: boolean
-    activeDigits?: number
-    idleDigits?: number
-}
+/**
+ * @desc 乘区的展示参数（结构化）：内核只给原始量纲，格式化留给调用方。
+ *
+ * - `delta`：显示成「+x%」（加深 / 增伤 / 易伤 / 终伤 / 谐度）
+ * - `factor`：显示成乘数（抗性 / 防御 / 免伤 / 特殊）
+ * - `deltaWhenActive`：生效时显示 delta、未生效显示乘数（集谐 / 同奏 / 暴击这类值可能恰为 1）
+ */
+export type MultiplierDisplay =
+    | { mode: 'delta'; pct: number; digits: number }
+    | { mode: 'factor'; digits: number }
+    | { mode: 'deltaWhenActive'; pct: number; active: boolean; activeDigits: number; idleDigits: number }
 
 /** @desc 一个乘子的求值结果 */
 export interface MultiplierZone {
