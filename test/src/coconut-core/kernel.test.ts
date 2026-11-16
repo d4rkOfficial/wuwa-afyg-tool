@@ -154,8 +154,10 @@ describe('CoconutCore：引用（转模）', () => {
 })
 
 describe('CoconutCore：公式与暴击三列', () => {
-    it('直伤：基值 = 面板三维 × 倍率串，乘子链顺序固定', () => {
-        const result = compute(directDamage('200%生命'))
+    it('直伤：基值 = 面板三维 × 倍率，乘子链顺序固定', () => {
+        const table = directDamage('200%')
+        table.damage_entries[0]!.damages[0]!.base = 'hp'
+        const result = compute(table)
         const damage = result.damages[0]!
         assert.equal(damage.baseValue, 20000)
         assert.deepEqual(
@@ -259,18 +261,19 @@ describe('CoconutCore：公式与暴击三列', () => {
 })
 
 describe('CoconutCore：倍率串', () => {
-    it('百分号 / 基准后缀都按约定解析', () => {
+    it('倍率串只认数字与 %，基准维度由字段给出', () => {
         const buff = { id: 'b', effect: { applyTo: 'atkPct', value: '0' } }
-        const cases: [string, number][] = [
-            ['100%', 900],
-            ['1', 900],
-            ['2', 1800],
-            ['100%生命', 10000],
-            ['0.5防御', 250]
+        const cases: [string, 'atk' | 'hp' | 'def' | undefined, number][] = [
+            ['100%', undefined, 900],
+            ['1', undefined, 900],
+            ['2', undefined, 1800],
+            ['100%', 'hp', 10000],
+            ['0.5', 'def', 250]
         ]
-        for (const [value, expected] of cases) {
-            const result = compute(directDamage(value, [buff]))
-            assert.equal(result.damages[0]!.baseValue, expected, `value=${value}`)
+        for (const [value, base, expected] of cases) {
+            const table = directDamage(value, [buff])
+            if (base) table.damage_entries[0]!.damages[0]!.base = base
+            assert.equal(compute(table).damages[0]!.baseValue, expected, `value=${value} base=${base}`)
         }
     })
 })

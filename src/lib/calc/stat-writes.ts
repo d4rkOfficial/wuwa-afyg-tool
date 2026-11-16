@@ -4,6 +4,20 @@
  * 内核不认识词条名：编译期在这里把 label 解析成作用 id（元素/类型加成再折成 per-伤害的 `bonusDmg`）。
  */
 import { ELEMENT_BONUS_MAP, TYPE_BONUS_MAP } from '$lib/consts/game-terms'
+import type { PanelDim } from '$coconut/actions'
+
+/** @desc 倍率串的基准后缀 → 面板维度（语料只活在工具箱：内核收的是纯倍数 + 维度 id） */
+export const BASE_SUFFIXES: readonly (readonly [string, PanelDim])[] = [
+    ['生命', 'hp'],
+    ['防御', 'def'],
+    ['攻击', 'atk']
+]
+
+/** @desc 通用增伤作用 id（编译器把属性/类型加成折进它） */
+export const BONUS_DMG_ACTION = 'bonusDmg'
+
+/** @desc 倍率串不带基准时读哪一维 */
+export const DEFAULT_PANEL_DIM = 'atk' as const
 
 export type StatWrite =
     | { kind: 'action'; action: string }

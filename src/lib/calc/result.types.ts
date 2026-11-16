@@ -8,19 +8,9 @@ import type { CalculationFormulaId } from './calculation.types'
  * - `factor`：显示成乘数（抗性 / 防御 / 免伤 / 特殊）；
  * - `deltaWhenActive`：生效时显示 delta、未生效时显示乘数（集谐 / 同奏 / 暴击这类值可能恰为 1 的乘区）。
  */
-export type MultiplierDisplay =
-    | { mode: 'delta'; pct: number; digits: number }
-    | { mode: 'factor'; digits: number }
-    | { mode: 'deltaWhenActive'; pct: number; active: boolean; activeDigits: number; idleDigits: number }
+import type { MultiplierZone } from '$coconut/result'
 
-export interface MultiplierZone {
-    /** @desc 乘子 id（公式注册表 `MULTIPLIERS` 的键，溯源段按它选来源收集器） */
-    id: string
-    label: string
-    value: number
-    /** @desc 结构化展示参数（不含本地化字符串） */
-    display: MultiplierDisplay
-}
+export type { MultiplierDisplay, MultiplierZone } from '$coconut/result'
 
 export interface ResultEntry {
     id: string

@@ -22,8 +22,8 @@ import {
 } from '$lib/calc/compute'
 import { ELEMENT_BONUS_MAP, NON_DIRECT_ELEMENT, TYPE_BONUS_MAP } from '$lib/consts/game-terms'
 import { getEffectBurstMultiplier, getEffectMultiplier } from '$lib/consts/effect-data'
-import { BASE_SUFFIXES, BONUS_DMG_ACTION, DEFAULT_PANEL_DIM } from '$coconut/stats'
-import { statActionOf } from '$lib/calc/stat-writes'
+import { BONUS_DMG_ACTION, DEFAULT_PANEL_DIM, statActionOf } from '$lib/calc/stat-writes'
+import type { PanelDim } from '$coconut/actions'
 import { PANEL_BASE_TYPES } from '$coconut/formulas'
 import type { Buff, Damage, DamageEntry, GeneralTable, Stat } from '$coconut'
 
@@ -51,18 +51,17 @@ const effectFactorOf = (entry: EngineDamageEntry): number =>
     getEffectMultiplier(entry.hitName, Math.round(entry.ratioValue)) +
     getEffectBurstMultiplier(entry.hitName, Math.round(entry.burstLayers ?? 0))
 
-/** @desc 面板基值维度 → 倍率串的基准后缀（由内核注册表派生，不自己列实体名） */
-const BASE_SUFFIX_OF: Record<string, string> = Object.fromEntries(BASE_SUFFIXES.map(([suffix, dim]) => [dim, suffix]))
-
-/** @desc 条目 → 内核的倍率串 */
+/** @desc 条目 → 内核的倍率串（纯倍数/百分比；基准维度另给，内核里没有语料） */
 const valueOf = (entry: EngineDamageEntry): string => {
     if (entry.formula === 'fixed') return String(entry.ratioValue)
-    // 系数类基值（处决/响应）读的是面板系数，倍率是**纯倍数**，不带「%」也不带基准后缀
     if (entry.formula === 'tune') return String(entry.ratioUnit === '%' ? entry.ratioValue / 100 : entry.ratioValue)
-    const suffix = BASE_SUFFIX_OF[PANEL_BASE_TYPES[entry.damageBaseType]?.dim ?? DEFAULT_PANEL_DIM] ?? ''
-    if (entry.ratioUnit === '%') return `${entry.ratioValue}%${suffix}`
-    return `${entry.ratioValue}${suffix}`
+    if (entry.ratioUnit === '%') return `${entry.ratioValue}%`
+    return String(entry.ratioValue)
 }
+
+/** @desc 条目 → 基值取自面板哪一维（语料映射只在这一层发生） */
+const baseDimOf = (entry: EngineDamageEntry): PanelDim =>
+    PANEL_BASE_TYPES[entry.damageBaseType]?.dim ?? DEFAULT_PANEL_DIM
 
 /** @desc 条目 → 内核的公式（固定值由倍率单位标记） */
 const formulaOf = (entry: EngineDamageEntry) => (entry.ratioUnit === 'fixed' ? 'fixed' : entry.formula)
@@ -197,6 +196,7 @@ export const compileGeneralTable = (request: ComputeRequest): GeneralTable => {
         const isEffect = entry.formula === 'effect'
         const damage: Damage = {
             value: isEffect ? String(effectFactorOf(entry)) : valueOf(entry),
+            base: baseDimOf(entry),
             activated_buffs: buffs,
             element: isEffect
                 ? ((NON_DIRECT_ELEMENT as Record<string, string>)[entry.hitName] ?? entry.damageElement)

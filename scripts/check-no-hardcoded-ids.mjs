@@ -140,7 +140,6 @@ const REGISTRY_SOURCES = [
     'src/lib/calc/stat-writes.ts',
     'src/coconut-core/actions.ts',
     'src/coconut-core/formulas.ts',
-    'src/coconut-core/stats.ts',
     'src/lib/calc/calculation.consts.ts',
     'src/lib/calc/rules.ts',
     'src/lib/consts/game-terms.ts',
@@ -157,7 +156,6 @@ const REGISTRY = new Set([
     'src/lib/calc/stat-writes.ts',
     'src/coconut-core/actions.ts',
     'src/coconut-core/formulas.ts',
-    'src/coconut-core/stats.ts',
     'src/lib/calc/calculation.consts.ts',
     'src/lib/calc/calculation.types.ts',
     'src/lib/calc/rules.ts'

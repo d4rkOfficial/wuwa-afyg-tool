@@ -261,7 +261,8 @@ describe('编译 → 内核 与引擎数值对账', () => {
         assert.equal(table.damage_entries.length, 4)
         assert.equal(table.damage_entries[0]!.damages.length, 3, 'hits=3 应展开成 3 段')
         assert.equal(table.damage_entries[1]!.damages.length, 1)
-        assert.match(table.damage_entries[0]!.damages[0]!.value, /^200%生命$/)
+        assert.equal(table.damage_entries[0]!.damages[0]!.value, '200%', '倍率串是纯倍数/百分比')
+        assert.equal(table.damage_entries[0]!.damages[0]!.base, 'hp', '基准维度走独立字段')
     })
 
     it('条件与转模：链门槛不满足的 buff 不进表，转模折算成字面值', () => {

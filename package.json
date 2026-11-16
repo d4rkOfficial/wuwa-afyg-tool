@@ -32,7 +32,9 @@
         "generate-tools-doc": "node scripts/generate-tools-doc.mjs",
         "collect-icons": "node scripts/collect-mdi-icons.mjs",
         "check:core": "node scripts/check-calc-core.mjs",
-        "build:calc-lib": "node scripts/build-calc-lib.mjs"
+        "build:calc-lib": "node scripts/build-calc-lib.mjs",
+        "build:core": "node scripts/build-calc-lib.mjs",
+        "release:core": "node scripts/release-calc-core.mjs"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
