@@ -35,10 +35,15 @@ export type CritDMG = CritActionId
 /** @desc 一条 buff 作用的落点 */
 export type ApplyToEnum = CharacterStatEnum | EnemyStatEnum | MultiEnum | CritRate | CritDMG
 
-/** @desc 词条键（攻击% / 生命 / 暴击率 …），落点表见 `STAT_ACTIONS` */
+/**
+ * @desc 词条键 = **作用 id**（`atkPct` / `hpFlat` / `critRate` / `bonusDmg` …）。
+ *
+ * 词条标签（「攻击%」「冷凝伤害加成」）→ 作用 id 的解析属于调用方业务：内核不认识词条名，
+ * 只认识落点。属性/类型加成由调用方编译成 `bonusDmg` 作用挂到对应伤害上。
+ */
 export type StatKeyEnum = string
 
-/** @desc 一条词条：键 + 值（`'12.6%'` / `'150'`） */
+/** @desc 一条词条：落点作用 id + 值（`'12.6'` / `'150'`） */
 export interface Stat {
     key: StatKeyEnum
     value: string
@@ -95,9 +100,6 @@ export interface DamageEntry {
 /** @desc 各属性抗性（%），顺序与 `ELEMENTS` 逐项对应 */
 export type EnemyBaseResistance = readonly number[]
 
-/** @desc 敌人：`[类型, 等级, 防御, 各属性抗性]` */
-export type EnemyInput = readonly [EnemyTypeEnum, number, number, EnemyBaseResistance]
-
 /** @desc 计算核的唯一输入 */
 export interface GeneralTable {
     /** @desc 队伍角色 id（下标与 `weapons` / `main_stats` / `sub_stats` 对齐） */
@@ -112,8 +114,6 @@ export interface GeneralTable {
     buffs: readonly Buff[]
     /** @desc 全部伤害条目 */
     damage_entries: readonly DamageEntry[]
-    /** @desc 敌人 */
-    enemy: EnemyInput
 }
 
 /** @desc 倍率串解析结果 */

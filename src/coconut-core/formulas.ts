@@ -9,7 +9,6 @@
  * - 乘区溯源段（`damage-trace` 的 `segments` 顺序与membership）
  * - 拉表可用作用白名单（哪些作用能被某类条目吃）
  */
-import { CHAR_LEVEL } from '$lib/consts/game-terms'
 import { TARGET_SCALARS } from '$coconut/actions'
 import type { CharacterPanel, TargetPanel } from '$coconut/panel'
 import type { CalculationFormula } from '$coconut/general-table'
@@ -24,10 +23,6 @@ export interface FormulaCtx {
     element: string
     /** @desc 条目已解析的伤害类型 */
     damageTypes: string[]
-    /** @desc 增伤区里按条目属性取到的元素加成合计（%） */
-    elementBonus: number
-    /** @desc 增伤区里按条目伤害类型取到的类型加成合计（%） */
-    typeBonus: number
 }
 
 /** @desc 数值输入名：面板作用 id，或 `target.` / `enemy.` / `const.` 前缀的保留输入 */
@@ -89,7 +84,8 @@ export const defineFormula = <
 
 // ────────────────────────────── 输入解析 ──────────────────────────────
 
-const FIXED_INPUTS: Record<string, number> = { 'const.charLevel': CHAR_LEVEL }
+/** @desc 角色等级缺省值（调用方可通过面板 `charLevel` 覆盖） */
+export const DEFAULT_CHAR_LEVEL = 90
 
 /** @desc 解析一个输入名：`target.` 前缀读目标面板，`const.` 读常量，其余读角色面板作用值 */
 export const readInput = (name: Readonly<NumericInput>, ctx: FormulaCtx): number => {
@@ -100,8 +96,7 @@ export const readInput = (name: Readonly<NumericInput>, ctx: FormulaCtx): number
         if (scalar) return scalar(ctx.target)
         return ctx.target.zones[key] ?? 0
     }
-    if (name === 'const.charLevel') return CHAR_LEVEL
-    if (name in FIXED_INPUTS) return FIXED_INPUTS[name]
+    if (name === 'const.charLevel') return ctx.panel.zones.charLevel ?? DEFAULT_CHAR_LEVEL
     return ctx.panel.zones[name] ?? 0
 }
 
@@ -125,9 +120,9 @@ export const evaluateHandle = (handle: FormulaHandle, ctx: FormulaCtx): number =
 // ────────────────────────────── 乘子算式 ──────────────────────────────
 
 /** @desc 防御区：`(800 + 8×角色等级) / (敌人防御×(1-减防)×(1-穿防) + 同上)`，下限 1% */
-export const computeDefMulti = (defense: number, defPen: number, defDown: number): number => {
+export const computeDefMulti = (defense: number, defPen: number, defDown: number, charLevel = 90): number => {
     const defEff = Math.max(defense * (1 - defDown / 100) * (1 - defPen / 100), 0)
-    const charTerm = 800 + 8 * CHAR_LEVEL
+    const charTerm = 800 + 8 * charLevel
     return Math.max(charTerm / (defEff + charTerm), 0.01)
 }
 
@@ -195,7 +190,7 @@ export const bonusMultiplier = defineFormula(
         version: 1,
         display: (value) => ({ mode: 'delta', pct: (value - 1) * 100, digits: 1 })
     },
-    ({ bonusDmg }, ctx) => 1 + (bonusDmg + ctx.elementBonus + ctx.typeBonus) / 100
+    ({ bonusDmg }) => 1 + bonusDmg / 100
 )
 
 /** @desc 易伤区（效应不吃） */
@@ -232,7 +227,7 @@ export const defenseMultiplier = defineFormula(
         version: 1,
         display: () => ({ mode: 'factor', digits: 4 })
     },
-    (r) => computeDefMulti(r['target.defense'], r.defPen, r.defDown)
+    (r, ctx) => computeDefMulti(r['target.defense'], r.defPen, r.defDown, ctx.panel.zones.charLevel ?? 90)
 )
 
 /** @desc 免伤区（跨侧：角色侧穿免 × 目标免伤作用） */

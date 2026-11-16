@@ -1,23 +1,15 @@
 /**
- * @desc 词条注册表：**词条 label → 它写进面板的哪里**。
+ * @desc 计算核的**值协议注册域**：倍率串基准后缀、缺省维度、通用增伤作用 id。
  *
- * 词条（声骸主词条 / 副词条 / 武器副词条）与 Buff 作用共用同一套落点，只是入口不同：
- * 面板作用直接写 `zones`，元素 / 类型加成写进面板的两份加成分组（增伤区按条目属性 / 类型取用）。
+ * 这里放的是「内核与调用方之间的书写约定」，不是游戏实体知识：
+ * 调用方按这些约定写倍率串与词条落点，内核按同一份数据解析。
  */
-import { ELEMENT_BONUS_MAP, TYPE_BONUS_MAP } from '$lib/consts/game-terms'
 import type { PanelDim } from '$coconut/actions'
-
-export type StatWrite =
-    | { kind: 'action'; action: string }
-    | { kind: 'elementBonus' }
-    | { kind: 'typeBonus' }
-    /** @desc 不进伤害公式的词条（如治疗加成） */
-    | { kind: 'none' }
 
 /**
  * @desc 倍率串的基准后缀 → 面板三维维度（`'200%生命'` 读生命上限）。
  *
- * 这张表放在注册域：倍率串的**书写协议**属于数据，计算代码里不出现基准名字。
+ * 这张表是协议数据：计算代码里不出现基准名字，只在解析时查它。
  */
 export const BASE_SUFFIXES: readonly (readonly [string, PanelDim])[] = [
     ['生命', 'hp'],
@@ -28,29 +20,5 @@ export const BASE_SUFFIXES: readonly (readonly [string, PanelDim])[] = [
 /** @desc 倍率串不带基准后缀时读哪一维（缺省攻击） */
 export const DEFAULT_PANEL_DIM: PanelDim = 'atk'
 
-/** @desc 只由单个面板作用承载的词条 */
-const ACTION_STATS: Record<string, string> = {
-    攻击: 'atkFlat',
-    生命: 'hpFlat',
-    防御: 'defFlat',
-    '攻击%': 'atkPct',
-    '生命%': 'hpPct',
-    '防御%': 'defPct',
-    暴击率: 'critRate',
-    暴击伤害: 'critDmg',
-    共鸣效率: 'recharge'
-}
-
-/**
- * @desc 全部词条 → 写入点。元素 / 类型加成由常量映射推导（`冷凝伤害加成` → 元素加成、`普攻伤害加成` → 类型加成），
- * 不在这里重复罗列。
- */
-export const STAT_WRITES: Record<string, StatWrite> = {
-    ...Object.fromEntries(Object.entries(ACTION_STATS).map(([label, action]) => [label, { kind: 'action', action }])),
-    ...Object.fromEntries(Object.keys(ELEMENT_BONUS_MAP).map((label) => [label, { kind: 'elementBonus' }])),
-    ...Object.fromEntries(Object.keys(TYPE_BONUS_MAP).map((label) => [label, { kind: 'typeBonus' }])),
-    治疗加成: { kind: 'none' }
-}
-
-/** @desc 通用增伤作用的 id：调用方把「伤害类型加成」折进通用增伤时用它（`bonusDmg`） */
+/** @desc 通用增伤作用的 id：调用方把「属性 / 伤害类型加成」折进通用增伤时用它 */
 export const BONUS_DMG_ACTION = 'bonusDmg'

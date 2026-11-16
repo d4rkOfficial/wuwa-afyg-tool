@@ -209,23 +209,31 @@ const request = {
     profile: PROFILE
 }
 
-/** @desc 内核注册表：直接吃 fixture 里的角色/武器白值 */
-const coreOf = () => {
-    const core = new CoconutCore()
-    core.registerCharacterBaseStats((id) => {
-        const info = charInfoMap[id]
-        if (info) return { ...info.lv90BaseStats, element: info.element }
-        if (id.startsWith('效应·')) {
-            return { atk: 0, hp: 0, def: 0, element: '衍射', coefficient: 3674 }
+/** @desc 基础数值：调用时传入（角色白值 / 武器白值 / 敌人数值 / 效应虚角色） */
+const basesOf = () => {
+    const characters: Record<string, { atk: number; hp: number; def: number; element: string; coefficient?: number }> =
+        {}
+    for (const [name, info] of Object.entries(charInfoMap)) {
+        characters[name] = { ...info.lv90BaseStats, element: info.element }
+    }
+    for (const entry of entries) {
+        if (entry.formula !== 'effect' || !entry.hitName) continue
+        characters[`效应·${entry.hitName}`] = { atk: 0, hp: 0, def: 0, element: '衍射', coefficient: 3674 }
+    }
+    const weapons: Record<string, { atk: number }> = {}
+    for (const [name, info] of Object.entries(weaponInfoMap)) weapons[name] = { atk: info.lv90BaseAtk }
+    return {
+        characters,
+        weapons,
+        enemy: {
+            type: config.enemy.type,
+            level: config.enemy.level,
+            defense: config.enemy.defense,
+            dmgReduction: config.enemy.dmgReduction,
+            resistances: config.enemy.resistances,
+            coefficient: 10027
         }
-        return null
-    })
-    core.registerWeaponBaseStats((id) => {
-        const info = weaponInfoMap[id]
-        return info ? { atk: info.lv90BaseAtk } : null
-    })
-    core.registerEnemyCoefficients({ BOSS: 10027, 精英怪: 2149, 小怪: 716.2 })
-    return core
+    } as unknown as Parameters<CoconutCore['compute']>[1]
 }
 
 describe('编译 → 内核 与引擎数值对账', () => {
@@ -241,12 +249,15 @@ describe('编译 → 内核 与引擎数值对账', () => {
         PROFILE
     )
     const table = compileGeneralTable(request)
-    const coreResult = coreOf().compute(table)
+    const coreResult = new CoconutCore().compute(table, basesOf())
 
     it('结构：角色/词条/段数都按编译器口径铺开', () => {
         assert.deepEqual(table.characters, [CHAR, '', '', '效应·光噪效应'])
         assert.deepEqual(table.weapons, [WEAPON, '', '', ''])
-        assert.ok(table.sub_stats[0]!.some((stat) => stat.key === '攻击%'))
+        assert.ok(
+            table.sub_stats[0]!.some((stat) => stat.key === 'atkPct'),
+            '词条键已编译成作用 id'
+        )
         assert.equal(table.damage_entries.length, 4)
         assert.equal(table.damage_entries[0]!.damages.length, 3, 'hits=3 应展开成 3 段')
         assert.equal(table.damage_entries[1]!.damages.length, 1)

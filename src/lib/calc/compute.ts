@@ -22,7 +22,7 @@ import {
 } from '$coconut/panel'
 import { ACTION_MAP, REF_SOURCE_MAP } from '$coconut/actions'
 import { evaluateFormula } from '$coconut/evaluate'
-import { STAT_WRITES } from '$coconut/stats'
+import { STAT_WRITES } from '$lib/calc/stat-writes'
 import {
     isEffectEntry,
     FORMULAS,
@@ -903,24 +903,25 @@ const isEffectBase = (def: FormulaDef): boolean => def.base.kind === 'panelStat'
 const elementOfFormula = (def: FormulaDef, entry: DamageEntry): string =>
     isEffectBase(def) ? ((NON_DIRECT_ELEMENT as Record<string, string>)[entry.hitName] ?? '') : entry.damageElement
 
-/** @desc 组装公式求值上下文（增伤区的元素 / 类型加成在此按条目一次性求和） */
+/** @desc 增伤区按条目匹配到的加成（元素 + 类型，%）；内核的增伤区只读 `bonusDmg`，这里由工具箱折进去 */
+interface EntryBonus {
+    elementBonus: number
+    typeBonus: number
+}
+
+/** @desc 组装公式求值上下文：把元素/类型加成**折进面板的 `bonusDmg`**（内核只认这一个作用） */
 const formulaCtxOf = (
     panel: CharacterPanel,
     entry: DamageEntry,
     damageTypes: string[],
     element: string,
     target: TargetPanel
-): FormulaCtx => {
-    let typeBonusSum = 0
-    for (const dt of damageTypes) typeBonusSum += panel.typeBonus[dt.replace('伤害', '')] ?? 0
-    return {
-        panel,
-        element,
-        damageTypes,
-        elementBonus: panel.elementBonus[element] ?? 0,
-        typeBonus: typeBonusSum,
-        target
-    }
+): { ctx: FormulaCtx; bonus: EntryBonus } => {
+    let typeBonus = 0
+    for (const dt of damageTypes) typeBonus += panel.typeBonus[dt.replace('伤害', '')] ?? 0
+    const elementBonus = panel.elementBonus[element] ?? 0
+    panel.zones.bonusDmg = (panel.zones.bonusDmg ?? 0) + elementBonus + typeBonus
+    return { ctx: { panel, element, damageTypes, target }, bonus: { elementBonus, typeBonus } }
 }
 
 /** @desc 基值解析结果：基值、有效倍率、以及各类公式需要的附加量 */
@@ -1007,9 +1008,7 @@ const runChain = (
         baseValue: 0,
         element: ctx.element,
         panel: ctx.panel,
-        target: ctx.target,
-        elementBonus: ctx.elementBonus,
-        typeBonus: ctx.typeBonus
+        target: ctx.target
     })
     const values = new Map(evaluation.multipliers.map((zone) => [zone.id, zone.value] as const))
     return {
@@ -1055,7 +1054,7 @@ export const computeFormulaEntry = (
 ): ResultEntry => {
     const def = FORMULAS[formulaOf(entry)]
     const element = elementOfFormula(def, entry)
-    const ctx = formulaCtxOf(panel, entry, damageTypes, element, target)
+    const { ctx, bonus } = formulaCtxOf(panel, entry, damageTypes, element, target)
     const hits = entry.hits || 1
     const z = (id: string): number => panel.zones[id] ?? 0
     const { values, parts, product, productNoCrit } = runChain(def, ctx)
@@ -1125,7 +1124,7 @@ export const computeFormulaEntry = (
         defFlatSum: fromPanel ? z('defFlat') : 0,
         totalTuneBreakBoost: z('tuneBreakBoost'),
         // 增伤区只属于面板基类（系数基类条目不吃增伤，其词条加成不得出现在结果里）
-        dmgBonus: fromPanel ? (z('bonusDmg') + ctx.elementBonus + ctx.typeBonus) / 100 : 0,
+        dmgBonus: fromPanel ? z('bonusDmg') / 100 : 0,
         deepen: values.has(MULTIPLIERS.deepen.id) ? z('deepenDmg') / 100 : 0,
         critRate: Math.min(z('critRate'), 100) / 100,
         critDmg: critDmgDecimal,
@@ -1150,7 +1149,7 @@ export const computeFormulaEntry = (
         canCrit,
         multiplierZones: parts,
         damageTypes: def.reportsDamageTypes ? damageTypes : [],
-        ...(fromPanel ? { elBonus: ctx.elementBonus, typeBonus: ctx.typeBonus } : {}),
+        ...(fromPanel ? { elBonus: bonus.elementBonus, typeBonus: bonus.typeBonus } : {}),
         ratioFactors
     }
 }

@@ -1,51 +1,59 @@
 /**
  * @desc 计算门面：**工具箱只做「编译 + 结果物化」，数值全部由内核给**。
  *
- * 流程：工程状态 → `GeneralTable`（编译）→ `CoconutCore.compute`（内核算面板与数值）
- * → 用内核产出的面板/乘区物化界面需要的 `ResultEntry`。
+ * 流程：工程状态 → `GeneralTable`（编译）+ 基础数值（角色/武器/敌人，调用时传入）
+ * → `CoconutCore.compute`（内核算面板与数值）→ 用内核产出的面板/乘区物化 `ResultEntry`。
  *
  * 为什么物化还留在工具箱：`ResultEntry` 是界面契约（倍率拆解、溯源辅助、兼容列），
  * 属于 app 的展示需求，不进内核。
  */
-import { CoconutCore, type GeneralTable } from '$coconut'
-import type { ComputeRequest } from '$lib/calc/core'
+import { CoconutCore, type BaseStats, type CharacterBaseStats, type GeneralTable } from '$coconut'
+import type { ComputeRequest } from '$lib/calc/request.types'
 import { TUNE_COEFF_MAP, computeFormulaEntry } from '$lib/calc/compute'
 import type { ResultEntry } from '$lib/calc/result.types'
 import { VIRTUAL_EFFECT_PREFIX, compileGeneralTable } from '$lib/calc/compile'
 import { NON_DIRECT_ELEMENT } from '$lib/consts/game-terms'
 import { EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
 
-/** @desc 用工程里的基础数据建内核（角色/武器白值、效应虚角色、敌人偏谐系数均由工程提供） */
-export const coreOfRequest = (request: ComputeRequest): CoconutCore => {
-    const core = new CoconutCore()
-    core.registerCharacterBaseStats((id) => {
-        const info = request.charInfo[id]
-        if (info) return { ...info.lv90BaseStats, element: info.element }
-        if (id.startsWith(VIRTUAL_EFFECT_PREFIX)) {
-            // 效应虚角色：只有「效应系数」这一维度（= 效应基础值），不参与三维面板
-            const name = id.slice(VIRTUAL_EFFECT_PREFIX.length)
-            return {
-                atk: 0,
-                hp: 0,
-                def: 0,
-                element: (NON_DIRECT_ELEMENT as Record<string, string>)[name] ?? '',
-                coefficient: EFFECT_BASE_VALUE
-            }
+/** @desc 工程状态 → 内核要的基础数值（角色 / 武器 / 敌人全部在这里给） */
+export const basesOfRequest = (request: ComputeRequest): BaseStats => {
+    const characters: Record<string, CharacterBaseStats> = {}
+    for (const [name, info] of Object.entries(request.charInfo)) {
+        characters[name] = { ...info.lv90BaseStats, element: info.element }
+    }
+    for (const entry of request.entries) {
+        if (entry.formula !== 'effect' || !entry.hitName) continue
+        // 效应虚角色：只有「效应系数」这一维度（= 效应基础值），不参与三维面板
+        characters[`${VIRTUAL_EFFECT_PREFIX}${entry.hitName}`] = {
+            atk: 0,
+            hp: 0,
+            def: 0,
+            element: (NON_DIRECT_ELEMENT as Record<string, string>)[entry.hitName] ?? '',
+            coefficient: EFFECT_BASE_VALUE
         }
-        return null
-    })
-    core.registerWeaponBaseStats((id) => {
-        const info = request.weaponInfo[id]
-        return info ? { atk: info.lv90BaseAtk } : null
-    })
-    core.registerEnemyCoefficients(TUNE_COEFF_MAP)
-    return core
+    }
+    const weapons: Record<string, { atk: number }> = {}
+    for (const [name, info] of Object.entries(request.weaponInfo)) weapons[name] = { atk: info.lv90BaseAtk }
+
+    const enemy = request.config.enemy
+    return {
+        characters,
+        weapons,
+        enemy: {
+            type: enemy.type,
+            level: enemy.level,
+            defense: enemy.defense,
+            dmgReduction: enemy.dmgReduction,
+            resistances: enemy.resistances,
+            coefficient: TUNE_COEFF_MAP[enemy.type] ?? 716.2
+        }
+    }
 }
 
 /** @desc 编译 + 内核结算，返回表与按条目分组的结算结果 */
 export const computeWithCore = (request: ComputeRequest) => {
     const table: GeneralTable = compileGeneralTable(request)
-    const result = coreOfRequest(request).compute(table)
+    const result = new CoconutCore().compute(table, basesOfRequest(request))
     return { table, result }
 }
 

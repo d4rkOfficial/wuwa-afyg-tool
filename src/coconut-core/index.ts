@@ -10,11 +10,11 @@
  */
 export { CoconutCore } from '$coconut/coconut-core'
 export type {
+    BaseStats,
     CharacterBaseStats,
-    CharacterStatsSource,
-    EnemyCoefficientSource,
-    WeaponBaseStats,
-    WeaponStatsSource
+    ComputeOptions,
+    EnemyBaseStats,
+    WeaponBaseStats
 } from '$coconut/coconut-core'
 
 export type {
@@ -29,8 +29,6 @@ export type {
     Damage,
     DamageEntry,
     ElementEnum,
-    EnemyBaseResistance,
-    EnemyInput,
     EnemyStatEnum,
     GeneralTable,
     MultiEnum,

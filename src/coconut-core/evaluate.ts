@@ -18,10 +18,6 @@ export interface FormulaEvaluationInput {
     element: string
     panel: CharacterPanel
     target: TargetPanel
-    /** @desc 元素加成合计（%）；缺省按面板里该属性的词条加成 */
-    elementBonus?: number
-    /** @desc 类型加成合计（%）；工具箱已把类型加成折进 `bonusDmg` 时缺省 0 */
-    typeBonus?: number
 }
 
 /** @desc 求值结果 */
@@ -43,9 +39,7 @@ export const formulaCtxOf = (input: FormulaEvaluationInput): FormulaCtx => ({
     panel: input.panel,
     target: input.target,
     element: input.element,
-    damageTypes: [],
-    elementBonus: input.elementBonus ?? input.panel.elementBonus[input.element] ?? 0,
-    typeBonus: input.typeBonus ?? 0
+    damageTypes: []
 })
 
 /** @desc 求值一条公式链 */

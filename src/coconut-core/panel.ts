@@ -35,9 +35,12 @@ export interface CharacterPanel {
     base: PanelTriple
     /** @desc 三维合计（`recomputeTotals` 的产物） */
     total: PanelTriple
-    /** @desc 元素伤害加成（词条来源；键是属性名，不是作用 id） */
+    /**
+     * @desc 元素伤害加成桶（**调用方自用**：按属性匹配是业务，内核的增伤区只读 `bonusDmg`）。
+     * 内核不写、不读它，只保证拷贝/初始化语义正确。
+     */
     elementBonus: Record<string, number>
-    /** @desc 伤害类型加成（词条来源；键是类型短名） */
+    /** @desc 伤害类型加成桶（同上，调用方自用） */
     typeBonus: Record<string, number>
 }
 

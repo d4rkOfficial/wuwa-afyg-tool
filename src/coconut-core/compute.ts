@@ -4,9 +4,8 @@
  * 这里**没有条件、没有规则、没有技能文案推断**：表里出现的 buff 一律生效。
  * 「哪些 buff 属于这一段」是调用方在编译表时求的值，内核不做二次判断。
  */
-import { ELEMENTS, ELEMENT_BONUS_MAP } from '$lib/consts/game-terms'
 import { ACTION_MAP, REF_SOURCE_MAP } from '$coconut/actions'
-import { CRIT_ACTION_IDS, FORMULAS, FORMULAS_DEFAULT_COEFF, type FormulaDef } from '$coconut/formulas'
+import { CRIT_ACTION_IDS, FORMULAS, type FormulaDef } from '$coconut/formulas'
 import { evaluateFormula } from '$coconut/evaluate'
 import {
     applyZone,
@@ -16,7 +15,6 @@ import {
     type CharacterPanel,
     type TargetPanel
 } from '$coconut/panel'
-import { STAT_WRITES } from '$coconut/stats'
 import {
     parseValue,
     type CalculationFormula,
@@ -26,13 +24,15 @@ import {
 } from '$coconut/general-table'
 import type { BuffContribution, CoreResult, DamageResult } from '$coconut/result'
 
-/** @desc 角色基础属性（由调用方注册；数值为 90 级白值） */
+/** @desc 角色基础属性（调用时传入；数值为 90 级白值） */
 export interface CharacterBaseStats {
     atk: number
     hp: number
     def: number
     /** @desc 伤害属性（用于抗性区取哪一档抗性） */
     element: string
+    /** @desc 角色等级（防御区口径；缺省 90） */
+    level?: number
     /** @desc 谐度破坏增幅（缺省 0） */
     tuneBreakBoost?: number
     /**
@@ -47,12 +47,25 @@ export interface WeaponBaseStats {
     atk: number
 }
 
-/** @desc 注册表：id → 基础属性 */
-export interface KernelRegistries {
+/** @desc 敌人基础数值（调用时传入） */
+export interface EnemyBaseStats {
+    /** @desc 敌人类型（只作标识 / 展示） */
+    type: string
+    level: number
+    defense: number
+    /** @desc 敌人免伤（%） */
+    dmgReduction: number
+    /** @desc 各属性抗性（%），按**属性名**给，不依赖任何下标顺序 */
+    resistances: Readonly<Record<string, number>>
+    /** @desc 偏谐系数（处决 / 偏谐响应的基值来源） */
+    coefficient: number
+}
+
+/** @desc 一次结算的基础数值来源 */
+export interface KernelBases {
     characterOf: (id: string) => CharacterBaseStats | null | undefined
     weaponOf: (id: string) => WeaponBaseStats | null | undefined
-    /** @desc 敌人类型 → 偏谐系数（处决 / 偏谐响应基值） */
-    enemyCoefficientOf: (type: string) => number | undefined
+    enemy: EnemyBaseStats
 }
 
 /** @desc 数值串 → 数字（`'12.6%'` → 12.6；无法解析按 0，不让坏数据炸整次结算） */
@@ -78,73 +91,58 @@ export const resolveStatRef = (ref: StatRef, panel: CharacterPanel, target: Targ
     return Math.min(Math.max(raw, Math.min(lower, upper)), Math.max(lower, upper))
 }
 
-/** @desc 双暴词条（系数基类条目不参与）——由乘子链声明推导，不手抄词条或作用名 */
-const CRIT_STAT_KEYS = new Set(
-    Object.entries(STAT_WRITES)
-        .filter(([, write]) => write.kind === 'action' && CRIT_ACTION_IDS.includes(write.action))
-        .map(([key]) => key)
-)
-
-/** @desc 词条 → 面板（内核侧唯一入口；`STAT_WRITES` 是词条落点表） */
+/** @desc 词条→作用 id 的解析属于调用方：内核只把 `Stat.key` 当作用 id 写进面板 */
 const applyStat = (panel: CharacterPanel, key: string, value: string): void => {
-    const write = STAT_WRITES[key]
-    if (!write || write.kind === 'none') return
-    if (write.kind === 'elementBonus') {
-        const element = ELEMENT_BONUS_MAP[key]
-        if (!element) return
-        panel.elementBonus[element] = (panel.elementBonus[element] ?? 0) + num(value)
-        return
-    }
-    // 类型加成没有「伤害类型」字段可对，须由调用方编译成 bonusDmg buff
-    if (write.kind !== 'action') return
-    applyZone(panel, write.action, num(value))
+    if (CRIT_ACTION_IDS.includes(key) && panel.zones[key] === undefined) return
+    applyZone(panel, key, num(value))
 }
 
 /** @desc 基础面板：白值 + 词条（不含 buff） */
 const basePanelOf = (
     table: GeneralTable,
-    registries: KernelRegistries,
+    bases: KernelBases,
     charIndex: number,
     critBase: 'panel' | 'coefficient'
 ): CharacterPanel => {
     const panel = emptyPanel(critBase)
-    const char = registries.characterOf(table.characters[charIndex] ?? '')
-    const weapon = registries.weaponOf(table.weapons[charIndex] ?? '')
+    const char = bases.characterOf(table.characters[charIndex] ?? '')
+    const weapon = bases.weaponOf(table.weapons[charIndex] ?? '')
     if (char) {
         panel.base.atk = Math.round(char.atk + (weapon?.atk ?? 0))
         panel.base.hp = Math.round(char.hp)
         panel.base.def = Math.round(char.def)
+        panel.zones.charLevel = char.level ?? 90
         panel.zones.tuneBreakBoost = Math.round(char.tuneBreakBoost ?? 0)
         panel.zones.effectCoeff = char.coefficient ?? 0
     }
     // 系数基类条目：双暴是它自己临时的一份，词条双暴不参与（决议 D1）
     const skipCrit = critBase === 'coefficient'
     for (const stat of table.main_stats[charIndex] ?? []) {
-        if (skipCrit && CRIT_STAT_KEYS.has(stat.key)) continue
+        if (skipCrit && CRIT_ACTION_IDS.includes(stat.key)) continue
         applyStat(panel, stat.key, stat.value)
     }
     for (const stat of table.sub_stats[charIndex] ?? []) {
-        if (skipCrit && CRIT_STAT_KEYS.has(stat.key)) continue
+        if (skipCrit && CRIT_ACTION_IDS.includes(stat.key)) continue
         applyStat(panel, stat.key, stat.value)
     }
     recomputeTotals(panel)
     return panel
 }
 
-/** @desc 目标面板：敌人配置 + 目标侧 buff（免伤落在 `dmgReduction`，其余落在 `zones`） */
+/** @desc 目标面板：敌人基础数值（调用方传入）+ 目标侧 buff（免伤/系数落在标量字段，其余落在 `zones`） */
 const targetPanelOf = (
-    table: GeneralTable,
-    registries: KernelRegistries,
+    bases: KernelBases,
     buffs: readonly { effect: { applyTo: string; value: unknown } }[]
 ): TargetPanel => {
     const panel = emptyTargetPanel()
-    const [type, , defense, resistances] = table.enemy
-    panel.type = type
-    panel.defense = num(defense)
-    panel.coefficient = registries.enemyCoefficientOf(type) ?? FORMULAS_DEFAULT_COEFF
-    ELEMENTS.forEach((element, index) => {
-        panel.resistances[element] = num(resistances[index])
-    })
+    const enemy = bases.enemy
+    panel.type = enemy.type
+    panel.defense = num(enemy.defense)
+    panel.dmgReduction = num(enemy.dmgReduction)
+    panel.coefficient = num(enemy.coefficient)
+    for (const [element, value] of Object.entries(enemy.resistances)) {
+        panel.resistances[element] = num(value)
+    }
     for (const buff of buffs) {
         const def = ACTION_MAP.get(buff.effect.applyTo)
         if (!def || def.side !== 'target') continue
@@ -176,13 +174,13 @@ const splitBuffs = (damage: Damage) => {
 /** @desc 结算一段伤害的面板（词条 + 角色侧 buff + 引用） */
 const panelOfDamage = (
     table: GeneralTable,
-    registries: KernelRegistries,
+    bases: KernelBases,
     charIndex: number,
     critBase: 'panel' | 'coefficient',
     damage: Damage,
     target: TargetPanel
 ): CharacterPanel => {
-    const panel = basePanelOf(table, registries, charIndex, critBase)
+    const panel = basePanelOf(table, bases, charIndex, critBase)
     const { literal, refs } = splitBuffs(damage)
     for (const write of literal) applyZone(panel, write.applyTo, write.value)
     recomputeTotals(panel)
@@ -216,7 +214,7 @@ const baseValueOf = (def: FormulaDef, damage: Damage, panel: CharacterPanel, tar
 /** @desc 单段结算（`excludeBuffId` 用于溯源：把这一条 buff 摘掉再算一遍） */
 const computeDamage = (
     table: GeneralTable,
-    registries: KernelRegistries,
+    bases: KernelBases,
     entryIndex: number,
     damageIndex: number,
     charIndex: number,
@@ -231,8 +229,8 @@ const computeDamage = (
     const def = FORMULAS[formula]
     const critBase = def.critBase
     const { targetSide } = splitBuffs(damage)
-    const target = targetPanelOf(table, registries, targetSide)
-    const panel = panelOfDamage(table, registries, charIndex, critBase, damage, target)
+    const target = targetPanelOf(bases, targetSide)
+    const panel = panelOfDamage(table, bases, charIndex, critBase, damage, target)
     const baseValue = baseValueOf(def, damage, panel, target)
     const evaluation = evaluateFormula({ formula, baseValue, element: damage.element, panel, target })
 
@@ -260,7 +258,7 @@ const computeDamage = (
 /** @desc 逐 buff 溯源：把每条 buff 单独摘掉重算，差值即它的贡献 */
 const contributionsOf = (
     table: GeneralTable,
-    registries: KernelRegistries,
+    bases: KernelBases,
     entryIndex: number,
     damageIndex: number,
     charIndex: number,
@@ -272,7 +270,7 @@ const contributionsOf = (
     for (const buff of damage.activated_buffs) {
         if (seen.has(buff.id)) continue
         seen.add(buff.id)
-        const without = computeDamage(table, registries, entryIndex, damageIndex, charIndex, buff.id)
+        const without = computeDamage(table, bases, entryIndex, damageIndex, charIndex, buff.id)
         const deltaExpected = full.expected - without.expected
         out.push({
             buffId: buff.id,
@@ -287,16 +285,16 @@ const contributionsOf = (
 /** @desc 结算整张表（`trace: true` 时为每段附带逐 buff 贡献） */
 export const computeGeneralTable = (
     table: GeneralTable,
-    registries: KernelRegistries,
+    bases: KernelBases,
     options?: { trace?: boolean }
 ): CoreResult => {
     const damages: DamageResult[] = []
     for (const [entryIndex, entry] of table.damage_entries.entries()) {
         const charIndex = table.characters.indexOf(entry.source)
         for (const [damageIndex] of entry.damages.entries()) {
-            const damage = computeDamage(table, registries, entryIndex, damageIndex, charIndex)
+            const damage = computeDamage(table, bases, entryIndex, damageIndex, charIndex)
             if (options?.trace) {
-                damage.contributions = contributionsOf(table, registries, entryIndex, damageIndex, charIndex, damage)
+                damage.contributions = contributionsOf(table, bases, entryIndex, damageIndex, charIndex, damage)
             }
             damages.push(damage)
         }

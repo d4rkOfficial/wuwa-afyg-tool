@@ -137,6 +137,7 @@ const ENTITY_IDS = [
 
 /** @desc ① 自检的搜索范围：这些文件里必须能找到 ENTITY_IDS 的每一项 */
 const REGISTRY_SOURCES = [
+    'src/lib/calc/stat-writes.ts',
     'src/coconut-core/actions.ts',
     'src/coconut-core/formulas.ts',
     'src/coconut-core/stats.ts',
@@ -153,6 +154,7 @@ const REGISTRY_SOURCES = [
  * 后续阶段会收敛成 `src/lib/calc/registry/**` 下的若干注册域。
  */
 const REGISTRY = new Set([
+    'src/lib/calc/stat-writes.ts',
     'src/coconut-core/actions.ts',
     'src/coconut-core/formulas.ts',
     'src/coconut-core/stats.ts',

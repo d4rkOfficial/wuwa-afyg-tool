@@ -10,7 +10,7 @@
  * 内核侧因此完全无条件：拿到什么就加什么。
  */
 import type { BuffInstance, DamageEntry as EngineDamageEntry } from '$lib/calc/calculation.types'
-import type { ComputeRequest } from '$lib/calc/core'
+import type { ComputeRequest } from '$lib/calc/request.types'
 import {
     DEFAULT_CONDITION_PROFILE,
     entryActiveBuffs,
@@ -20,9 +20,10 @@ import {
     type ConditionProfile,
     type ZoneCtx
 } from '$lib/calc/compute'
-import { ELEMENTS, NON_DIRECT_ELEMENT, TYPE_BONUS_MAP } from '$lib/consts/game-terms'
+import { ELEMENT_BONUS_MAP, NON_DIRECT_ELEMENT, TYPE_BONUS_MAP } from '$lib/consts/game-terms'
 import { getEffectBurstMultiplier, getEffectMultiplier } from '$lib/consts/effect-data'
 import { BASE_SUFFIXES, BONUS_DMG_ACTION, DEFAULT_PANEL_DIM } from '$coconut/stats'
+import { statActionOf } from '$lib/calc/stat-writes'
 import { PANEL_BASE_TYPES } from '$coconut/formulas'
 import type { Buff, Damage, DamageEntry, GeneralTable, Stat } from '$coconut'
 
@@ -32,6 +33,15 @@ const toMutableList = (record: Readonly<Record<string, readonly string[]>> | und
 
 /** @desc 词条键是否属于「伤害类型加成」（这类词条要按段挂成 `bonusDmg`） */
 const isTypeBonusStat = (key: string): boolean => TYPE_BONUS_MAP[key] !== undefined
+
+/** @desc 词条键是否属于「属性加成」（同样按段挂 `bonusDmg`，只挑属性匹配的伤害） */
+const isElementBonusStat = (key: string): boolean => ELEMENT_BONUS_MAP[key] !== undefined
+
+/** @desc 词条 label → 内核作用 id；没有单一落点的（元素/类型/治疗）返回 null */
+const toActionStat = (stat: Stat): Stat | null => {
+    const action = statActionOf(stat.key)
+    return action === null ? null : { key: action, value: stat.value }
+}
 
 /** @desc 效应虚角色的 id 前缀：效应没有源角色，内核里用虚角色承载「效应系数」面板属性 */
 export const VIRTUAL_EFFECT_PREFIX = '效应·'
@@ -89,11 +99,19 @@ const effectsOf = (buffs: readonly BuffInstance[], ctx: ZoneCtx, refValues: Read
  * - 普通词条留在 `sub_stats`；
  * - 类型加成词条按段挂成 `bonusDmg`（内核没有伤害类型字段）。
  */
-const splitStats = (stats: readonly Stat[]): { plain: Stat[]; typeBonus: Stat[] } => {
+const splitStats = (stats: readonly Stat[]): { plain: Stat[]; typeBonus: Stat[]; elementBonus: Stat[] } => {
     const plain: Stat[] = []
     const typeBonus: Stat[] = []
-    for (const stat of stats) (isTypeBonusStat(stat.key) ? typeBonus : plain).push(stat)
-    return { plain, typeBonus }
+    const elementBonus: Stat[] = []
+    for (const stat of stats) {
+        if (isTypeBonusStat(stat.key)) typeBonus.push(stat)
+        else if (isElementBonusStat(stat.key)) elementBonus.push(stat)
+        else {
+            const action = toActionStat(stat)
+            if (action) plain.push(action)
+        }
+    }
+    return { plain, typeBonus, elementBonus }
 }
 
 /** @desc 类型加成词条 → 命中该伤害类型的段挂 `bonusDmg`（类型名去掉「伤害」后缀） */
@@ -104,11 +122,14 @@ const typeBonusBuffsOf = (stats: readonly Stat[], ctx: ZoneCtx): Buff[] =>
         return hit ? [{ id: `statBonus:${stat.key}`, effect: { applyTo: BONUS_DMG_ACTION, value: stat.value } }] : []
     })
 
-/** @desc 敌人配置里「不属于表元组」的部分：免伤（内核用目标侧作用表达，故按段挂一条 buff） */
-const enemyBuffsOf = (enemy: ComputeRequest['config']['enemy']): Buff[] =>
-    enemy.dmgReduction === 0
-        ? []
-        : [{ id: 'enemy:dmgReduction', effect: { applyTo: 'enemyDmgReduction', value: String(enemy.dmgReduction) } }]
+/** @desc 属性加成词条 → 命中该伤害属性的段挂 `bonusDmg` */
+const elementBonusBuffsOf = (stats: readonly Stat[], element: string): Buff[] =>
+    stats.flatMap((stat) => {
+        const matched = ELEMENT_BONUS_MAP[stat.key] === element
+        return matched
+            ? [{ id: `statElement:${stat.key}`, effect: { applyTo: BONUS_DMG_ACTION, value: stat.value } }]
+            : []
+    })
 
 /** @desc 工程状态 → 一张 `GeneralTable` */
 export const compileGeneralTable = (request: ComputeRequest): GeneralTable => {
@@ -126,12 +147,14 @@ export const compileGeneralTable = (request: ComputeRequest): GeneralTable => {
     const mainStats: Stat[][] = []
     const subStats: Stat[][] = []
     const typeBonusStats: Stat[][] = []
+    const elementBonusStats: Stat[][] = []
     for (const stats of statsPerChar) {
         const mains = splitStats([...stats.mainStats])
         const subs = splitStats([...stats.subStats])
         mainStats.push(mains.plain)
         subStats.push(subs.plain)
         typeBonusStats.push([...mains.typeBonus, ...subs.typeBonus])
+        elementBonusStats.push([...mains.elementBonus, ...subs.elementBonus])
     }
 
     const refContext = {
@@ -166,9 +189,9 @@ export const compileGeneralTable = (request: ComputeRequest): GeneralTable => {
 
         const refValues = charIndex >= 0 ? resolveRefZoneValues(entry, refContext) : new Map<string, number>()
         const buffs: Buff[] = [
-            ...enemyBuffsOf(request.config.enemy),
             ...effectsOf(active, ctx, refValues),
-            ...typeBonusBuffsOf(typeBonusStats[charIndex] ?? [], ctx)
+            ...typeBonusBuffsOf(typeBonusStats[charIndex] ?? [], ctx),
+            ...elementBonusBuffsOf(elementBonusStats[charIndex] ?? [], entry.damageElement)
         ]
 
         const isEffect = entry.formula === 'effect'
@@ -200,16 +223,6 @@ export const compileGeneralTable = (request: ComputeRequest): GeneralTable => {
         main_stats: mainStats,
         sub_stats: subStats,
         buffs: damageEntries.flatMap((entry) => entry.damages.flatMap((damage) => damage.activated_buffs)),
-        damage_entries: damageEntries,
-        enemy: [
-            request.config.enemy.type,
-            request.config.enemy.level,
-            request.config.enemy.defense,
-            enemyResistancesOf(request.config.enemy)
-        ]
+        damage_entries: damageEntries
     }
 }
-
-/** @desc 敌人各属性抗性（顺序 = `ELEMENTS`；配置里缺的属性按 0） */
-const enemyResistancesOf = (enemy: ComputeRequest['config']['enemy']): number[] =>
-    ELEMENTS.map((element) => Number(enemy.resistances[element] ?? 0))
