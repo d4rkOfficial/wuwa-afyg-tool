@@ -9,7 +9,7 @@
     import { getActiveProject, updateResultAnalysis, updateComparisonPoints } from '$lib/data/project.svelte'
     import { getMultiEntryExpand } from '$lib/data/interaction-prefs.svelte'
     import { nextExpandedIds } from '$lib/utils/expand-state'
-    import { computeAll as computeAllDamage } from '$coconut/engine/compute'
+    import { computeAllCore as computeAllDamage } from '$lib/calc/compute-facade'
     import {
         getAllDamageEntries,
         getCalcState,

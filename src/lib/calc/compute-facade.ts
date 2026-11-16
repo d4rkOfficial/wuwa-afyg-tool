@@ -45,3 +45,29 @@ export const computeAllViaCore = (request: ComputeRequest): ResultEntry[] => {
         return computeFormulaEntry(entry, first.panel, first.target, damageTypes)
     })
 }
+
+/** @desc 与引擎 `computeAll` 同位置参数的入口（调用处只换 import，不改实参顺序） */
+export const computeAllCore = (
+    entries: ComputeRequest['entries'],
+    buffs: ComputeRequest['buffs'],
+    bindings: ComputeRequest['bindings'],
+    damageTypes: ComputeRequest['damageTypes'],
+    config: ComputeRequest['config'],
+    team: ComputeRequest['team'],
+    charInfo: ComputeRequest['charInfo'],
+    weaponInfo: ComputeRequest['weaponInfo'],
+    profile?: ComputeRequest['profile'],
+    echoSkillText?: ComputeRequest['echoSkillText']
+): ResultEntry[] =>
+    computeAllViaCore({
+        entries,
+        buffs,
+        bindings,
+        damageTypes,
+        config,
+        team,
+        charInfo,
+        weaponInfo,
+        profile,
+        echoSkillText
+    })

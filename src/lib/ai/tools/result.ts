@@ -2,7 +2,7 @@
 import { tick } from 'svelte'
 import { defineTool } from './registry'
 import { summarizeDamageByCharacter } from '$lib/ai/result-summary'
-import { computeAll } from '$coconut/engine/compute'
+import { computeAllCore as computeAll } from '$lib/calc/compute-facade'
 import {
     getAllDamageEntries,
     getCalcState,
