@@ -53,9 +53,9 @@ export interface EncounterState {
     config: PhaseStateV2<ConfigState>
 }
 
-// ── 新工程结构（version 9：敌人类型条件改多选，同类条件只保留一条）──
+// ── 新工程结构（version 10：作用能力位生效，不可挂条件的组合在归一化时清掉）──
 
-export const PROJECT_VERSION = 9
+export const PROJECT_VERSION = 10
 
 export interface ProjectV2 {
     version: number

@@ -8,16 +8,15 @@ import {
     getTargetSideSourceBuffs,
     resolveDamageTypes,
     resolveRefZoneValues,
-    usesCoefficientFormula,
     zoneConditionMet,
     type ConditionProfile,
     type RuleEvalDeps,
     type ZoneCtx
 } from './compute'
 import { describeZoneConditionBadge } from './condition'
-import { zoneAppliesToCoeffEntry } from './calculation.consts'
+import { isEffectEntry, formulaAcceptsRef, type CritBase } from './registry/formulas'
 import { buildEchoDescByEntry } from './skill-infer'
-import { getEchoSkillText } from '$lib/data/char-info.svelte'
+import { FORMULAS, formulaOf, type MultiplierId } from './registry/formulas'
 import { ELEMENT_BONUS_MAP, TYPE_BONUS_MAP, WEAPON_SUBSTAT_NAME_MAP } from '$lib/consts/game-terms'
 
 /** @desc 溯源所需上下文（结果页可直接提供的输入，与 computeAll 同源） */
@@ -30,6 +29,8 @@ export interface DamageTraceCtx {
     charInfoMap: Record<string, CharacterInfo>
     weaponInfoMap: Record<string, WeaponInfo>
     conditionProfile: ConditionProfile
+    /** @desc 声骸技能文案索引（伤害类型推导规则2）；缺省 = 规则2 不参与 */
+    echoSkillText?: Record<string, string>
 }
 
 /** @desc 单个来源条目：白值/武器/声骸/拉表Buff/敌人面板 */
@@ -158,7 +159,7 @@ const zoneCtxOf = (entryLike: DamageEntry, ctx: DamageTraceCtx, echoDescByEntry:
     refinements: ctx.conditionProfile.refinements,
     element: entryLike.damageElement,
     damageTypes: resolveDamageTypes(entryLike, ctx.damageEntryDamageTypes, ctx.charInfoMap, echoDescByEntry),
-    isEffect: entryLike.isEffect,
+    isEffect: isEffectEntry(entryLike),
     damageName: entryLike.displayName
 })
 
@@ -189,17 +190,18 @@ const refKeyOf = (buffId: string, zoneIndex: number): string => `${buffId}#${zon
  * @desc 乘区来源的判定上下文：
  * - `zoneCtx`：乘区级条件判据（与引擎同一个 `zoneConditionMet`）
  * - `refValues`：引用（转模）的解算结果（`buffId#zoneIndex` → 数值）—— 溯源只展示结果，不展示转模过程
- * - `coeffEntry`：本条是否系数基类条目（处决/响应/效应/偏谐系数直伤）—— 这些条目上双暴只有「覆盖」生效，
- *   追加/引用的双暴乘区既不算数值、也不得列为来源（判据与引擎同一个 `zoneAppliesToCoeffEntry`）
+ * - `critBase`：本条的双暴口径 —— 系数口径下双暴的引用写入不生效，
+ *   系数口径下双暴的**引用写入**既不算数值、也不得列为来源（判据与引擎同一个 `formulaAcceptsRef`）
  */
 interface ZoneTraceCtx {
     zoneCtx: ZoneCtx
     refValues: Map<string, number>
-    coeffEntry: boolean
+    critBase: CritBase
 }
 
 /** @desc 该乘区在本条上是否生效（系数基类条目的双暴只有覆盖生效） */
-const zoneApplies = (zone: BuffZoneValue, coeffEntry: boolean): boolean => !coeffEntry || zoneAppliesToCoeffEntry(zone)
+const zoneApplies = (zone: BuffZoneValue, critBase: CritBase): boolean =>
+    !zone.ref || formulaAcceptsRef(critBase, zone.zoneId)
 
 /**
  * @desc 拉表Buff 指定乘区的来源（普通加值 / 覆盖 / 引用）；存在生效覆盖时只列覆盖来源，加算值不显示（与引擎一致）。
@@ -212,7 +214,7 @@ function buffZoneParts(
     zoneId: string,
     label: string,
     unit: '%' | 'flat',
-    { zoneCtx, refValues, coeffEntry }: ZoneTraceCtx
+    { zoneCtx, refValues, critBase }: ZoneTraceCtx
 ): TracePart[] {
     const adds: TracePart[] = []
     const overrides: TracePart[] = []
@@ -222,7 +224,7 @@ function buffZoneParts(
             if (z.zoneId !== zoneId) return
             // 乘区条件不满足 ⇒ 引擎没算它，来源也不得列出（判据与引擎同一个 `zoneConditionMet`）
             if (!zoneConditionMet(z, zoneCtx)) return
-            if (!zoneApplies(z, coeffEntry)) return
+            if (!zoneApplies(z, critBase)) return
             const zoneLabel = zoneLabelWithCondition(label, z.condition)
             if (z.ref) {
                 refs.push({
@@ -280,7 +282,7 @@ function collectBaseParts(
     entry: ResultEntry,
     ctx: DamageTraceCtx,
     buffs: BuffConf[],
-    { zoneCtx, refValues, coeffEntry }: ZoneTraceCtx
+    { zoneCtx, refValues, critBase }: ZoneTraceCtx
 ): TracePart[] {
     const parts: TracePart[] = []
     const charName = entry.character || ''
@@ -366,7 +368,7 @@ function collectBaseParts(
         bs.zones.forEach((z, zi) => {
             if (z.zoneId !== zoneFlat && z.zoneId !== zonePct) return
             if (!zoneConditionMet(z, zoneCtx)) return
-            if (!zoneApplies(z, coeffEntry)) return
+            if (!zoneApplies(z, critBase)) return
             const value = z.ref ? (refValues.get(refKeyOf(bs.id, zi)) ?? 0) : z.value
             if (!z.ref && value === 0) return
             const pct = z.zoneId === zonePct
@@ -385,7 +387,7 @@ function collectBaseParts(
     // 若按来源贡献求和与面板总值仍有缺口（覆盖等无法逐条列出的写入），补一个「其它」占位
     // contribSum 含白值来源，故基准用面板总值 totalStat（而非已减白值的 green），避免多扣一个白值
     const contribSum = parts.reduce((s, p) => s + (p.contribution ?? 0), 0)
-    const totalStat = kind === 'hp' ? entry.totalHp : kind === 'def' ? entry.totalDef : entry.totalAtk
+    const totalStat = entry.panel.total[kind]
     const gap = Math.round(totalStat) - Math.round(contribSum)
     if (Math.abs(gap) > 1) {
         parts.push({
@@ -513,7 +515,7 @@ function collectEnemyParts(
  * - **面板基类（直伤）**：基础双暴 5% / 150%（角色面板）+ 声骸/武器词条双暴 + 拉表 Buff 双暴。
  * - **系数基类（`偏谐系数` / `效应系数`：处决/响应/效应/偏谐系数直伤）**：不吃角色面板双暴，
  *   基准 0% / 100%（「额外暴击伤害 +0%」），也不列声骸/武器词条 —— 只有绑定到本条的 Buff 参与。
- *   与 `compute.ts` 的 `critBase(fromPanel=false)` 必须保持一致，否则来源列表会与暴击区数值打架。
+ *   与注册表的 `initCoeff`（暴击率 0 / 暴击伤害 100）必须保持一致，否则来源列表会与暴击区数值打架。
  */
 function collectCritParts(
     entry: ResultEntry,
@@ -560,7 +562,7 @@ function collectCritParts(
 }
 
 /** @desc 特殊区：拉表Buff 特殊终伤（加算）与特殊终伤·乘算（连乘因子），含引用/覆盖来源（引用只给结果） */
-function collectCustomParts(buffs: BuffConf[], { zoneCtx, refValues, coeffEntry }: ZoneTraceCtx): TracePart[] {
+function collectCustomParts(buffs: BuffConf[], { zoneCtx, refValues, critBase }: ZoneTraceCtx): TracePart[] {
     const adds: TracePart[] = []
     const overrides: TracePart[] = []
     const refs: TracePart[] = []
@@ -569,7 +571,7 @@ function collectCustomParts(buffs: BuffConf[], { zoneCtx, refValues, coeffEntry 
             const isMul = z.zoneId === 'specialFinal2'
             if (z.zoneId !== 'specialFinal1' && !isMul) return
             if (!zoneConditionMet(z, zoneCtx)) return
-            if (!zoneApplies(z, coeffEntry)) return
+            if (!zoneApplies(z, critBase)) return
             const zoneLabel = zoneLabelWithCondition(isMul ? '特殊终伤(2)·乘算' : '特殊终伤(1)', z.condition)
             const extra = isMul ? { contribution: 1 + z.value / 100 } : {}
             if (z.ref) {
@@ -691,11 +693,10 @@ function toDamageEntryLike(entry: ResultEntry): DamageEntry {
         skillType: entry.skillType,
         hitName: entry.hitName,
         displayName: entry.displayName,
-        isEffect: entry.baseUnit === '效应系数',
-        isTuneBreak: entry.baseUnit.startsWith('偏谐系数'),
-        isTuneResponse: false,
+        formula: entry.formula,
         ratioValue: entry.ratioNum,
-        ratioUnit: '%',
+        // 固定值条目的倍率单位不是 %：还原时保留这一区别，否则公式链会被判成直伤
+        ratioUnit: entry.baseUnit === '固定' ? 'fixed' : '%',
         damageBaseType: entry.baseUnit,
         damageElement: entry.element,
         sourceTimelineBlockId: entry.sourceTimelineBlockId,
@@ -706,6 +707,137 @@ function toDamageEntryLike(entry: ResultEntry): DamageEntry {
 /** @desc 暴击展示口径：由调用方按「该条目是否被设为凹暴/不暴」传入（不要用数值反推——
  *  暴击率≥100% 时期望值天然等于全暴击值，反推会把「必暴」误判成「凹暴」模式） */
 export type CritDisplayMode = 'expected' | 'rig' | 'noCrit'
+
+/** @desc 乘区段的构造上下文：溯源自有（需要 buff 来源与展示模式），数值统一取自引擎的乘区明细 */
+interface SegmentCtx {
+    entry: ResultEntry
+    ctx: DamageTraceCtx
+    buffs: BuffConf[]
+    targetSideBuffs: BuffConf[]
+    zoneTrace: ZoneTraceCtx
+    missed: boolean
+    critMode: CritDisplayMode
+    /** @desc 取某乘子的数值（与 `ResultEntry.multiplierZones` 同源） */
+    valueOf: (id: MultiplierId) => number
+}
+
+/**
+ * @desc 乘子 id → 溯源段构造器。
+ *
+ * **membership 与顺序由公式链决定**（`FORMULAS[id].chain`），这里只回答「这一段怎么展示、来源从哪来」。
+ * 新增乘子时补一个构造器即可，不需要在 `buildDamageSegments` 里插一段。
+ */
+const SEGMENT_BUILDERS: Record<MultiplierId, (c: SegmentCtx) => DamageSegment | null> = {
+    deepen: ({ entry, buffs, zoneTrace, valueOf }) =>
+        seg(
+            'deepen',
+            '加深区',
+            valueOf('deepen'),
+            `(1 + ${fmtPercent(entry.deepen * 100)})`,
+            buffZoneParts(buffs, 'deepenDmg', '加深', '%', zoneTrace)
+        ),
+    bonus: ({ entry, ctx, buffs, zoneTrace, valueOf }) =>
+        seg(
+            'bonus',
+            '增伤区',
+            valueOf('bonus'),
+            `(1 + ${fmtPercent(entry.dmgBonus * 100)})`,
+            collectBonusParts(entry, ctx, buffs, zoneTrace)
+        ),
+    vuln: ({ entry, buffs, zoneTrace, valueOf }) =>
+        seg(
+            'vuln',
+            '易伤区',
+            valueOf('vuln'),
+            `(1 + ${fmtPercent(entry.vulnerability * 100)})`,
+            buffZoneParts(buffs, 'dmgTakenInc', '易伤', '%', zoneTrace)
+        ),
+    resist: ({ entry, ctx, buffs, zoneTrace, valueOf }) =>
+        seg(
+            'resist',
+            '抗性区',
+            valueOf('resist'),
+            entry.resMulti.toFixed(4),
+            collectEnemyParts(entry, ctx, buffs, 'res', zoneTrace)
+        ),
+    defense: ({ entry, ctx, buffs, zoneTrace, valueOf }) =>
+        seg(
+            'defense',
+            '防御区',
+            valueOf('defense'),
+            entry.defMulti.toFixed(4),
+            collectEnemyParts(entry, ctx, buffs, 'def', zoneTrace)
+        ),
+    dmgRed: ({ entry, ctx, buffs, zoneTrace, valueOf }) =>
+        seg(
+            'dmgRed',
+            '免伤区',
+            valueOf('dmgRed'),
+            entry.dmgRedMulti.toFixed(4),
+            collectEnemyParts(entry, ctx, buffs, 'dmgRed', zoneTrace)
+        ),
+    // 集谐·干涉层数挂在目标身上、全队一份：来源可能指向别的角色，按目标侧口径取（不做作用域过滤）。
+    // 该区不生效（值恒为 1）时不列来源，否则溯源/AI 会读到「区值 1 却有一堆来源」的幻影贡献。
+    tuneStrain: ({ entry, buffs, targetSideBuffs, zoneTrace, valueOf }) => {
+        const delta = entry.finalTuneStrainMulti
+        const parts =
+            delta > 0
+                ? [
+                      ...buffZoneParts(targetSideBuffs, 'tuneStrainLayer', '集谐层数', 'flat', zoneTrace),
+                      ...buffZoneParts(buffs, 'tuneBreakBoost', '谐度破坏增幅', 'flat', zoneTrace)
+                  ]
+                : []
+        return seg('tuneStrain', '集谐区', valueOf('tuneStrain'), `(1 + ${(delta * 100).toFixed(2)}%)`, parts)
+    },
+    // 谐度区与集谐区是两个独立乘区，不能合并展示
+    tuneBreak: ({ entry, buffs, zoneTrace, valueOf }) => {
+        const delta = entry.finalTuneBreakZone
+        const parts = delta > 0 ? buffZoneParts(buffs, 'tuneBreakBoost', '谐度破坏增幅', 'flat', zoneTrace) : []
+        return seg('tuneBreak', '谐度区', valueOf('tuneBreak'), `(1 + ${(delta * 100).toFixed(2)}%)`, parts)
+    },
+    unison: ({ entry, buffs, zoneTrace, valueOf }) =>
+        seg(
+            'unison',
+            '同奏区',
+            valueOf('unison'),
+            `(1 + ${(entry.finalUnisonMulti * 100).toFixed(1)}%)`,
+            buffZoneParts(buffs, 'unisonBoonLayer', '同奏层数', 'flat', zoneTrace)
+        ),
+    final: ({ entry, buffs, zoneTrace, valueOf }) =>
+        seg(
+            'final',
+            '终伤区',
+            valueOf('final'),
+            `(1 + ${fmtPercent(entry.finalDmg * 100)})`,
+            buffZoneParts(buffs, 'finalDmg', '终伤', '%', zoneTrace)
+        ),
+    special: ({ entry, buffs, zoneTrace, valueOf }) =>
+        seg('special', '特殊区', valueOf('special'), entry.customMult.toFixed(4), collectCustomParts(buffs, zoneTrace)),
+    /**
+     * @desc 暴击段的有效乘子按展示模式取值，保证 基础×各区×暴击 = 条目期望：
+     * 普通 = 1 + 暴击率×(暴击伤害-1)；凹暴 = 暴击伤害；不暴 = 1；未命中 = 常规公式（由「未命中」段归零）。
+     */
+    crit: ({ entry, ctx, buffs, zoneTrace, missed, critMode }) => {
+        if (!entry.canCrit) return null
+        const critAvg = 1 + entry.critRate * (entry.critDmg - 1)
+        const preCrit = entry.nonCritPerHit
+        // 模式来自调用方传入的勾选状态；暴击率≥100%（或≤0）时只是「数学上必暴/必不暴」，不等于选了凹暴/不暴模式
+        const rigged = !missed && critMode === 'rig'
+        const noCrit = !missed && critMode === 'noCrit'
+        const critPct = (entry.critRate * 100).toFixed(1)
+        const effective = missed || preCrit <= 0 ? critAvg : entry.expectedPerHit / preCrit
+        const detail = rigged
+            ? '全暴击（凹暴）'
+            : noCrit
+              ? '不暴击'
+              : entry.critRate >= 1
+                ? `暴击率 ${critPct}%（必暴）`
+                : entry.critRate <= 0
+                  ? `暴击率 ${critPct}%（必不暴击）`
+                  : `(1 + ${critPct}% × ${((entry.critDmg - 1) * 100).toFixed(1)}%)`
+        return seg('crit', '暴击区', effective, detail, collectCritParts(entry, ctx, buffs, zoneTrace))
+    }
+}
 
 /** @desc 将某伤害条目还原为分段：基础值拆分 + 各乘区段（含来源溯源），并给出 per-hit / 段数 汇总；
  *  missed 表示该条目被设为「未命中」（伤害归零）；critMode 表示该条目当前处于期望/凹暴/不暴哪一种口径 */
@@ -726,19 +858,19 @@ export function buildDamageSegments(
     let baseGreen = 0
     let baseParts: TracePart[] = []
     if (isCoeff) {
-        const coeff = entry.baseAtk
+        const coeff = entry.panel.base.atk
         baseWhite = coeff
         totalStat = coeff
         baseParts = collectCoeffParts(baseUnit, coeff, ctx)
     } else {
-        baseWhite = kind === 'hp' ? entry.baseHp : kind === 'def' ? entry.baseDef : entry.baseAtk
-        totalStat = kind === 'hp' ? entry.totalHp : kind === 'def' ? entry.totalDef : entry.totalAtk
+        baseWhite = entry.panel.base[kind]
+        totalStat = entry.panel.total[kind]
         baseGreen = totalStat - baseWhite
     }
 
     const charIdx = ctx.team.findIndex((s) => s.character === entry.character)
     const entryLike = toDamageEntryLike(entry)
-    const echoDescByEntry = buildEchoDescByEntry([entryLike], ctx.team, getEchoSkillText())
+    const echoDescByEntry = buildEchoDescByEntry([entryLike], ctx.team, ctx.echoSkillText ?? {})
     const buffs = getBoundBuffSets(
         entryLike,
         charIdx,
@@ -773,133 +905,36 @@ export function buildDamageSegments(
     const zoneTrace: ZoneTraceCtx = {
         zoneCtx: zoneCtxOf(entryLike, ctx, echoDescByEntry),
         refValues: hasRefZones ? resolveRefZoneValues(entryLike, ctx) : new Map<string, number>(),
-        coeffEntry: usesCoefficientFormula(entryLike)
+        critBase: FORMULAS[formulaOf(entryLike)].critBase
+    }
+
+    /**
+     * @desc 乘区段全部由**公式链**派生：membership 与顺序只有注册表一个来源
+     * （`registry/formulas.ts` 的 `FORMULAS[id].chain`），因此结果页乘区明细与溯源段不会再漂移。
+     * 数值取 `ResultEntry.multiplierZones` 的同名项（引擎算出的就是它），文案沿用溯源自己的写法。
+     */
+    const zoneOfId = new Map(entry.multiplierZones.map((zone) => [zone.id, zone]))
+    const valueOf = (id: MultiplierId): number => zoneOfId.get(id)?.value ?? 1
+    const chain = FORMULAS[formulaOf(entryLike)].chain
+
+    const segCtx: SegmentCtx = {
+        entry,
+        ctx,
+        buffs,
+        targetSideBuffs,
+        zoneTrace,
+        missed,
+        critMode,
+        valueOf
     }
 
     const segments: DamageSegment[] = []
-
-    // 加深
-    segments.push(
-        seg(
-            'deepen',
-            '加深区',
-            1 + entry.deepen,
-            `(1 + ${fmtPercent(entry.deepen * 100)})`,
-            buffZoneParts(buffs, 'deepenDmg', '加深', '%', zoneTrace)
-        )
-    )
-    // 增伤（面板/元素/类型）
-    const bonusParts = collectBonusParts(entry, ctx, buffs, zoneTrace)
-    segments.push(seg('bonus', '增伤区', 1 + entry.dmgBonus, `(1 + ${fmtPercent(entry.dmgBonus * 100)})`, bonusParts))
-    // 易伤
-    segments.push(
-        seg(
-            'vuln',
-            '易伤区',
-            1 + entry.vulnerability,
-            `(1 + ${fmtPercent(entry.vulnerability * 100)})`,
-            buffZoneParts(buffs, 'dmgTakenInc', '易伤', '%', zoneTrace)
-        )
-    )
-    // 抗性（敌人 + 穿/减）
-    segments.push(
-        seg(
-            'res',
-            '抗性区',
-            entry.resMulti,
-            entry.resMulti.toFixed(4),
-            collectEnemyParts(entry, ctx, buffs, 'res', zoneTrace)
-        )
-    )
-    // 防御（敌人 + 穿/减）
-    segments.push(
-        seg(
-            'def',
-            '防御区',
-            entry.defMulti,
-            entry.defMulti.toFixed(4),
-            collectEnemyParts(entry, ctx, buffs, 'def', zoneTrace)
-        )
-    )
-    // 免伤
-    segments.push(
-        seg(
-            'dmgRed',
-            '免伤区',
-            entry.dmgRedMulti,
-            entry.dmgRedMulti.toFixed(4),
-            collectEnemyParts(entry, ctx, buffs, 'dmgRed', zoneTrace)
-        )
-    )
-    // 集谐区（只有直伤吃）：1 + 0.12% × 该角色谐度破坏增幅 × 目标侧集谐·干涉层数
-    // 集谐·干涉层数挂在目标身上、全队一份：来源可能指向别的角色，按目标侧口径取（不做作用域过滤）
-    // 该区不生效（值恒为 1）时不列来源：否则溯源/AI 会读到「区值 1 却有一堆来源」的幻影贡献
-    const tuneStrainDelta = entry.finalTuneStrainMulti
-    const tuneStrainParts =
-        tuneStrainDelta > 0
-            ? [
-                  ...buffZoneParts(targetSideBuffs, 'tuneStrainLayer', '集谐层数', 'flat', zoneTrace),
-                  ...buffZoneParts(buffs, 'tuneBreakBoost', '谐度破坏增幅', 'flat', zoneTrace)
-              ]
-            : []
-    segments.push(
-        seg('tune', '集谐区', 1 + tuneStrainDelta, `(1 + ${(tuneStrainDelta * 100).toFixed(2)}%)`, tuneStrainParts)
-    )
-    // 谐度区（只有处决/偏谐响应吃）：1 + 谐度破坏增幅% —— 与集谐区是两个独立乘区，不能合并
-    // （直伤/效应不读该区，值恒为 1，溯源链上由视图按「值 = 1 不展示」过滤掉）
-    const tuneBreakDelta = entry.finalTuneBreakZone
-    const tuneBreakParts =
-        tuneBreakDelta > 0 ? buffZoneParts(buffs, 'tuneBreakBoost', '谐度破坏增幅', 'flat', zoneTrace) : []
-    segments.push(
-        seg('tuneBreak', '谐度区', 1 + tuneBreakDelta, `(1 + ${(tuneBreakDelta * 100).toFixed(2)}%)`, tuneBreakParts)
-    )
-    // 同奏（同奏区 = 1 + 3%×同奏增益层数，直伤/效应/处决响应全生效）
-    const unisonParts = buffZoneParts(buffs, 'unisonBoonLayer', '同奏层数', 'flat', zoneTrace)
-    segments.push(
-        seg(
-            'unison',
-            '同奏区',
-            1 + entry.finalUnisonMulti,
-            `(1 + ${(entry.finalUnisonMulti * 100).toFixed(1)}%)`,
-            unisonParts
-        )
-    )
-    // 终伤
-    segments.push(
-        seg(
-            'finalDmg',
-            '终伤区',
-            1 + entry.finalDmg,
-            `(1 + ${fmtPercent(entry.finalDmg * 100)})`,
-            buffZoneParts(buffs, 'finalDmg', '终伤', '%', zoneTrace)
-        )
-    )
-    // 特殊区
-    segments.push(
-        seg('custom', '特殊区', entry.customMult, entry.customMult.toFixed(4), collectCustomParts(buffs, zoneTrace))
-    )
-    // 暴击
-    // 暴击段的有效乘子按展示模式取值，保证 基础×各区×暴击 = 条目期望：
-    //   普通 = 1 + 暴击率×(暴击伤害-1)；凹暴 = 暴击伤害；不暴 = 1；未命中 = 常规公式（由「未命中」段归零）
     let critSegment: DamageSegment | null = null
-    if (entry.canCrit) {
-        const critAvg = 1 + entry.critRate * (entry.critDmg - 1)
-        const preCrit = entry.nonCritPerHit
-        // 模式来自调用方传入的勾选状态；暴击率≥100%（或≤0）时只是「数学上必暴/必不暴」，不等于选了凹暴/不暴模式
-        const rigged = !missed && critMode === 'rig'
-        const noCrit = !missed && critMode === 'noCrit'
-        const critPct = (entry.critRate * 100).toFixed(1)
-        const effective = missed || preCrit <= 0 ? critAvg : entry.expectedPerHit / preCrit
-        const detail = rigged
-            ? '全暴击（凹暴）'
-            : noCrit
-              ? '不暴击'
-              : entry.critRate >= 1
-                ? `暴击率 ${critPct}%（必暴）`
-                : entry.critRate <= 0
-                  ? `暴击率 ${critPct}%（必不暴击）`
-                  : `(1 + ${critPct}% × ${((entry.critDmg - 1) * 100).toFixed(1)}%)`
-        critSegment = seg('crit', '暴击区', effective, detail, collectCritParts(entry, ctx, buffs, zoneTrace))
+    for (const handle of chain) {
+        const built = SEGMENT_BUILDERS[handle.id as MultiplierId](segCtx)
+        if (!built) continue
+        if (built.id === 'crit') critSegment = built
+        else segments.push(built)
     }
 
     const ratioPct = (entry.ratioNum / (entry.hits || 1)) * 100

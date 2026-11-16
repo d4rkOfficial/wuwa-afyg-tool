@@ -19,7 +19,7 @@
     import { openHelp } from '$lib/data/help.svelte'
 
     /** @desc 面板类型加成固定展示顺序：普攻/重击/共鸣技能/共鸣解放/变奏/延奏/声骸/协同，效应与其它不展示 */
-    const TYPE_DMG_ORDER = DAMAGE_TYPES.filter((dt) => dt !== '效应伤害' && dt !== '其它类型伤害')
+    const TYPE_DMG_ORDER = DAMAGE_TYPES.filter((dt) => dt !== '效应伤害' && dt !== '处决' && dt !== '其它类型伤害')
 
     interface Props extends ComponentsProps {
         open: boolean

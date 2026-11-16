@@ -1,3 +1,5 @@
+import type { MultiplierDisplay } from './result.types'
+
 /**
  * @desc 结果页 / 结果页弹窗（数据分析、链阶对比）共用的展示样式口径。
  *
@@ -70,3 +72,26 @@ export const STAT_CARD_GRADIENT_STYLE =
 /** @desc 次级数值卡底纹：主题色描边 + 更淡的斜向渐变 */
 export const STAT_CARD_GRADIENT_SUBTLE_STYLE =
     'border-color: color-mix(in srgb, var(--theme-accent-bg) 35%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-bg) 10%, transparent), transparent 70%);'
+
+// ── 乘区展示 ─────────────────────────────────────────────────────────
+/**
+ * @desc 把乘区的**结构化**展示参数格式化成界面文案（引擎不再产出本地化字符串）。
+ *
+ * - `delta`：`(1 + x%)`
+ * - `factor`：乘数本身
+ * - `deltaWhenActive`：生效时是 `(1 + x%)`，未生效（值恒为 1）时显示乘数
+ */
+export const formatMultiplierDisplay = (value: number, display: MultiplierDisplay): string => {
+    switch (display.mode) {
+        case 'delta':
+            return `(1 + ${display.pct.toFixed(display.digits)}%)`
+        case 'factor':
+            return value.toFixed(display.digits)
+        case 'deltaWhenActive':
+            return display.active
+                ? `(1 + ${display.pct.toFixed(display.activeDigits)}%)`
+                : value.toFixed(display.idleDigits)
+        default:
+            return value.toFixed(4)
+    }
+}

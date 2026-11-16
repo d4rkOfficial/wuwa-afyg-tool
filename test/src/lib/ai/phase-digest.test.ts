@@ -280,9 +280,7 @@ const entry = (id: string, character: string, displayName: string, extra: Partia
     skillType: '共鸣技能',
     hitName: '共鸣技能伤害',
     displayName,
-    isEffect: false,
-    isTuneBreak: false,
-    isTuneResponse: false,
+    formula: 'direct',
     ratioValue: 100,
     ratioUnit: '%',
     damageBaseType: '攻击',
@@ -313,7 +311,7 @@ describe('拉表渲染', () => {
 
     it('非直伤条目带类型标记，未设伤害类型给出提示', () => {
         const out = renderCalculationDigest({
-            entries: [entry('e9', '无', '电磁效应', { isEffect: true })],
+            entries: [entry('e9', '无', '电磁效应', { formula: 'effect' })],
             buffNamesOf: () => [],
             damageTypesOf: () => [],
             posOf: () => undefined

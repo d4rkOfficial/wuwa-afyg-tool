@@ -55,9 +55,7 @@ const entry: DamageEntry = {
     character: CHAR,
     hitName: '测试伤害',
     displayName: '测试伤害',
-    isEffect: false,
-    isTuneBreak: false,
-    isTuneResponse: false,
+    formula: 'direct',
     ratioValue: 100,
     ratioUnit: '%',
     damageBaseType: '攻击',
@@ -198,9 +196,9 @@ const fixedBuff = (id: string, value: number, slots: number[]): BuffInstance =>
     ({ id, name: `定值-${id}`, scope: slots, zones: [{ zoneId: 'specialFinal1', value }] }) as unknown as BuffInstance
 
 describe('层数作为引用来源：按角色读取、互不串味', () => {
-    it('引用来源清单里有同奏增益层数，没有集谐干涉层数、也没有自定义层数', () => {
+    it('引用来源清单里有同奏增益层数（按角色）与集谐干涉层数（目标侧），没有自定义层数', () => {
         assert.ok(ZONE_REF_MAP.has('unisonBoonLayer'), '同奏增益层数应可作为引用来源')
-        assert.equal(ZONE_REF_MAP.has('tuneStrainLayer'), false, '集谐干涉层数不属于角色，不作为引用来源')
+        assert.equal(ZONE_REF_MAP.has('tuneStrainLayer'), true, '集谐干涉层数挂在目标面板上，可作为引用来源（D23）')
         for (const id of ['customLayer1', 'customLayer2', 'customLayer3']) {
             assert.equal(ZONE_REF_MAP.has(id), false, `${id} 不是引用来源`)
         }

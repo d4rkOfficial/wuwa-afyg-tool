@@ -11,8 +11,28 @@ import type { ConfigState, EchoSlotConfig } from './config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { ResultEntry, MultiplierZone, RatioFactor } from './result.types'
 import type { CharSlot } from '$lib/types/project'
-import { TARGET_SIDE_ZONE_IDS, ZONE_NO_REF_IDS, zoneAppliesToCoeffEntry } from './calculation.consts'
-import { applyZone, recomputeTotals, type CharacterComputed } from './zone-ops'
+import { TARGET_SIDE_ZONE_IDS, ZONE_NO_REF_IDS } from './calculation.consts'
+import { applyZone, clonePanel, emptyPanel, recomputeTotals, type CharacterPanel, type TargetPanel } from './zone-ops'
+import { ACTION_MAP, REF_SOURCE_MAP } from './registry/actions'
+import { STAT_WRITES } from './registry/stats'
+import {
+    isEffectEntry,
+    evaluateHandle,
+    FORMULAS,
+    formulaOf,
+    formulaAcceptsRef,
+    CRIT_ACTION_IDS,
+    type CritBase,
+    PANEL_BASE_DEFAULT,
+    PANEL_BASE_TYPES,
+    MULTIPLIERS,
+    usesCoefficientFormula,
+    type FormulaCtx,
+    type FormulaDef
+} from './registry/formulas'
+
+/** @desc 条目是否走系数基类口径（双暴基准 0/100）—— 由公式注册表推导，引擎与界面共用 */
+export { usesCoefficientFormula }
 import { evaluateCondition } from './condition'
 import { evaluateRules, resolveActiveBuffIds, ruleMet, type RuleContext, type RuleStats } from './rules'
 import { getEffectMultiplier, getEffectBurstMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
@@ -21,81 +41,25 @@ import {
     TYPE_BONUS_MAP,
     ELEMENT_BONUS_MAP,
     WEAPON_SUBSTAT_NAME_MAP,
-    SUBSTAT_DECIMAL_TO_PCT,
-    CHAR_LEVEL
+    SUBSTAT_DECIMAL_TO_PCT
 } from '$lib/consts/game-terms'
 import { SECOND_MAIN_STAT } from '$lib/consts/stat-data'
 
 // ── helpers ──
 
-import type { EnemyConfig } from './config.types'
-
 import { inferDamageTypes } from './utils'
 import { buildEchoDescByEntry } from './skill-infer'
-import { getEchoSkillText } from '$lib/data/char-info.svelte'
-
-/** @desc 解析某个伤害条目最终生效的伤害类型集合（显式配置优先，其次按技能/声骸描述推断） */
-export function resolveDamageTypes(
-    entry: DamageEntry,
-    damageEntryDamageTypes: Record<string, string[]>,
-    charInfoMap?: Record<string, CharacterInfo>,
-    echoDescByEntry?: Record<string, string>
-): string[] {
-    const explicit = damageEntryDamageTypes[entry.id] ?? []
-    if (explicit.length > 0) return explicit
-    return inferDamageTypes(
-        entry,
-        entry.character ? charInfoMap?.[entry.character] : undefined,
-        echoDescByEntry?.[entry.id]
-    )
-}
 
 /**
- * 实战对比验证：鸣潮减防与穿防为独立乘算 (1-减防)×(1-穿防)，
- * 非加算 (1-减防-穿防)，原算法（加算）低估了减防/穿防收益
+ * @desc 解析引用转模读数：从「本条目可见面板」里取被引用角色的属性（无面板时视为 0）。
+ *
+ * `ZoneRef` 的语义：读到的面板值减去 `threshold` 后的部分，按 `pct`（线性）或
+ * `divisor`/`multiplier`（离散取整）折算，最后按 `lower`/`upper` 截断。
  */
-function computeDefMulti(enemy: EnemyConfig, defPen: number, defDown: number): number {
-    const defBase = enemy.defense
-    const defEff = Math.max(defBase * (1 - defDown / 100) * (1 - defPen / 100), 0)
-    const charTerm = 800 + 8 * CHAR_LEVEL
-    return Math.max(charTerm / (defEff + charTerm), 0.01)
-}
-
-/**
- * 抗性乘区（分段公式，effResist 为有效抗性，单位小数，可负）
- * - 抗性 < 0（抗性被穿/降穿透成负）：抗性乘区 = 1 + |抗性| / 2（减半收益）
- * - 0 <= 抗性 < 80%：抗性乘区 = 1 - 抗性（线性减免）
- * - 抗性 >= 80%：抗性乘区 = 1 / ((抗性 + 0.2) * 5)（封顶，防接近 100% 时伤害归零）
- */
-function computeResMulti(baseResist: number, resPen: number, resDown: number): number {
-    const effResist = baseResist - resPen / 100 - resDown / 100
-    if (effResist < 0) return 1 + Math.abs(effResist) / 2
-    if (effResist < 0.8) return 1 - effResist
-    return 1 / ((effResist + 0.2) * 5)
-}
-
-const REF_STAT_MAP: Record<string, keyof CharacterComputed> = {
-    baseAtk: 'baseAtk',
-    totalAtk: 'totalAtk',
-    baseHp: 'baseHp',
-    totalHp: 'totalHp',
-    baseDef: 'baseDef',
-    totalDef: 'totalDef',
-    recharge: 'recharge',
-    tuneBreakBoost: 'totalTuneBreakBoost',
-    offTuneBuildupRate: 'offTuneBuildupRate',
-    critRate: 'critRate',
-    critDmg: 'critDmg',
-    // 层数类来源：读该角色面板上累计的同奏层数（每个角色独立，互不串味）
-    unisonBoonLayer: 'unisonBoonLayer'
-}
-
-/** @desc 解析引用转模读数：从「本条目可见面板」里取被引用角色的属性（无面板时视为 0） */
-function resolveRefValue(ref: ZoneRef, panel: CharacterComputed | undefined): number {
-    if (!panel) return 0
-    const key = REF_STAT_MAP[ref.zoneId]
-    if (!key) return 0
-    const statValue = panel[key] as number
+function resolveRefValue(ref: ZoneRef, panel: CharacterPanel, target: TargetPanel): number {
+    const source = REF_SOURCE_MAP.get(ref.zoneId)
+    if (!source) return 0
+    const statValue = source.get(panel, target)
     const excess = statValue - ref.threshold
     let value: number
     if (ref.discrete) {
@@ -118,108 +82,49 @@ function resolveRefValue(ref: ZoneRef, panel: CharacterComputed | undefined): nu
     return value
 }
 
-function isElementBonus(label: string): boolean {
-    return label in ELEMENT_BONUS_MAP
-}
-
-function isTypeBonus(label: string): boolean {
-    return label in TYPE_BONUS_MAP
+/** @desc 解析某个伤害条目最终生效的伤害类型集合（显式配置优先，其次按技能/声骸描述推断） */
+export function resolveDamageTypes(
+    entry: DamageEntry,
+    damageEntryDamageTypes: Record<string, string[]>,
+    charInfoMap?: Record<string, CharacterInfo>,
+    echoDescByEntry?: Record<string, string>
+): string[] {
+    const explicit = damageEntryDamageTypes[entry.id] ?? []
+    if (explicit.length > 0) return explicit
+    return inferDamageTypes(
+        entry,
+        entry.character ? charInfoMap?.[entry.character] : undefined,
+        echoDescByEntry?.[entry.id]
+    )
 }
 
 /**
- * @desc 双暴基准：面板口径 5% / 150%；**系数基类**（处决 / 响应 / 效应 / 偏谐系数直伤）口径 0% / 100%
- * —— 后者「额外暴击伤害 = 0%」，即 `1 + 暴击率 × (暴击伤害 - 1)` 在只有暴击率时恒为 1，不会掉伤害。
- */
-const critBase = (coeffEntry: boolean): { rate: number; dmg: number } =>
-    coeffEntry ? { rate: 0, dmg: 100 } : { rate: 5, dmg: 150 }
-
-/**
- * @desc 把装备/词条上的属性词条（元素加成 / 类型加成 / 面板词条）写入角色贡献累加器。
+ * @desc 把装备/词条上的属性词条（元素加成 / 类型加成 / 面板作用）写入角色面板。
  *
- * `coeffEntry=true`（系数基类条目）时丢弃装备双暴：处决/响应/效应不吃角色面板双暴，
- * 双暴只能由**绑定到该条目**的「覆盖」型 buff 提供（追加/引用对它们不生效，见
- * `calculation.consts.ts` 的 `COEFF_OVERRIDE_ONLY_ZONE_IDS`）。
+ * 落点由 `registry/stats.ts` 的 `STAT_WRITES` 决定；系数口径（`critBase === 'coefficient'`）时
+ * 丢弃装备双暴 —— 系数基类条目的双暴是它自己临时的一份（决议 D1）。
  */
-function applyEntryStatToAccum(label: string, value: number, acc: CharacterComputed, coeffEntry = false) {
-    if (isElementBonus(label)) {
+const applyEntryStatToAccum = (
+    label: string,
+    value: number,
+    acc: CharacterPanel,
+    critBase: CritBase = 'panel'
+): void => {
+    const write = STAT_WRITES[label]
+    if (!write) return
+    if (write.kind === 'elementBonus') {
         const el = ELEMENT_BONUS_MAP[label]
         acc.elementBonus[el] = (acc.elementBonus[el] ?? 0) + value
         return
     }
-    if (isTypeBonus(label)) {
+    if (write.kind === 'typeBonus') {
         const t = TYPE_BONUS_MAP[label]
         acc.typeBonus[t] = (acc.typeBonus[t] ?? 0) + value
         return
     }
-    switch (label) {
-        case '攻击':
-            applyZone(acc, 'atkFlat', value)
-            break
-        case '生命':
-            applyZone(acc, 'hpFlat', value)
-            break
-        case '防御':
-            applyZone(acc, 'defFlat', value)
-            break
-        case '攻击%':
-            applyZone(acc, 'atkPct', value)
-            break
-        case '生命%':
-            applyZone(acc, 'hpPct', value)
-            break
-        case '防御%':
-            applyZone(acc, 'defPct', value)
-            break
-        case '暴击率':
-            if (!coeffEntry) applyZone(acc, 'critRate', value)
-            break
-        case '暴击伤害':
-            if (!coeffEntry) applyZone(acc, 'critDmg', value)
-            break
-        case '共鸣效率':
-            applyZone(acc, 'recharge', value)
-            break
-        case '治疗加成':
-            break // not used in damage formula
-    }
-}
-
-function emptyAccum(coeffEntry = false): CharacterComputed {
-    const crit = critBase(coeffEntry)
-    return {
-        baseAtk: 0,
-        baseHp: 0,
-        baseDef: 0,
-        totalAtk: 0,
-        totalHp: 0,
-        totalDef: 0,
-        totalTuneBreakBoost: 0,
-        offTuneBuildupRate: 100,
-        recharge: 100,
-        atkPctSum: 0,
-        atkFlatSum: 0,
-        hpPctSum: 0,
-        hpFlatSum: 0,
-        defPctSum: 0,
-        defFlatSum: 0,
-        critRate: crit.rate,
-        critDmg: crit.dmg,
-        bonusDmg: 0,
-        deepenDmg: 0,
-        resPen: 0,
-        defPen: 0,
-        defDown: 0,
-        resDown: 0,
-        unisonBoonLayer: 0,
-        finalDmg: 0,
-        dmgTakenInc: 0,
-        specialFinal1: 0,
-        specialFinal2Mul: 1,
-        dmgRedPen: 0,
-        extraRatio: 0,
-        elementBonus: {},
-        typeBonus: {}
-    }
+    if (write.kind !== 'action') return
+    if (critBase === 'coefficient' && CRIT_ACTION_IDS.includes(write.action)) return
+    applyZone(acc, write.action, value)
 }
 
 // ── compute base stat accum from echoes + weapon ──
@@ -228,15 +133,15 @@ function accumulateEchoes(
     echoes: EchoSlotConfig[],
     weaponSubstatValue: number,
     weaponSubstatLabel: string | undefined,
-    acc: CharacterComputed,
-    coeffEntry = false
+    acc: CharacterPanel,
+    critBase: CritBase = 'panel'
 ) {
     if (weaponSubstatLabel) {
-        applyEntryStatToAccum(weaponSubstatLabel, weaponSubstatValue, acc, coeffEntry)
+        applyEntryStatToAccum(weaponSubstatLabel, weaponSubstatValue, acc, critBase)
     }
     for (const echo of echoes) {
         if (echo.mainStat) {
-            applyEntryStatToAccum(echo.mainStat.type, echo.mainStat.value, acc, coeffEntry)
+            applyEntryStatToAccum(echo.mainStat.type, echo.mainStat.value, acc, critBase)
         }
         if (echo.secondMainStat) {
             if (echo.secondMainStat.type === '攻击') applyZone(acc, 'atkFlat', echo.secondMainStat.value)
@@ -249,7 +154,7 @@ function accumulateEchoes(
             }
         }
         for (const sub of echo.substats) {
-            applyEntryStatToAccum(sub.type, sub.value, acc, coeffEntry)
+            applyEntryStatToAccum(sub.type, sub.value, acc, critBase)
         }
     }
 }
@@ -294,16 +199,16 @@ interface PanelContext {
 }
 
 /** @desc 把角色面板压成规则可读的「无条件部分」数值（单位与面板显示一致） */
-const ruleStatsOf = (stats: CharacterComputed): RuleStats => ({
-    atk: Math.round(stats.totalAtk),
-    hp: Math.round(stats.totalHp),
-    def: Math.round(stats.totalDef),
-    recharge: stats.recharge,
-    offTuneBuildupRate: stats.offTuneBuildupRate,
-    tuneBreakBoost: Math.round(stats.totalTuneBreakBoost),
-    unisonBoonLayer: stats.unisonBoonLayer,
-    critRate: stats.critRate,
-    critDmg: stats.critDmg
+const ruleStatsOf = (stats: CharacterPanel): RuleStats => ({
+    atk: Math.round(stats.total.atk),
+    hp: Math.round(stats.total.hp),
+    def: Math.round(stats.total.def),
+    recharge: stats.zones.recharge,
+    offTuneBuildupRate: stats.zones.offTuneBuildupRate,
+    tuneBreakBoost: Math.round(stats.zones.tuneBreakBoost),
+    unisonBoonLayer: stats.zones.unisonBoonLayer,
+    critRate: stats.zones.critRate,
+    critDmg: stats.zones.critDmg
 })
 
 /**
@@ -332,7 +237,7 @@ const panelBuffsOf = (
         ...(ctx.enemyType !== undefined ? { enemyType: ctx.enemyType } : {})
     }
     const eligible = (buff: BuffInstance): boolean => {
-        if (!scopeMatches(buff, charIdx, entry.isEffect)) return false
+        if (!scopeMatches(buff, charIdx, isEffectEntry(entry))) return false
         const rules = buff.rules ?? []
         if (rules.some((rule) => rule.kind === 'buffActive')) return false
         return rules.every((rule) => rule.kind === 'zoneCompare' || ruleMet(rule, ruleCtx))
@@ -343,12 +248,7 @@ const panelBuffsOf = (
 }
 
 /** @desc 由「面板可计入 Buff 列表」算出角色面板（装备 + 这些 Buff 的不带条件/引用的乘区条目） */
-const panelStatsOf = (
-    charIdx: number,
-    plain: BuffInstance[],
-    deps: RuleEvalDeps,
-    coeffEntry: boolean
-): CharacterComputed | undefined => {
+const panelStatsOf = (charIdx: number, plain: BuffInstance[], deps: RuleEvalDeps): CharacterPanel | undefined => {
     const slot = deps.team[charIdx]
     const charInfo = slot?.character ? deps.charInfoMap[slot.character] : undefined
     if (!slot || !charInfo) return undefined
@@ -358,8 +258,7 @@ const panelStatsOf = (
         deps.weaponInfoMap[slot.weapon ?? ''] ?? null,
         deps.configState.characters[charIdx]?.echoes ?? [],
         plain,
-        undefined,
-        coeffEntry
+        undefined
     )
     for (const zone of overrideZonesOf(plain, undefined)) applyZone(stats, zone.zoneId, zone.value, 'override')
     recomputeTotals(stats)
@@ -367,18 +266,15 @@ const panelStatsOf = (
 }
 
 /**
- * @desc 面板里能否「减掉自己」：面板的普通乘区都是 additive 写入（`ZONE_OPS` 的 add 分支），
- * 直接减掉即可；但**覆盖写入**会改 `totalAtk/…`、`specialFinal2` 是连乘 —— 这两类退回重算。
+ * @desc 面板里能否「减掉自己」：加算写入直接减掉即可；但**覆盖写入**会改三维合计、
+ * 连乘写入（`combine: 'multiply'`）不可逆 —— 这两类退回整表重算。
  */
-const subtractSafeOf = (zone: BuffZoneValue): boolean => !zone.override && zone.zoneId !== 'specialFinal2'
+const subtractSafeOf = (zone: BuffZoneValue): boolean =>
+    !zone.override && ACTION_MAP.get(zone.zoneId)?.combine !== 'multiply'
 
 /** @desc 从面板里摘掉自己：拷贝后逐条减法写回，再重算三维面板 */
-const panelStatsWithoutZones = (base: CharacterComputed, zones: readonly BuffZoneValue[]): RuleStats => {
-    const stats: CharacterComputed = {
-        ...base,
-        elementBonus: { ...base.elementBonus },
-        typeBonus: { ...base.typeBonus }
-    }
+const panelStatsWithoutZones = (base: CharacterPanel, zones: readonly BuffZoneValue[]): RuleStats => {
+    const stats = clonePanel(base)
     for (const zone of zones) applyZone(stats, zone.zoneId, -zone.value)
     recomputeTotals(stats)
     return ruleStatsOf(stats)
@@ -395,7 +291,6 @@ const entryRuleDepsOf = (
     candidates: readonly BuffInstance[],
     deps: RuleEvalDeps | undefined,
     profile: ConditionProfile,
-    coeffEntry: boolean,
     matchEntry = true
 ): EntryRuleDeps => {
     if (!deps) return {}
@@ -406,7 +301,7 @@ const entryRuleDepsOf = (
         ...(deps.enemyType !== undefined ? { enemyType: deps.enemyType } : {})
     }
     const plainCache = new Map<number, BuffInstance[]>()
-    const baseCache = new Map<number, CharacterComputed | undefined>()
+    const baseCache = new Map<number, CharacterPanel | undefined>()
     const statsCache = new Map<string, RuleStats | undefined>()
 
     /** @desc 某槽位的面板可计入 Buff 列表（按槽位缓存） */
@@ -419,8 +314,8 @@ const entryRuleDepsOf = (
     }
 
     /** @desc 基准面板（含全部可计入 Buff） */
-    const baseOf = (charIdx: number): CharacterComputed | undefined => {
-        if (!baseCache.has(charIdx)) baseCache.set(charIdx, panelStatsOf(charIdx, plainOf(charIdx), deps, coeffEntry))
+    const baseOf = (charIdx: number): CharacterPanel | undefined => {
+        if (!baseCache.has(charIdx)) baseCache.set(charIdx, panelStatsOf(charIdx, plainOf(charIdx), deps))
         return baseCache.get(charIdx)
     }
 
@@ -430,17 +325,17 @@ const entryRuleDepsOf = (
      * 只有「面板真的把它算进去了」才需要摘：加算条目按 `activeZonesOf` 同口径过滤后直接减法，
      * 覆盖写入（改 `totalAtk/…`）与 `specialFinal2` 连乘则退回「重算一份不含它的面板」。
      */
-    const statsWithout = (charIdx: number, base: CharacterComputed, excludeBuffId: string): RuleStats => {
+    const statsWithout = (charIdx: number, base: CharacterPanel, excludeBuffId: string): RuleStats => {
         const own = plainOf(charIdx).find((buff) => buff.id === excludeBuffId)
         const ownZones = own?.zones.filter((zone) => !zone.ref && zone.value !== 0) ?? []
-        const ownAdds = ownZones.filter((zone) => !zone.override && (!coeffEntry || zoneAppliesToCoeffEntry(zone)))
+        const ownAdds = ownZones.filter((zone) => !zone.override)
         const ownOverrides = ownZones.filter((zone) => zone.override)
         if (ownOverrides.length === 0 && ownAdds.length === 0) return ruleStatsOf(base)
         if (ownOverrides.length === 0 && ownAdds.every(subtractSafeOf)) {
             return panelStatsWithoutZones(base, ownAdds)
         }
         const rest = plainOf(charIdx).filter((buff) => buff.id !== excludeBuffId)
-        const rebuilt = panelStatsOf(charIdx, rest, deps, coeffEntry)
+        const rebuilt = panelStatsOf(charIdx, rest, deps)
         return ruleStatsOf(rebuilt ?? base)
     }
 
@@ -577,7 +472,7 @@ const activeBoundForChar = (
 const scopeMatchesTargetSide = (buff: BuffInstance, isEffect: boolean): boolean =>
     Array.isArray(buff.scope) && buff.scope.length === 0 ? isEffect : true
 
-/** @desc 生效 Buff（引擎内部用：逐条乘区条目写入累加器） */
+/** @desc 生效 Buff（引擎内部用：逐条作用写入面板） */
 function boundBuffs(
     entry: DamageEntry,
     charIndex: number,
@@ -591,11 +486,11 @@ function boundBuffs(
     rulesDeps?: RuleEvalDeps
 ): BuffInstance[] {
     const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
-    const deps = entryRuleDepsOf(entry, candidates, rulesDeps, profile, usesCoefficientFormula(entry), matchEntry)
+    const deps = entryRuleDepsOf(entry, candidates, rulesDeps, profile, matchEntry)
     return activeBoundForChar(
         candidates,
         charIndex,
-        entry.isEffect,
+        isEffectEntry(entry),
         profile,
         // matchEntry=false 时没有条目上下文：伤害名规则不构成否定（角色级聚合口径）
         matchEntry ? { damageName: entry.displayName } : {},
@@ -606,8 +501,9 @@ function boundBuffs(
 /** @desc 计算某个角色槽位某条目可见的完整贡献（装备 + 绑定且生效的 Buff 条目）。
  *  门槛判定（作用域 + 实例级硬性条件）由调用方先完成，此处只做乘区写入（含每条目自身的乘区条件）。
  *
- *  `coeffEntry=true` 用于**系数基类条目**（处决/响应/效应/偏谐系数直伤）：
- *  基础双暴与装备双暴都不计入（基准改 0% / 100%），且**双暴只有「覆盖」写入生效**
+ *  `critBase='coefficient'` 用于**系数基类条目**（处决/响应/效应/偏谐系数直伤）：
+ *  基础双暴与装备双暴都不计入（基准改 0% / 100%）—— 这类条目的双暴是它自己临时的一份，
+ *  追加写入照常生效，只有引用写入被 `formulaAcceptsRef` 剔除
  *  （追加/引用对它们没有意义，见 `COEFF_OVERRIDE_ONLY_ZONE_IDS`）。 */
 function computeCharacterStats(
     charInfo: CharacterInfo,
@@ -616,18 +512,13 @@ function computeCharacterStats(
     echoes: EchoSlotConfig[],
     boundBuffs: BuffInstance[],
     ctx?: ZoneCtx,
-    coeffEntry = false
-): CharacterComputed {
-    const baseAtk = Math.round(charInfo.lv90BaseStats.atk + (weaponInfo?.lv90BaseAtk ?? 0))
-    const baseHp = Math.round(charInfo.lv90BaseStats.hp)
-    const baseDef = Math.round(charInfo.lv90BaseStats.def)
-    const baseTuneBreakBoost = Math.round(charInfo.lv90BaseStats.tuneBreakBoost)
-
-    const acc = emptyAccum(coeffEntry)
-    acc.baseAtk = baseAtk
-    acc.baseHp = baseHp
-    acc.baseDef = baseDef
-    acc.totalTuneBreakBoost = baseTuneBreakBoost
+    critBase: CritBase = 'panel'
+): CharacterPanel {
+    const panel = emptyPanel(critBase)
+    panel.base.atk = Math.round(charInfo.lv90BaseStats.atk + (weaponInfo?.lv90BaseAtk ?? 0))
+    panel.base.hp = Math.round(charInfo.lv90BaseStats.hp)
+    panel.base.def = Math.round(charInfo.lv90BaseStats.def)
+    panel.zones.tuneBreakBoost = Math.round(charInfo.lv90BaseStats.tuneBreakBoost)
 
     const wSubValue = weaponInfo?.substat ? parseFloat(weaponInfo.substat.value) : 0
     const wSubName = weaponInfo?.substat?.name
@@ -639,30 +530,19 @@ function computeCharacterStats(
             wSubCanonicalValue = wSubValue * 100
         }
     }
-    accumulateEchoes(echoes, wSubCanonicalValue, wSubCanonicalName, acc, coeffEntry)
+    accumulateEchoes(echoes, wSubCanonicalValue, wSubCanonicalName, panel, critBase)
 
-    // 一切皆 buff：绑定到该角色的 Buff 逐条乘区条目写入同一贡献累加器（乘区级条件在此过滤）
-    for (const z of activeZonesOf(boundBuffs, ctx, coeffEntry)) {
-        applyZone(acc, z.zoneId, z.value)
+    // 一切皆 buff：绑定到该角色的 Buff 逐条作用于面板（作用级条件在此过滤）
+    for (const z of activeZonesOf(boundBuffs, ctx)) {
+        applyZone(panel, z.zoneId, z.value)
     }
 
-    const atkGreen = Math.round(acc.atkFlatSum + (baseAtk * acc.atkPctSum) / 100)
-    const hpGreen = Math.round(acc.hpFlatSum + (baseHp * acc.hpPctSum) / 100)
-    const defGreen = Math.round(acc.defFlatSum + (baseDef * acc.defPctSum) / 100)
-
-    return {
-        ...acc,
-        baseAtk,
-        baseHp,
-        baseDef,
-        totalAtk: baseAtk + atkGreen,
-        totalHp: baseHp + hpGreen,
-        totalDef: baseDef + defGreen,
-        totalTuneBreakBoost: Math.round(acc.totalTuneBreakBoost)
-    }
+    recomputeTotals(panel)
+    panel.zones.tuneBreakBoost = Math.round(panel.zones.tuneBreakBoost)
+    return panel
 }
 
-/** @desc 生效 Buff 的全部乘区条目（引擎逐条写入累加器的唯一出口） */
+/** @desc 生效 Buff 的全部作用条目（引擎逐条写入面板的唯一出口） */
 const collectZones = (buffs: BuffInstance[]): BuffZoneValue[] => buffs.flatMap((b) => b.zones)
 
 /** @desc 乘区级条件求值上下文：伤害段上下文 + 链阶档位（`isEffect` / `damageName` 供 Buff 级规则使用） */
@@ -692,30 +572,34 @@ export const zoneConditionMet = (zone: { condition?: BuffCondition }, ctx: ZoneC
  * @desc 生效 Buff 提供的直接贡献乘区（跳过引用/覆盖/零值；乘区条件不满足者逐条剔除）。
  * 同一乘区可有多条：`if (链阶硬门槛满足) { 各条目各自 add if 自身条件满足 }` —— 满足的全部相加。
  *
- * `coeffEntry=true`（系数基类条目）时再剔一道：**双暴的追加写入不生效**，只有「覆盖」能定值
- * （见 `COEFF_OVERRIDE_ONLY_ZONE_IDS`）—— 这些条目不吃面板式双暴累加。
+ * 系数基类条目的双暴是它自己临时的一份（`critBase`），因此**追加写入同样合法** ——
+ * 不需要任何「系数条目上双暴不生效」的 gate（决议 D2）。
  */
-const activeZonesOf = (buffs: BuffInstance[], ctx?: ZoneCtx, coeffEntry = false): { zoneId: string; value: number }[] =>
+const activeZonesOf = (buffs: BuffInstance[], ctx?: ZoneCtx): { zoneId: string; value: number }[] =>
     collectZones(buffs).flatMap((z) =>
-        !z.ref &&
-        !z.override &&
-        z.value !== 0 &&
-        (!ctx || zoneConditionMet(z, ctx)) &&
-        (!coeffEntry || zoneAppliesToCoeffEntry(z))
+        !z.ref && !z.override && z.value !== 0 && (!ctx || zoneConditionMet(z, ctx))
             ? [{ zoneId: z.zoneId as string, value: z.value }]
             : []
     )
 
 /**
  * @desc 生效 Buff 里带引用标记的乘区（转模：稍后按面板解析；乘区条件不满足者剔除）。
- * `coeffEntry=true` 时双暴引用同样不生效：引用属于「追加」语义，不是「覆盖」。
+ * 系数口径下双暴不接受引用写入（`formulaAcceptsRef`，决议 D24）：那种面板是条目临时的一份，
+ * 把别的面板搬过来对它没有意义。
  */
-const refZonesOf = (buffs: BuffInstance[], ctx?: ZoneCtx, coeffEntry = false): { zoneId: string; ref: ZoneRef }[] =>
+const refZonesOf = (
+    buffs: BuffInstance[],
+    ctx?: ZoneCtx,
+    critBase: CritBase = 'panel'
+): {
+    zoneId: string
+    ref: ZoneRef
+}[] =>
     collectZones(buffs).flatMap((z) =>
         z.ref &&
         !ZONE_NO_REF_IDS.has(z.zoneId) &&
         (!ctx || zoneConditionMet(z, ctx)) &&
-        (!coeffEntry || zoneAppliesToCoeffEntry(z))
+        formulaAcceptsRef(critBase, z.zoneId)
             ? [{ zoneId: z.zoneId as string, ref: z.ref }]
             : []
     )
@@ -759,6 +643,32 @@ export function targetSideZonesOf(
     return out
 }
 
+/**
+ * @desc 构建目标面板：敌人配置初值 + Buff 对目标侧作用的写入。
+ *
+ * 与角色面板同构（都按条目构建）：目标侧不看 Buff 指向哪个角色槽位 —— 一条「作用域=角色1」的
+ * 集谐 buff 也照样给全队提供层数，因此不存在「某某角色的集谐干涉层数」。
+ */
+export const buildTargetPanel = (
+    candidates: readonly BuffInstance[],
+    profile: ConditionProfile,
+    zoneCtx: ZoneCtx,
+    enemy: ConfigState['enemy'],
+    deps: EntryRuleDeps = {}
+): TargetPanel => {
+    const panel: TargetPanel = {
+        type: enemy.type,
+        defense: enemy.defense,
+        dmgReduction: enemy.dmgReduction,
+        resistances: enemy.resistances,
+        zones: {}
+    }
+    for (const { zoneId, value } of targetSideZonesOf(candidates, profile, zoneCtx, deps)) {
+        panel.zones[zoneId] = value
+    }
+    return panel
+}
+
 /** @desc 取目标侧某乘区的合计值（读不到即 0） */
 export const targetSideValueOf = (
     candidates: readonly BuffInstance[],
@@ -784,11 +694,11 @@ export function getTargetSideSourceBuffs(
     rulesDeps?: RuleEvalDeps
 ): BuffInstance[] {
     const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
-    const deps = entryRuleDepsOf(entry, candidates, rulesDeps, profile, usesCoefficientFormula(entry), matchEntry)
+    const deps = entryRuleDepsOf(entry, candidates, rulesDeps, profile, matchEntry)
     return activeBoundForChar(
         candidates,
         -1,
-        entry.isEffect,
+        isEffectEntry(entry),
         profile,
         matchEntry ? { damageName: entry.displayName } : {},
         deps,
@@ -859,7 +769,7 @@ export function createEntryRuleMatcher(args: {
     const charIdx = deps.team.findIndex((slot) => slot.character === entry.character)
     /** @desc 条目上下文（伤害名规则用；引擎 `zoneCtx` 同口径） */
     const entryCtx = { damageName: entry.displayName }
-    const ruleDeps = entryRuleDepsOf(entry, args.boundBuffs, deps, profile, usesCoefficientFormula(entry))
+    const ruleDeps = entryRuleDepsOf(entry, args.boundBuffs, deps, profile)
     const ctx = ruleContextOf(profile, charIdx, entryCtx, ruleDeps)
     const active = resolveActiveBuffIds(args.boundBuffs, () => true, ctx)
     const activeOf = (buffId: string): boolean => active.has(buffId)
@@ -925,175 +835,206 @@ const withExtraRatioFactor = (factors: RatioFactor[], extraRatio: number, hits: 
 
 // ── compute a single ResultEntry ──
 
-/**
- * @desc 直伤条目结算。
- *
- * `targetTuneStrainLayer` 是**目标侧**的集谐·干涉层数（挂在怪物身上、全队一份），由调用方用
- * `targetSideValueOf()` 算好后传入 —— 不读 `stats.tuneStrainLayer`（那是按角色累加的，
- * 会出现「某角色的集谐层数」，与游戏定义不符）。
- */
-function computeResultEntry(
+// ────────────────────────────── 公式求值（直伤 / 处决 / 效应 / 固定值 共用） ──────────────────────────────
+
+/** @desc 偏谐系数（处决 / 偏谐系数直伤）的基值系数：按敌人类型取表 */
+const TUNE_COEFF_MAP: Record<string, number> = {
+    BOSS: 10027,
+    精英怪: 2149,
+    小怪: 716.2
+}
+
+/** @desc 条目实际生效的伤害属性：效应条目用效应自身的属性映射，其余用条目属性 */
+const elementOfFormula = (def: FormulaDef, entry: DamageEntry): string =>
+    def.base.kind === 'effectTable'
+        ? ((NON_DIRECT_ELEMENT as Record<string, string>)[entry.hitName] ?? '')
+        : entry.damageElement
+
+/** @desc 组装公式求值上下文（增伤区的元素 / 类型加成在此按条目一次性求和） */
+const formulaCtxOf = (
+    panel: CharacterPanel,
     entry: DamageEntry,
-    stats: CharacterComputed,
-    enemy: ConfigState['enemy'],
     damageTypes: string[],
-    targetTuneStrainLayer: number
-): ResultEntry {
-    const ratioNum = entry.ratioUnit === '%' ? entry.ratioValue / 100 : entry.ratioValue
-    const effectiveRatio = ratioNum + (stats.extraRatio / 100) * (entry.hits || 1)
+    element: string,
+    target: TargetPanel
+): FormulaCtx => {
+    let typeBonusSum = 0
+    for (const dt of damageTypes) typeBonusSum += panel.typeBonus[dt.replace('伤害', '')] ?? 0
+    return {
+        panel,
+        element,
+        damageTypes,
+        elementBonus: panel.elementBonus[element] ?? 0,
+        typeBonus: typeBonusSum,
+        target
+    }
+}
 
-    // determine base stat and baseValue
-    let totalStat = 0
-    let baseUnit = '固定'
-    let baseValue = 0
+/** @desc 基值解析结果：基值、有效倍率、以及各类公式需要的附加量 */
+interface ResolvedBase {
+    /** @desc `ResultEntry.baseUnit` 的取值 */
+    baseUnit: string
+    /** @desc `ResultEntry.baseAtk` 的取值（面板攻击 / 偏谐系数 / 效应基础值） */
+    baseAtkField: number
+    /** @desc 有效倍率（含额外倍率与段数） */
+    effectiveRatio: number
+    /** @desc `ResultEntry.ratioNum` 的取值（直伤为原始倍率，其余为有效倍率） */
+    reportedRatio: number
+    baseValue: number
+    /** @desc 效应条目的层数倍率成分（用于 `ratioFactors`） */
+    effect?: { name: string; layers: number; effectMult: number; burstLayers: number; burstMult: number }
+}
 
-    if (entry.ratioUnit === '%') {
-        switch (entry.damageBaseType) {
-            case '攻击':
-                totalStat = stats.totalAtk
-                baseUnit = '攻击'
-                break
-            case '生命':
-                totalStat = stats.totalHp
-                baseUnit = '生命'
-                break
-            case '防御':
-                totalStat = stats.totalDef
-                baseUnit = '防御'
-                break
-            case '偏谐系数':
-                totalStat = stats.totalAtk
-                baseUnit = '偏谐系数'
-                break
-            default:
-                totalStat = stats.totalAtk
-                baseUnit = '攻击'
-                break
+/** @desc 解析基值（`base` 配方是数据，这里只是四个分支的执行体） */
+const resolveBase = (def: FormulaDef, entry: DamageEntry, panel: CharacterPanel, ctx: FormulaCtx): ResolvedBase => {
+    const hits = entry.hits || 1
+    const extraRatio = panel.zones.extraRatio ?? 0
+
+    if (def.base.kind === 'fixed') {
+        return {
+            baseUnit: '固定',
+            baseAtkField: 0,
+            effectiveRatio: 1,
+            reportedRatio: 1,
+            baseValue: entry.ratioValue
         }
-        baseValue = totalStat * effectiveRatio
-    } else {
-        baseValue = entry.ratioValue
-        // fixed damage: skip all multipliers, show 100%
-        const r: ResultEntry = makeStubEntry(entry)
+    }
+
+    if (def.base.kind === 'effectTable') {
+        const layers = Math.round(entry.ratioValue)
+        const burstLayers = entry.burstLayers ?? 0
+        const effectMult = getEffectMultiplier(entry.hitName, layers)
+        const burstMult = getEffectBurstMultiplier(entry.hitName, burstLayers)
+        const effectiveRatio = (effectMult + burstMult) * hits + (extraRatio / 100) * hits
+        return {
+            baseUnit: '效应系数',
+            baseAtkField: EFFECT_BASE_VALUE,
+            effectiveRatio,
+            reportedRatio: effectiveRatio,
+            baseValue: Math.round(EFFECT_BASE_VALUE * effectiveRatio),
+            effect: { name: entry.hitName, layers, effectMult, burstLayers, burstMult }
+        }
+    }
+
+    const ratio = entry.ratioUnit === '%' ? entry.ratioValue / 100 : entry.ratioValue
+    const effectiveRatio = ratio + (extraRatio / 100) * hits
+
+    if (def.base.kind === 'enemyCoeff') {
+        const coeff = TUNE_COEFF_MAP[ctx.target.type] ?? 716.2
+        return {
+            baseUnit: '偏谐系数',
+            baseAtkField: coeff,
+            effectiveRatio,
+            reportedRatio: effectiveRatio,
+            baseValue: coeff * effectiveRatio
+        }
+    }
+
+    // panelStat：基值类型决定取三维里的哪一项（映射见 `registry/formulas.ts` 的 `PANEL_BASE_TYPES`）
+    const mapped = PANEL_BASE_TYPES[entry.damageBaseType] ?? PANEL_BASE_TYPES[PANEL_BASE_DEFAULT]
+    return {
+        baseUnit: mapped.unit,
+        baseAtkField: panel.base.atk,
+        effectiveRatio,
+        reportedRatio: ratio,
+        baseValue: panel.total[mapped.dim] * effectiveRatio
+    }
+}
+
+/** @desc 逐条乘子求值：按公式链（唯一规范顺序）产出数值与明细 */
+const runChain = (
+    def: FormulaDef,
+    ctx: FormulaCtx
+): { values: Map<string, number>; parts: MultiplierZone[]; product: number; productNoCrit: number } => {
+    const values = new Map<string, number>()
+    const parts: MultiplierZone[] = []
+    let product = 1
+    let productNoCrit = 1
+    for (const handle of def.chain) {
+        const value = evaluateHandle(handle, ctx)
+        values.set(handle.id, value)
+        product *= value
+        if (handle !== MULTIPLIERS.crit) productNoCrit *= value
+        parts.push({ id: handle.id, label: handle.label, value, display: handle.display(value, ctx) })
+    }
+    return { values, parts, product, productNoCrit }
+}
+
+/** @desc 效应条目的倍率因子（层数倍率 + 爆发倍率，两者相加构成总倍率） */
+const effectRatioFactors = (effect: NonNullable<ResolvedBase['effect']>, hits: number): RatioFactor[] => {
+    const factors: RatioFactor[] = [
+        {
+            label: `${effect.name} ${effect.layers} 层`,
+            weight: effect.effectMult * hits * 100,
+            segmentRatio: effect.effectMult * 100,
+            kind: 'effect'
+        }
+    ]
+    if (effect.burstMult > 0) {
+        factors.push({
+            label: `${effect.name}爆发 ${effect.burstLayers} 层`,
+            weight: effect.burstMult * hits * 100,
+            segmentRatio: effect.burstMult * 100,
+            kind: 'effect'
+        })
+    }
+    return factors
+}
+
+/**
+ * @desc 单条目结算（直伤 / 处决 / 偏谐响应 / 效应 / 固定值共用）。
+ *
+ * 结构：`公式（基值配方 + 有序乘子链）` → `基值 × ∏乘子`。四条公式的差异全部在注册表里，
+ * 这里只剩「基值怎么解析」与「`ResultEntry` 字段怎么物化」两件事。
+ */
+const computeFormulaEntry = (
+    entry: DamageEntry,
+    panel: CharacterPanel,
+    target: TargetPanel,
+    damageTypes: string[]
+): ResultEntry => {
+    const def = FORMULAS[formulaOf(entry)]
+    const element = elementOfFormula(def, entry)
+    const ctx = formulaCtxOf(panel, entry, damageTypes, element, target)
+    const hits = entry.hits || 1
+    const z = (id: string): number => panel.zones[id] ?? 0
+    const { values, parts, product, productNoCrit } = runChain(def, ctx)
+    const base = resolveBase(def, entry, panel, ctx)
+
+    // ── 固定值条目：旁路全部乘子 ──
+    if (def.base.kind === 'fixed') {
+        const r = makeStubEntry(entry)
         r.ratioNum = 1
-        r.baseValue = Math.round(baseValue)
+        r.baseValue = Math.round(base.baseValue)
         r.baseUnit = '固定'
-        r.expectedPerHit = Math.round(baseValue)
-        r.rawPerHit = Math.round(baseValue)
-        r.totalDamage = Math.round(baseValue)
+        r.expectedPerHit = Math.round(base.baseValue)
+        r.rawPerHit = Math.round(base.baseValue)
+        r.totalDamage = Math.round(base.baseValue)
         r.totalMultiplier = 1
         r.damageTypes = damageTypes
         r.ratioFactors = skillRatioFactors(entry)
         return r
     }
 
-    // element/type bonus -> total dmg bonus
-    const elBonus = stats.elementBonus[entry.damageElement] ?? 0
-    let typeBonusSum = 0
-    for (const dt of damageTypes) {
-        const key = dt.replace('伤害', '')
-        typeBonusSum += stats.typeBonus[key] ?? 0
-    }
-    const totalDmgBonus = stats.bonusDmg + elBonus + typeBonusSum
+    const critDmgDecimal = z('critDmg') / 100
+    const canCrit = def.canCrit(panel, ctx)
+    const fromPanel = def.base.kind === 'panelStat'
 
-    // ── formula multipliers ──
-
-    const deepen = 1 + stats.deepenDmg / 100
-    const bonus = 1 + totalDmgBonus / 100
-    const vulnerability = 1 + stats.dmgTakenInc / 100
-    const finalDmg = 1 + stats.finalDmg / 100
-    const customMult = (stats.specialFinal1 !== 0 ? 1 + stats.specialFinal1 / 100 : 1) * stats.specialFinal2Mul
-    /** @desc 集谐区：1 + 0.12% × 该角色谐度破坏增幅 × 目标侧集谐·干涉层数（层数全队共用一份） */
-    const tuneStrainMulti = 1 + 0.0012 * stats.totalTuneBreakBoost * targetTuneStrainLayer
-
-    /** @desc 同奏区：1 + 3% × 同奏增益层数（直伤/效应/处决响应全生效的独立乘区） */
-    const unisonMulti = 1 + 0.03 * stats.unisonBoonLayer
-
-    // crit (cap at 100%)
-    const critDecimal = Math.min(stats.critRate, 100) / 100
-    const critDmgDecimal = stats.critDmg / 100
-    const critAvg = 1 + critDecimal * (critDmgDecimal - 1)
-
-    // defense zone
-    const defMulti = computeDefMulti(enemy, stats.defPen, stats.defDown)
-
-    // resistance zone
-    const baseResist = (enemy.resistances[entry.damageElement] ?? 0) / 100
-    const resMulti = computeResMulti(baseResist, stats.resPen, stats.resDown)
-
-    // damage reduction zone
-    const dmgRedMulti = 1 - enemy.dmgReduction / 100 - stats.dmgRedPen / 100
-
-    // total multiplier (for display)
-    const totalMultiplier =
-        effectiveRatio *
-        bonus *
-        deepen *
-        vulnerability *
-        tuneStrainMulti *
-        unisonMulti *
-        finalDmg *
-        customMult *
-        defMulti *
-        resMulti *
-        dmgRedMulti *
-        critAvg
-
-    // non-crit and crit per hit (all zones except crit)
-    const nonCritRaw =
-        baseValue *
-        deepen *
-        bonus *
-        vulnerability *
-        resMulti *
-        dmgRedMulti *
-        defMulti *
-        tuneStrainMulti *
-        unisonMulti *
-        finalDmg *
-        customMult
+    const nonCritRaw = base.baseValue * productNoCrit
+    const expectedRaw = base.baseValue * product
     const nonCritPerHit = Math.round(nonCritRaw)
     const critPerHit = Math.round(nonCritRaw * critDmgDecimal)
-
-    const expectedRaw =
-        baseValue *
-        deepen *
-        bonus *
-        critAvg *
-        vulnerability *
-        resMulti *
-        dmgRedMulti *
-        defMulti *
-        tuneStrainMulti *
-        unisonMulti *
-        finalDmg *
-        customMult
     const expectedPerHit = Math.round(expectedRaw)
 
-    const multZones: MultiplierZone[] = [
-        { label: '加深区', value: deepen, detail: `(1 + ${stats.deepenDmg.toFixed(1)}%)` },
-        { label: '增伤区', value: bonus, detail: `(1 + ${totalDmgBonus.toFixed(1)}%)` },
-        { label: '易伤区', value: vulnerability, detail: `(1 + ${stats.dmgTakenInc.toFixed(1)}%)` },
-        { label: '抗性区', value: resMulti, detail: resMulti.toFixed(4) },
-        { label: '免伤区', value: dmgRedMulti, detail: dmgRedMulti.toFixed(4) },
-        { label: '防御区', value: defMulti, detail: defMulti.toFixed(4) },
-        {
-            label: '集谐区',
-            value: tuneStrainMulti,
-            detail:
-                targetTuneStrainLayer > 0
-                    ? `(1 + ${((tuneStrainMulti - 1) * 100).toFixed(1)}%)`
-                    : tuneStrainMulti.toFixed(4)
-        },
-        {
-            label: '同奏区',
-            value: unisonMulti,
-            detail:
-                stats.unisonBoonLayer > 0 ? `(1 + ${((unisonMulti - 1) * 100).toFixed(1)}%)` : unisonMulti.toFixed(4)
-        },
-        { label: '终伤区', value: finalDmg, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
-        { label: '特殊区', value: customMult, detail: customMult.toFixed(4) }
-    ]
+    const unisonZone = values.get(MULTIPLIERS.unison.id)
+    const tuneStrainZone = values.get(MULTIPLIERS.tuneStrain.id)
+    const tuneBreakZone = values.get(MULTIPLIERS.tuneBreak.id)
+    const customMult = values.get(MULTIPLIERS.special.id) ?? 1
+
+    const ratioFactors =
+        base.effect !== undefined
+            ? withExtraRatioFactor(effectRatioFactors(base.effect, hits), z('extraRatio'), hits)
+            : withExtraRatioFactor(skillRatioFactors(entry), z('extraRatio'), hits)
 
     return {
         id: entry.id,
@@ -1101,64 +1042,56 @@ function computeResultEntry(
         hitName: entry.hitName,
         skillType: entry.skillType ?? '',
         displayName: entry.displayName,
-        element: entry.damageElement,
-        ratioNum,
+        element,
+        formula: def.id,
+        panel: { base: { ...panel.base }, total: { ...panel.total }, zones: { ...panel.zones } },
+        ratioNum: base.reportedRatio,
         hits: entry.hits,
         sourceTimelineBlockId: entry.sourceTimelineBlockId,
-        baseValue: Math.round(baseValue),
-        baseUnit,
-        totalMultiplier,
-        extraRatio: stats.extraRatio,
-        baseAtk: stats.baseAtk,
-        totalAtk: stats.totalAtk,
-        atkPctSum: stats.atkPctSum,
-        atkFlatSum: stats.atkFlatSum,
-        baseHp: stats.baseHp,
-        totalHp: stats.totalHp,
-        hpPctSum: stats.hpPctSum,
-        hpFlatSum: stats.hpFlatSum,
-        baseDef: stats.baseDef,
-        totalDef: stats.totalDef,
-        defPctSum: stats.defPctSum,
-        defFlatSum: stats.defFlatSum,
-        totalTuneBreakBoost: stats.totalTuneBreakBoost,
-        dmgBonus: totalDmgBonus / 100,
-        deepen: stats.deepenDmg / 100,
-        critRate: critDecimal,
+        baseValue: Math.round(base.baseValue),
+        baseUnit: base.baseUnit,
+        totalMultiplier: base.effectiveRatio * product,
+        baseAtk: base.baseAtkField,
+        totalAtk: fromPanel ? panel.total.atk : 0,
+        atkPctSum: fromPanel ? z('atkPct') : 0,
+        atkFlatSum: fromPanel ? z('atkFlat') : 0,
+        baseHp: fromPanel ? panel.base.hp : 0,
+        totalHp: fromPanel ? panel.total.hp : 0,
+        hpPctSum: fromPanel ? z('hpPct') : 0,
+        hpFlatSum: fromPanel ? z('hpFlat') : 0,
+        baseDef: fromPanel ? panel.base.def : 0,
+        totalDef: fromPanel ? panel.total.def : 0,
+        defPctSum: fromPanel ? z('defPct') : 0,
+        defFlatSum: fromPanel ? z('defFlat') : 0,
+        totalTuneBreakBoost: z('tuneBreakBoost'),
+        // 增伤区只属于面板基类（系数基类条目不吃增伤，其词条加成不得出现在结果里）
+        dmgBonus: fromPanel ? (z('bonusDmg') + ctx.elementBonus + ctx.typeBonus) / 100 : 0,
+        deepen: values.has(MULTIPLIERS.deepen.id) ? z('deepenDmg') / 100 : 0,
+        critRate: Math.min(z('critRate'), 100) / 100,
         critDmg: critDmgDecimal,
-        defMulti,
-        resMulti,
-        dmgRedMulti,
-        finalDmg: stats.finalDmg / 100,
-        finalTuneStrainMulti: targetTuneStrainLayer > 0 ? tuneStrainMulti - 1 : 0,
-        finalTuneBreakZone: 0,
-        finalUnisonMulti: stats.unisonBoonLayer > 0 ? unisonMulti - 1 : 0,
+        defMulti: values.get(MULTIPLIERS.defense.id) ?? 0,
+        resMulti: values.get(MULTIPLIERS.resist.id) ?? 0,
+        dmgRedMulti: values.get(MULTIPLIERS.dmgRed.id) ?? 0,
+        finalDmg: z('finalDmg') / 100,
+        finalTuneStrainMulti:
+            tuneStrainZone !== undefined && (target.zones.tuneStrainLayer ?? 0) > 0 ? tuneStrainZone - 1 : 0,
+        finalTuneBreakZone: tuneBreakZone !== undefined ? tuneBreakZone - 1 : 0,
+        finalUnisonMulti: unisonZone !== undefined && z('unisonBoonLayer') > 0 ? unisonZone - 1 : 0,
         customMult,
-        vulnerability: stats.dmgTakenInc / 100,
-        rawPerHit: Math.round(
-            baseValue *
-                deepen *
-                bonus *
-                resMulti *
-                dmgRedMulti *
-                defMulti *
-                tuneStrainMulti *
-                unisonMulti *
-                finalDmg *
-                customMult
-        ),
+        extraRatio: z('extraRatio'),
+        vulnerability: values.has(MULTIPLIERS.vuln.id) ? z('dmgTakenInc') / 100 : 0,
+        rawPerHit: nonCritPerHit,
         expectedPerHit,
         totalDamage: expectedPerHit,
         totalDamageRaw: expectedRaw,
-        nonCritPerHit,
-        critPerHit,
-        canCrit: entry.damageBaseType !== '偏谐系数',
-        multiplierZones: multZones,
-        damageTypes,
-        // 溯源辅助：增伤区元素/类型拆分（%）
-        elBonus,
-        typeBonus: typeBonusSum,
-        ratioFactors: withExtraRatioFactor(skillRatioFactors(entry), stats.extraRatio, entry.hits || 1)
+        // 不可暴击时「暴击 / 不暴击」两列保持与期望同值，避免下游旧勾选把该段算成 0
+        nonCritPerHit: canCrit ? nonCritPerHit : expectedPerHit,
+        critPerHit: canCrit ? critPerHit : expectedPerHit,
+        canCrit,
+        multiplierZones: parts,
+        damageTypes: def.reportsDamageTypes ? damageTypes : [],
+        ...(fromPanel ? { elBonus: ctx.elementBonus, typeBonus: ctx.typeBonus } : {}),
+        ratioFactors
     }
 }
 
@@ -1170,6 +1103,8 @@ function makeStubEntry(entry: DamageEntry): ResultEntry {
         skillType: entry.skillType ?? '',
         displayName: entry.displayName,
         element: entry.damageElement,
+        formula: formulaOf(entry),
+        panel: { base: { atk: 0, hp: 0, def: 0 }, total: { atk: 0, hp: 0, def: 0 }, zones: {} },
         ratioNum: entry.ratioUnit === '%' ? entry.ratioValue / 100 : entry.ratioValue,
         hits: entry.hits,
         sourceTimelineBlockId: entry.sourceTimelineBlockId,
@@ -1216,376 +1151,7 @@ function makeStubEntry(entry: DamageEntry): ResultEntry {
     }
 }
 
-// ── tune (处决/响应) computation ──
-
-/**
- * @desc 条目是否走**系数基类公式**（`computeTuneEntry` / `computeEffectEntry`）。
- *
- * 与 `computeAll` / `computeOneEntry` 的分派判据逐字一致：处决 / 响应 / 效应 / 偏谐系数直伤。
- * 这些条目不参与角色面板式双暴累加（基准 0% / 100%），且**双暴只有「覆盖」写入生效** ——
- * 追加/引用一律不生效（见 `COEFF_OVERRIDE_ONLY_ZONE_IDS`）。
- * 溯源（`damage-trace`）与拉表可用性判定（`spread-table.utils`）也复用本判据。
- */
-export const usesCoefficientFormula = (entry: DamageEntry): boolean =>
-    entry.isEffect || entry.isTuneBreak || entry.isTuneResponse || entry.damageBaseType === '偏谐系数'
-
-const TUNE_COEFF_MAP: Record<string, number> = {
-    BOSS: 10027,
-    精英怪: 2149,
-    小怪: 716.2
-}
-
-const TUNE_BASE_UNIT = '偏谐系数'
-
-function computeTuneEntry(entry: DamageEntry, stats: CharacterComputed, enemy: ConfigState['enemy']): ResultEntry {
-    const ratioNum = entry.ratioUnit === '%' ? entry.ratioValue / 100 : entry.ratioValue
-    const effectiveRatio = ratioNum + (stats.extraRatio / 100) * (entry.hits || 1)
-    const tuneCoeff = TUNE_COEFF_MAP[enemy.type] ?? 716.2
-    const baseUnit = TUNE_BASE_UNIT
-    const baseValue = tuneCoeff * effectiveRatio
-
-    // tune break zone: 1 + tuneBreakBoost / 100
-    const tuneBreakZone = 1 + stats.totalTuneBreakBoost / 100
-
-    // defense zone (same as direct damage)
-    const defMulti = computeDefMulti(enemy, stats.defPen, stats.defDown)
-
-    // resistance zone (element from entry)
-    const baseResist = (enemy.resistances[entry.damageElement] ?? 0) / 100
-    const resMulti = computeResMulti(baseResist, stats.resPen, stats.resDown)
-
-    // damage reduction zone
-    const dmgRedMulti = 1 - enemy.dmgReduction / 100 - stats.dmgRedPen / 100
-
-    // final dmg & custom mult
-    const finalDmgDec = stats.finalDmg / 100
-    const customMultVal = (stats.specialFinal1 !== 0 ? 1 + stats.specialFinal1 / 100 : 1) * stats.specialFinal2Mul
-
-    // 同奏区：1 + 3% × 同奏增益层数（全伤害通用乘区）
-    const unisonMulti = 1 + 0.03 * stats.unisonBoonLayer
-
-    // vulnerability zone (易伤区)
-    const vulnerability = 1 + stats.dmgTakenInc / 100
-
-    const preCritPerHit =
-        baseValue *
-        vulnerability *
-        defMulti *
-        resMulti *
-        dmgRedMulti *
-        tuneBreakZone *
-        unisonMulti *
-        (1 + finalDmgDec) *
-        customMultVal
-
-    /**
-     * ── 暴击区 ──
-     * 双暴基准 0% / 100%（`stats` 由系数基类口径构建：面板与装备双暴都不计入，见 `critBase`），
-     * 因此只有绑定到该条目的双暴 buff 会抬高它：
-     * - 暴击率 0 ⇒ 期望 = 不暴击，`canCrit: false`（结果页「暴击 / 不暴击」两列显示占位符，与改前一致）；
-     * - 暴击率 > 0 ⇒ 期望 = 不暴击 × (1 + 暴击率 × 额外暴伤)。
-     */
-    const critDecimal = Math.min(stats.critRate, 100) / 100
-    const critDmgDecimal = stats.critDmg / 100
-    const critAvg = 1 + critDecimal * (critDmgDecimal - 1)
-    const canCrit = critDecimal > 0
-
-    const nonCritValue = Math.round(preCritPerHit)
-    const expectedRaw = preCritPerHit * critAvg
-    const expectedPerHit = Math.round(expectedRaw)
-    const critValue = Math.round(preCritPerHit * critDmgDecimal)
-
-    const multZones: MultiplierZone[] = [
-        { label: '抗性区', value: resMulti, detail: resMulti.toFixed(4) },
-        { label: '免伤区', value: dmgRedMulti, detail: dmgRedMulti.toFixed(4) },
-        { label: '防御区', value: defMulti, detail: defMulti.toFixed(4) },
-        { label: '谐度区', value: tuneBreakZone, detail: `(1 + ${stats.totalTuneBreakBoost.toFixed(1)}%)` },
-        { label: '易伤区', value: vulnerability, detail: `(1 + ${stats.dmgTakenInc.toFixed(1)}%)` },
-        { label: '终伤区', value: 1 + finalDmgDec, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
-        {
-            label: '同奏区',
-            value: unisonMulti,
-            detail:
-                stats.unisonBoonLayer > 0 ? `(1 + ${((unisonMulti - 1) * 100).toFixed(1)}%)` : unisonMulti.toFixed(4)
-        },
-        { label: '特殊区', value: customMultVal, detail: customMultVal.toFixed(4) }
-    ]
-
-    return {
-        id: entry.id,
-        character: entry.character ?? '',
-        hitName: entry.hitName,
-        skillType: entry.skillType ?? '',
-        displayName: entry.displayName,
-        element: entry.damageElement,
-        ratioNum: effectiveRatio,
-        hits: entry.hits,
-        sourceTimelineBlockId: entry.sourceTimelineBlockId,
-        baseValue: Math.round(baseValue),
-        baseUnit,
-        totalMultiplier:
-            effectiveRatio *
-            vulnerability *
-            defMulti *
-            resMulti *
-            dmgRedMulti *
-            tuneBreakZone *
-            unisonMulti *
-            (1 + finalDmgDec) *
-            customMultVal *
-            critAvg,
-        baseAtk: tuneCoeff,
-        totalAtk: 0,
-        atkPctSum: 0,
-        atkFlatSum: 0,
-        baseHp: 0,
-        totalHp: 0,
-        hpPctSum: 0,
-        hpFlatSum: 0,
-        baseDef: 0,
-        totalDef: 0,
-        defPctSum: 0,
-        defFlatSum: 0,
-        totalTuneBreakBoost: stats.totalTuneBreakBoost,
-        dmgBonus: 0,
-        deepen: 0,
-        critRate: critDecimal,
-        critDmg: critDmgDecimal,
-        defMulti,
-        resMulti,
-        dmgRedMulti,
-        finalDmg: finalDmgDec,
-        finalTuneStrainMulti: 0,
-        finalTuneBreakZone: tuneBreakZone - 1,
-        finalUnisonMulti: stats.unisonBoonLayer > 0 ? unisonMulti - 1 : 0,
-        customMult: customMultVal,
-        extraRatio: stats.extraRatio,
-        vulnerability: stats.dmgTakenInc / 100,
-        totalDamageRaw: expectedRaw,
-        rawPerHit: nonCritValue,
-        expectedPerHit,
-        totalDamage: expectedPerHit,
-        // 暴击率为 0（canCrit: false）时两列保持与期望同值，避免下游「凹暴/不暴」旧勾选把该段算成 0
-        nonCritPerHit: canCrit ? nonCritValue : expectedPerHit,
-        critPerHit: canCrit ? critValue : expectedPerHit,
-        canCrit,
-        multiplierZones: multZones,
-        damageTypes: [],
-        ratioFactors: withExtraRatioFactor(skillRatioFactors(entry), stats.extraRatio, entry.hits || 1)
-    }
-}
-
-/** @desc 无角色面板的兜底面板（效应条目 / 引用目标缺失）：`coeffEntry=true` 时双暴取系数基类基准 0% / 100% */
-function emptyCharacterStats(coeffEntry = false): CharacterComputed {
-    const crit = critBase(coeffEntry)
-    return {
-        baseAtk: 0,
-        baseHp: 0,
-        baseDef: 0,
-        totalAtk: 0,
-        totalHp: 0,
-        totalDef: 0,
-        totalTuneBreakBoost: 0,
-        offTuneBuildupRate: 100,
-        extraRatio: 0,
-        recharge: 100,
-        atkPctSum: 0,
-        atkFlatSum: 0,
-        hpPctSum: 0,
-        hpFlatSum: 0,
-        defPctSum: 0,
-        defFlatSum: 0,
-        critRate: crit.rate,
-        critDmg: crit.dmg,
-        bonusDmg: 0,
-        deepenDmg: 0,
-        resPen: 0,
-        defPen: 0,
-        defDown: 0,
-        resDown: 0,
-        unisonBoonLayer: 0,
-        finalDmg: 0,
-        dmgTakenInc: 0,
-        specialFinal1: 0,
-        specialFinal2Mul: 1,
-        dmgRedPen: 0,
-        elementBonus: {},
-        typeBonus: {}
-    }
-}
-
-// ── effect damage ──
-
-function computeEffectEntry(
-    entry: DamageEntry,
-    stats: CharacterComputed,
-    enemy: ConfigState['enemy'],
-    damageTypes: string[]
-): ResultEntry {
-    /** @desc
-     * ── 倍率：查表取效应倍率（EFFECT_TABLE[效应名][层数]，见 $lib/consts/effect-data.ts）──
-     * entry.ratioValue 即效应层数；burstLayers 仅电磁效应 > 0（其余效应为 0）
-     */
-    const layers = Math.round(entry.ratioValue)
-    const burstLayers = entry.burstLayers ?? 0
-    const effectMult = getEffectMultiplier(entry.hitName, layers)
-    const burstMult = getEffectBurstMultiplier(entry.hitName, burstLayers)
-    const multiplier = (effectMult + burstMult) * (entry.hits || 1)
-    const ratioNum = multiplier
-
-    /** @desc ── 加「额外倍率」乘区（buff 提供，效应伤害专属增益）── */
-    const effectiveRatio = ratioNum + (stats.extraRatio / 100) * (entry.hits || 1)
-    const element = (NON_DIRECT_ELEMENT as Record<string, string>)[entry.hitName] ?? ''
-
-    /** @desc ── 基础值：效应伤害有独立基础值 3674，与角色攻击力无关（不吃攻击/暴击/增伤/面板类）── */
-    const baseUnit = '效应系数'
-    const baseValue = Math.round(EFFECT_BASE_VALUE * effectiveRatio)
-
-    /** @desc 防御区：独立乘算 (1-减防)×(1-穿防)（非加算），800+8×等级 减伤公式 */
-    const defMulti = computeDefMulti(enemy, stats.defPen, stats.defDown)
-
-    /** @desc 抗性区：分段公式（负抗减半收益 / 线性减免 / ≥80% 封顶，防止伤害归零） */
-    const baseResist = (enemy.resistances[element] ?? 0) / 100
-    const resMulti = computeResMulti(baseResist, stats.resPen, stats.resDown)
-
-    /** @desc 免伤区：1 - 敌人免伤 - 穿免 */
-    const dmgRedMulti = 1 - enemy.dmgReduction / 100 - stats.dmgRedPen / 100
-
-    /** @desc 加深区：1 + 加深%（效应吃加深、不吃谐度增幅） */
-    const deepen = 1 + stats.deepenDmg / 100
-
-    /** @desc 终伤区 & 特殊区：1 + 终伤%；自定义倍率（≠0 才生效） */
-    const finalDmgDec = stats.finalDmg / 100
-    const customMultVal = (stats.specialFinal1 !== 0 ? 1 + stats.specialFinal1 / 100 : 1) * stats.specialFinal2Mul
-
-    /** @desc 同奏区：1 + 3% × 同奏增益层数（全伤害通用乘区，效应伤害同样生效） */
-    const unisonMulti = 1 + 0.03 * stats.unisonBoonLayer
-
-    /** @desc ── 单段不含暴击的原始伤害：基础值 × 各乘区乘积（无易伤区，效应伤害不吃易伤）── */
-    const preCritPerHit =
-        baseValue * defMulti * resMulti * dmgRedMulti * deepen * (1 + finalDmgDec) * customMultVal * unisonMulti
-
-    /**
-     * ── 暴击区 ──
-     * 双暴基准 0% / 100%（系数基类口径：效应不吃角色面板双暴，见 `critBase`），
-     * 只有绑定到本条目、且作用域覆盖它的双暴 buff 会抬高它。暴击率 0 ⇒ `canCrit: false`（结果页两列显示占位符，与改前一致）。
-     */
-    const critDecimal = Math.min(stats.critRate, 100) / 100
-    const critDmgDecimal = stats.critDmg / 100
-    const critAvg = 1 + critDecimal * (critDmgDecimal - 1)
-    const canCrit = critDecimal > 0
-
-    const nonCritValue = Math.round(preCritPerHit)
-    const expectedRaw = preCritPerHit * critAvg
-    const expectedPerHit = Math.round(expectedRaw)
-    const critValue = Math.round(preCritPerHit * critDmgDecimal)
-
-    /** @desc 乘区明细（供结果页展示乘区分解） */
-    const multZones: MultiplierZone[] = [
-        { label: '加深区', value: deepen, detail: `(1 + ${stats.deepenDmg.toFixed(1)}%)` },
-        { label: '抗性区', value: resMulti, detail: resMulti.toFixed(4) },
-        { label: '免伤区', value: dmgRedMulti, detail: dmgRedMulti.toFixed(4) },
-        { label: '防御区', value: defMulti, detail: defMulti.toFixed(4) },
-        { label: '终伤区', value: 1 + finalDmgDec, detail: `(1 + ${stats.finalDmg.toFixed(1)}%)` },
-        {
-            label: '同奏区',
-            value: unisonMulti,
-            detail:
-                stats.unisonBoonLayer > 0 ? `(1 + ${((unisonMulti - 1) * 100).toFixed(1)}%)` : unisonMulti.toFixed(4)
-        },
-        { label: '特殊区', value: customMultVal, detail: customMultVal.toFixed(4) }
-    ]
-
-    /**
-     * @desc ── 复合倍率因子：效应层数倍率 + 爆发倍率（两者相加构成总倍率）+ 额外倍率 ──
-     * 三者同量纲（绝对倍率），按权重分摊最终伤害是精确的。
-     */
-    const effectFactors: RatioFactor[] = [
-        {
-            label: `${entry.hitName} ${layers} 层`,
-            weight: effectMult * (entry.hits || 1) * 100,
-            segmentRatio: effectMult * 100,
-            kind: 'effect'
-        }
-    ]
-    if (burstMult > 0) {
-        effectFactors.push({
-            label: `${entry.hitName}爆发 ${burstLayers} 层`,
-            weight: burstMult * (entry.hits || 1) * 100,
-            segmentRatio: burstMult * 100,
-            kind: 'effect'
-        })
-    }
-
-    /** @desc
-     * ── 输出 ResultEntry：伤害类型为推导/显式结果（damageTypes: ['效应伤害'] 等）、
-     * 面板类字段（攻击等）恒为 0，双暴走系数基类口径（基准 0% / 100%，只有绑定 buff 能加）、
-     * 基础值来自独立常量 EFFECT_BASE_VALUE ──
-     */
-    return {
-        id: entry.id,
-        character: entry.character ?? '',
-        hitName: entry.hitName,
-        skillType: entry.skillType ?? '',
-        displayName: entry.displayName,
-        element,
-        ratioNum: effectiveRatio,
-        hits: entry.hits,
-        sourceTimelineBlockId: entry.sourceTimelineBlockId,
-        baseValue,
-        baseUnit,
-        totalMultiplier:
-            effectiveRatio *
-            defMulti *
-            resMulti *
-            dmgRedMulti *
-            deepen *
-            (1 + finalDmgDec) *
-            customMultVal *
-            unisonMulti *
-            critAvg,
-        baseAtk: EFFECT_BASE_VALUE,
-        totalAtk: 0,
-        atkPctSum: 0,
-        atkFlatSum: 0,
-        baseHp: 0,
-        totalHp: 0,
-        hpPctSum: 0,
-        hpFlatSum: 0,
-        baseDef: 0,
-        totalDef: 0,
-        defPctSum: 0,
-        defFlatSum: 0,
-        totalTuneBreakBoost: stats.totalTuneBreakBoost,
-        dmgBonus: 0,
-        deepen: stats.deepenDmg / 100,
-        critRate: critDecimal,
-        critDmg: critDmgDecimal,
-        defMulti,
-        resMulti,
-        dmgRedMulti,
-        finalDmg: finalDmgDec,
-        finalTuneStrainMulti: 0,
-        finalTuneBreakZone: 0,
-        finalUnisonMulti: stats.unisonBoonLayer > 0 ? unisonMulti - 1 : 0,
-        customMult: customMultVal,
-        extraRatio: stats.extraRatio,
-        vulnerability: 0,
-        totalDamageRaw: expectedRaw,
-        rawPerHit: nonCritValue,
-        expectedPerHit,
-        totalDamage: expectedPerHit,
-        // 暴击率为 0（canCrit: false）时两列保持与期望同值，避免下游「凹暴/不暴」旧勾选把该段算成 0
-        nonCritPerHit: canCrit ? nonCritValue : expectedPerHit,
-        critPerHit: canCrit ? critValue : expectedPerHit,
-        canCrit,
-        multiplierZones: multZones,
-        damageTypes,
-        ratioFactors: withExtraRatioFactor(effectFactors, stats.extraRatio, entry.hits || 1)
-    }
-}
-
-// ── 引用转模：按「本条目可见面板」解析（乘区算子统一走 ZONE_OPS）──
+// ── 引用转模：按「本条目可见面板」解析（写入口径统一走 applyZone）──
 
 /**
  * @desc 按「本条目可见面板」解析 ref（转模）。
@@ -1594,17 +1160,18 @@ function computeEffectEntry(
  * （作用域指向被引用角色的 Buff 被勾到本条目上，就参与该角色在这一段的面板；未勾选的其它条目绑定不参与）。
  * 本角色槽位直接用本条目面板 `partialStats`；其它角色槽位按需现算（`panelOf` 内部带缓存）。
  *
- * `coeffEntry=true` 时双暴引用被 `refZonesOf` 剔除（双暴只有「覆盖」生效）。
+ * 系数口径下双暴的引用写入被 `refZonesOf` 剔除（`formulaAcceptsRef`）。
  */
 function resolveRefsForEntry(
-    stats: CharacterComputed,
-    panelOf: (charIdx: number) => CharacterComputed,
+    stats: CharacterPanel,
+    panelOf: (charIdx: number) => CharacterPanel,
+    target: TargetPanel,
     boundBuffs: BuffInstance[],
     ctx?: ZoneCtx,
-    coeffEntry = false
+    critBase: CritBase = 'panel'
 ): void {
-    for (const { zoneId, ref } of refZonesOf(boundBuffs, ctx, coeffEntry)) {
-        const resolved = resolveRefValue(ref, panelOf(ref.characterIdx))
+    for (const { zoneId, ref } of refZonesOf(boundBuffs, ctx, critBase)) {
+        const resolved = resolveRefValue(ref, panelOf(ref.characterIdx), target)
         if (resolved === 0) continue
         applyZone(stats, zoneId, resolved)
         recomputeTotals(stats)
@@ -1615,12 +1182,12 @@ function resolveRefsForEntry(
  * @desc 构建「本条目可见」的某角色槽位面板：装备/词条 + 绑定到本条目的、作用域指向该角色的 Buff。
  * 与角色槽位级面板（把该角色全部条目上的绑定取并集）的区别：这里严格只看这一段伤害勾了什么。
  *
- * `coeffEntry=true`（系数基类条目）时，被引用角色的面板同样不带双暴 —— 「面板双暴不计入」对
- * 本角色与跨角色引用保持同一口径（系数基类条目的双暴只能来自「覆盖」型 buff，不能靠转模引用面板双暴）。
+ * 被引用角色的面板恒按**角色口径**构建（含双暴）：系数基类条目的双暴是它自己临时的一份，
+ * 不接受把别的面板搬过来（`formulaAcceptsRef`）。
  */
 function buildEntryPanel(
     refIdx: number,
-    ownStats: CharacterComputed,
+    ownStats: CharacterPanel,
     charIndex: number,
     entry: DamageEntry,
     candidates: BuffInstance[],
@@ -1630,21 +1197,19 @@ function buildEntryPanel(
     configState: ConfigState,
     charInfoMap: Record<string, CharacterInfo>,
     weaponInfoMap: Record<string, WeaponInfo>,
-    coeffEntry = false,
     deps: EntryRuleDeps = {}
-): CharacterComputed {
+): CharacterPanel {
     if (refIdx === charIndex) return ownStats
     const slot = team[refIdx]
-    if (!slot?.character || !charInfoMap[slot.character]) return emptyCharacterStats(coeffEntry)
-    const bound = activeBoundForChar(candidates, refIdx, entry.isEffect, profile, ctx, deps)
+    if (!slot?.character || !charInfoMap[slot.character]) return emptyPanel('panel')
+    const bound = activeBoundForChar(candidates, refIdx, isEffectEntry(entry), profile, ctx, deps)
     const panel = computeCharacterStats(
         charInfoMap[slot.character],
         slot.weapon,
         weaponInfoMap[slot.weapon ?? ''] ?? null,
         configState.characters[refIdx]?.echoes ?? [],
         bound,
-        ctx,
-        coeffEntry
+        ctx
     )
     for (const z of overrideZonesOf(bound, ctx)) applyZone(panel, z.zoneId, z.value, 'override')
     recomputeTotals(panel)
@@ -1662,7 +1227,9 @@ export function computeAll(
     team: CharSlot[],
     charInfoMap: Record<string, CharacterInfo>,
     weaponInfoMap: Record<string, WeaponInfo>,
-    conditionProfile: ConditionProfile = DEFAULT_CONDITION_PROFILE
+    conditionProfile: ConditionProfile = DEFAULT_CONDITION_PROFILE,
+    /** @desc 声骸技能文案索引（伤害类型推导规则2）；缺省 = 规则2 不参与 */
+    echoSkillText: Record<string, string> = {}
 ): ResultEntry[] {
     const enemy = configState.enemy
     /** @desc Buff 级规则的固定装置（敌人类型来自工程配置；面板按条目现算） */
@@ -1676,7 +1243,7 @@ export function computeAll(
 
     // 逐条目计算：条目面板 = 装备 + 绑定到本条目的 Buff；被引用角色的面板同样只看本条目勾选的 Buff
     /** @desc 声骸技能文案索引（伤害类型规则2：声骸技能条目的「视为/为 XX 伤害」） */
-    const echoDescByEntry = buildEchoDescByEntry(damageEntries, team, getEchoSkillText())
+    const echoDescByEntry = buildEchoDescByEntry(damageEntries, team, echoSkillText)
     return damageEntries.map((entry) => {
         const charName = entry.character
         const charIndex = team.findIndex((s) => s.character === charName)
@@ -1690,16 +1257,16 @@ export function computeAll(
             refinements: conditionProfile.refinements,
             element: entry.damageElement,
             damageTypes,
-            isEffect: entry.isEffect,
+            isEffect: isEffectEntry(entry),
             damageName: entry.displayName
         }
         const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
-        const coeffEntry = usesCoefficientFormula(entry)
-        const entryRuleDeps = entryRuleDepsOf(entry, candidates, ruleDeps, conditionProfile, coeffEntry)
+        const critBase: CritBase = FORMULAS[formulaOf(entry)].critBase
+        const entryRuleDeps = entryRuleDepsOf(entry, candidates, ruleDeps, conditionProfile)
         const entryBound = activeBoundForChar(
             candidates,
             charIndex,
-            entry.isEffect,
+            isEffectEntry(entry),
             conditionProfile,
             zoneCtx,
             entryRuleDeps
@@ -1708,7 +1275,7 @@ export function computeAll(
         /** @desc 系数基类条目（处决/响应/效应/偏谐系数直伤）：不吃角色面板双暴（基准 0% / 100%），双暴只有覆盖生效 */
 
         // Compute partial stats (echo+weapon + non-ref buffs only)
-        let partialStats: CharacterComputed
+        let partialStats: CharacterPanel
         if (charInfo) {
             partialStats = computeCharacterStats(
                 charInfo,
@@ -1717,19 +1284,19 @@ export function computeAll(
                 echoes,
                 entryBound,
                 zoneCtx,
-                coeffEntry
+                critBase
             )
         } else {
-            partialStats = emptyCharacterStats(coeffEntry)
-            for (const z of activeZonesOf(entryBound, zoneCtx, coeffEntry)) {
+            partialStats = emptyPanel(critBase)
+            for (const z of activeZonesOf(entryBound, zoneCtx)) {
                 applyZone(partialStats, z.zoneId, z.value)
             }
             recomputeTotals(partialStats)
         }
 
         // 被引用角色面板：按需现算（同一槽位只算一次）
-        const panelCache = new Map<number, CharacterComputed>()
-        const panelOf = (refIdx: number): CharacterComputed => {
+        const panelCache = new Map<number, CharacterPanel>()
+        const panelOf = (refIdx: number): CharacterPanel => {
             // 出伤者（`characterIdx = -1`）= 本条目所属角色；其余按槽位
             const idx = refIdx < 0 ? charIndex : refIdx
             if (idx === charIndex) return partialStats
@@ -1747,7 +1314,6 @@ export function computeAll(
                 configState,
                 charInfoMap,
                 weaponInfoMap,
-                coeffEntry,
                 entryRuleDeps
             )
             panelCache.set(idx, built)
@@ -1755,32 +1321,22 @@ export function computeAll(
         }
 
         // Resolve ref zones and apply to stats
-        const stats = { ...partialStats }
-        resolveRefsForEntry(stats, panelOf, entryBound, zoneCtx, coeffEntry)
+        const stats = clonePanel(partialStats)
+        const targetPanel = buildTargetPanel(candidates, conditionProfile, zoneCtx, enemy, entryRuleDeps)
+        resolveRefsForEntry(stats, panelOf, targetPanel, entryBound, zoneCtx, critBase)
 
         // Apply override zones (set value directly, takes precedence over everything)
         for (const z of overrideZonesOf(entryBound, zoneCtx)) {
             applyZone(stats, z.zoneId, z.value, 'override')
         }
 
-        // effect damage
-        if (entry.isEffect) {
-            return computeEffectEntry(entry, stats, enemy, damageTypes)
-        }
-        if (!charName || !charInfo || charIndex < 0) return makeStubEntry(entry)
-
-        // tune damage (处决/响应) + 偏谐系数直伤按响应公式计算
-        if (entry.isTuneBreak || entry.isTuneResponse || entry.damageBaseType === '偏谐系数') {
-            return computeTuneEntry(entry, stats, enemy)
-        }
-
-        // direct damage
-        return computeResultEntry(
+        // 系数基类条目（效应）不吃面板，无角色也能算；其余条目缺角色时给占位结果
+        if (!isEffectEntry(entry) && (!charName || !charInfo || charIndex < 0)) return makeStubEntry(entry)
+        return computeFormulaEntry(
             entry,
             stats,
-            enemy,
-            damageTypes,
-            targetSideValueOf(candidates, conditionProfile, zoneCtx, 'tuneStrainLayer', entryRuleDeps)
+            buildTargetPanel(candidates, conditionProfile, zoneCtx, enemy, entryRuleDeps),
+            damageTypes
         )
     })
 }
@@ -1797,7 +1353,8 @@ export function computeOneEntry(
     team: CharSlot[],
     charInfoMap: Record<string, CharacterInfo>,
     weaponInfoMap: Record<string, WeaponInfo>,
-    conditionProfile: ConditionProfile = DEFAULT_CONDITION_PROFILE
+    conditionProfile: ConditionProfile = DEFAULT_CONDITION_PROFILE,
+    echoSkillText: Record<string, string> = {}
 ): ResultEntry {
     const enemy = configState.enemy
     const charName = entry.character
@@ -1805,7 +1362,7 @@ export function computeOneEntry(
     const wInfo = weaponInfoMap[weaponName ?? ''] ?? null
     const charInfo = charName ? charInfoMap[charName] : undefined
     /** @desc 声骸技能文案索引（伤害类型规则2） */
-    const echoDescByEntry = buildEchoDescByEntry([entry], team, getEchoSkillText())
+    const echoDescByEntry = buildEchoDescByEntry([entry], team, echoSkillText)
 
     // 解析条目伤害类型（显式优先，否则自动推导；效应条目推导为「效应伤害」）
     const damageTypes = resolveDamageTypes(entry, damageEntryDamageTypes, charInfoMap, echoDescByEntry)
@@ -1815,12 +1372,12 @@ export function computeOneEntry(
         refinements: conditionProfile.refinements,
         element: entry.damageElement,
         damageTypes,
-        isEffect: entry.isEffect,
+        isEffect: isEffectEntry(entry),
         damageName: entry.displayName
     }
     const candidates = entryCandidateBuffs(entry, buffSets, damageEntryBuffSetIds)
     /** @desc 系数基类条目（处决/响应/效应/偏谐系数直伤）：不吃角色面板双暴（基准 0% / 100%），双暴只有覆盖生效 */
-    const coeffEntry = usesCoefficientFormula(entry)
+    const critBase: CritBase = FORMULAS[formulaOf(entry)].critBase
     const entryRuleDeps = entryRuleDepsOf(
         entry,
         candidates,
@@ -1831,19 +1388,25 @@ export function computeOneEntry(
             weaponInfoMap,
             ...(enemy?.type ? { enemyType: enemy.type } : {})
         },
-        conditionProfile,
-        coeffEntry
+        conditionProfile
     )
-    const bound = activeBoundForChar(candidates, charIndex, entry.isEffect, conditionProfile, zoneCtx, entryRuleDeps)
+    const bound = activeBoundForChar(
+        candidates,
+        charIndex,
+        isEffectEntry(entry),
+        conditionProfile,
+        zoneCtx,
+        entryRuleDeps
+    )
 
     // partial stats (echo+weapon + non-ref buffs)
     const partialStats = charInfo
-        ? computeCharacterStats(charInfo, weaponName, wInfo, echoes, bound, zoneCtx, coeffEntry)
-        : emptyCharacterStats(coeffEntry)
+        ? computeCharacterStats(charInfo, weaponName, wInfo, echoes, bound, zoneCtx, critBase)
+        : emptyPanel(critBase)
 
     // 被引用角色面板：按需现算（同一槽位只算一次）
-    const panelCache = new Map<number, CharacterComputed>()
-    const panelOf = (refIdx: number): CharacterComputed => {
+    const panelCache = new Map<number, CharacterPanel>()
+    const panelOf = (refIdx: number): CharacterPanel => {
         // 出伤者（`characterIdx = -1`）= 本条目所属角色；其余按槽位
         const idx = refIdx < 0 ? charIndex : refIdx
         if (idx === charIndex) return partialStats
@@ -1861,7 +1424,6 @@ export function computeOneEntry(
             configState,
             charInfoMap,
             weaponInfoMap,
-            coeffEntry,
             entryRuleDeps
         )
         panelCache.set(idx, built)
@@ -1869,25 +1431,20 @@ export function computeOneEntry(
     }
 
     // resolve ref zones
-    const stats = { ...partialStats }
-    resolveRefsForEntry(stats, panelOf, bound, zoneCtx, coeffEntry)
+    const stats = clonePanel(partialStats)
+    const targetPanel = buildTargetPanel(candidates, conditionProfile, zoneCtx, enemy, entryRuleDeps)
+    resolveRefsForEntry(stats, panelOf, targetPanel, bound, zoneCtx, critBase)
     for (const z of overrideZonesOf(bound, zoneCtx)) {
         applyZone(stats, z.zoneId, z.value, 'override')
     }
 
-    if (entry.isEffect) {
-        return computeEffectEntry(entry, stats, enemy, damageTypes)
-    }
-    if (!charName || !charInfo || charIndex < 0) return makeStubEntry(entry)
-    if (entry.isTuneBreak || entry.isTuneResponse || entry.damageBaseType === '偏谐系数') {
-        return computeTuneEntry(entry, stats, enemy)
-    }
-    return computeResultEntry(
+    // 系数基类条目（效应）不吃面板，无角色也能算；其余条目缺角色时给占位结果
+    if (!isEffectEntry(entry) && (!charName || !charInfo || charIndex < 0)) return makeStubEntry(entry)
+    return computeFormulaEntry(
         entry,
         stats,
-        enemy,
-        damageTypes,
-        targetSideValueOf(candidates, conditionProfile, zoneCtx, 'tuneStrainLayer', entryRuleDeps)
+        buildTargetPanel(candidates, conditionProfile, zoneCtx, enemy, entryRuleDeps),
+        damageTypes
     )
 }
 
@@ -1901,6 +1458,8 @@ export interface RefResolveContext {
     charInfoMap: Record<string, CharacterInfo>
     weaponInfoMap: Record<string, WeaponInfo>
     conditionProfile: ConditionProfile
+    /** @desc 声骸技能文案索引（伤害类型推导规则2）；缺省 = 规则2 不参与 */
+    echoSkillText?: Record<string, string>
 }
 
 /**
@@ -1917,43 +1476,45 @@ export const resolveRefZoneValues = (entry: DamageEntry, ctx: RefResolveContext)
     const weaponName = charIndex >= 0 ? (ctx.team[charIndex]?.weapon ?? null) : null
     const weaponInfo = ctx.weaponInfoMap[weaponName ?? ''] ?? null
     const echoes = charIndex >= 0 ? (ctx.configState.characters[charIndex]?.echoes ?? []) : []
-    const echoDescByEntry = buildEchoDescByEntry([entry], ctx.team, getEchoSkillText())
+    const echoDescByEntry = buildEchoDescByEntry([entry], ctx.team, ctx.echoSkillText ?? {})
     const damageTypes = resolveDamageTypes(entry, ctx.damageEntryDamageTypes, ctx.charInfoMap, echoDescByEntry)
     const zoneCtx: ZoneCtx = {
         chains: ctx.conditionProfile.chains,
         refinements: ctx.conditionProfile.refinements,
         element: entry.damageElement,
         damageTypes,
-        isEffect: entry.isEffect,
+        isEffect: isEffectEntry(entry),
         damageName: entry.displayName
     }
     const candidates = entryCandidateBuffs(entry, ctx.buffSets, ctx.damageEntryBuffSetIds)
-    const coeffEntry = usesCoefficientFormula(entry)
-    const ruleDeps = entryRuleDepsOf(entry, candidates, ctx, ctx.conditionProfile, coeffEntry)
+    const critBase: CritBase = FORMULAS[formulaOf(entry)].critBase
+    const ruleDeps = entryRuleDepsOf(entry, candidates, ctx, ctx.conditionProfile)
     const entryBound = activeBoundForChar(
         candidates,
         charIndex,
-        entry.isEffect,
+        isEffectEntry(entry),
         ctx.conditionProfile,
         zoneCtx,
         ruleDeps
     )
     const charInfo = charName ? ctx.charInfoMap[charName] : undefined
 
-    let partialStats: CharacterComputed
+    let partialStats: CharacterPanel
     if (charInfo) {
-        partialStats = computeCharacterStats(charInfo, weaponName, weaponInfo, echoes, entryBound, zoneCtx, coeffEntry)
+        partialStats = computeCharacterStats(charInfo, weaponName, weaponInfo, echoes, entryBound, zoneCtx, critBase)
     } else {
-        partialStats = emptyCharacterStats(coeffEntry)
-        for (const z of activeZonesOf(entryBound, zoneCtx, coeffEntry)) {
+        partialStats = emptyPanel(critBase)
+        for (const z of activeZonesOf(entryBound, zoneCtx)) {
             applyZone(partialStats, z.zoneId, z.value)
         }
         recomputeTotals(partialStats)
     }
 
+    const targetPanel = buildTargetPanel(candidates, ctx.conditionProfile, zoneCtx, ctx.configState.enemy, ruleDeps)
+
     // 被引用角色面板：与 computeAll 同一套「按需现算 + 缓存」；引用一律读**回写前**的面板
-    const panelCache = new Map<number, CharacterComputed>()
-    const panelOf = (refIdx: number): CharacterComputed => {
+    const panelCache = new Map<number, CharacterPanel>()
+    const panelOf = (refIdx: number): CharacterPanel => {
         // 出伤者（`characterIdx = -1`）= 本条目所属角色；其余按槽位
         const idx = refIdx < 0 ? charIndex : refIdx
         if (idx === charIndex) return partialStats
@@ -1970,8 +1531,7 @@ export const resolveRefZoneValues = (entry: DamageEntry, ctx: RefResolveContext)
             ctx.team,
             ctx.configState,
             ctx.charInfoMap,
-            ctx.weaponInfoMap,
-            coeffEntry
+            ctx.weaponInfoMap
         )
         panelCache.set(idx, built)
         return built
@@ -1981,8 +1541,8 @@ export const resolveRefZoneValues = (entry: DamageEntry, ctx: RefResolveContext)
         bs.zones.forEach((z, zi) => {
             if (!z.ref || ZONE_NO_REF_IDS.has(z.zoneId) || !zoneConditionMet(z, zoneCtx)) return
             // 系数基类条目上双暴引用不生效（双暴只有「覆盖」生效），连解算都不做，溯源才不会列出幻影来源
-            if (coeffEntry && !zoneAppliesToCoeffEntry(z)) return
-            out.set(`${bs.id}#${zi}`, resolveRefValue(z.ref, panelOf(z.ref.characterIdx)))
+            if (!formulaAcceptsRef(critBase, z.zoneId)) return
+            out.set(`${bs.id}#${zi}`, resolveRefValue(z.ref, panelOf(z.ref.characterIdx), targetPanel))
         })
     }
     return out

@@ -56,6 +56,7 @@ import {
 import { ownerIdxOfItem, rewriteOwnerInRules } from './buff-owner'
 import { resolveImportTarget } from './buff-import-target'
 import { libraryRefCharacterIdx } from './buff-library-condition'
+import { isEffectEntry } from '$lib/calc/registry/formulas'
 
 let _entries = $state<DamageEntry[]>([])
 let _buffSets = $state<BuffConf[]>([])
@@ -298,7 +299,7 @@ export function init(
      * 否则整场会话都停在 0（条目只在 init 时建一次，不会自动刷新）。
      */
     const coldResponders = [
-        ...new Set(_entries.filter((e) => e.isTuneResponse && !e.ratioValue).map((e) => e.character))
+        ...new Set(_entries.filter((e) => e.formula === 'tune' && !e.ratioValue).map((e) => e.character))
     ].filter((n): n is string => !!n)
     const pending: Promise<unknown>[] = []
     if (names.length > 0 && !haveAllElements) {
@@ -478,9 +479,7 @@ export function buildDamageEntriesFromTimeline(
                         skillType: hit.skillType,
                         hitName: hit.hitName,
                         displayName,
-                        isEffect: false,
-                        isTuneBreak: false,
-                        isTuneResponse: false,
+                        formula: 'direct',
                         ratioValue: ratioSum * (hit.hits ?? 1),
                         ratioUnit: '%',
                         damageBaseType: baseType,
@@ -503,9 +502,7 @@ export function buildDamageEntriesFromTimeline(
                         skillType: hit.skillType,
                         hitName: hit.hitName,
                         displayName,
-                        isEffect: false,
-                        isTuneBreak: false,
-                        isTuneResponse: false,
+                        formula: 'direct',
                         ratioValue: flatTotal * (hit.hits ?? 1),
                         ratioUnit: 'fixed',
                         damageBaseType: '固定',
@@ -549,9 +546,7 @@ export function buildDamageEntriesFromTimeline(
                             skillType: '偏谐响应',
                             hitName: nd.name,
                             displayName: nd.name,
-                            isEffect: false,
-                            isTuneBreak: false,
-                            isTuneResponse: true,
+                            formula: 'tune',
                             ratioValue: ratio,
                             ratioUnit: '%',
                             damageBaseType: '偏谐系数',
@@ -573,9 +568,7 @@ export function buildDamageEntriesFromTimeline(
                         skillType: '谐度破坏',
                         hitName: '谐度破坏',
                         displayName: '谐度破坏',
-                        isEffect: false,
-                        isTuneBreak: true,
-                        isTuneResponse: false,
+                        formula: 'tune',
                         ratioValue: 1600,
                         ratioUnit: '%',
                         damageBaseType: '偏谐系数',
@@ -603,9 +596,7 @@ export function buildDamageEntriesFromTimeline(
                             isDianci && burstLayers > 0
                                 ? nd.name + nd.layers + '层+爆发' + burstLayers + '层'
                                 : nd.name + nd.layers + '层',
-                        isEffect: true,
-                        isTuneBreak: false,
-                        isTuneResponse: false,
+                        formula: 'effect',
                         ratioValue: nd.layers,
                         ratioUnit: '%',
                         damageBaseType: '效应系数',
@@ -1353,7 +1344,7 @@ export function getPaneEffectSources(entryId: string): Record<string, PaneEffect
     if (!entry) return {}
     const team = _initTeam
     const charIdx = entry.character && team ? team.findIndex((s) => s.character === entry.character) : -1
-    return paneEffectSourcesOf(charIdx, entry.isEffect, _damageEntryBuffSetIds[entryId] ?? [], _buffSets)
+    return paneEffectSourcesOf(charIdx, isEffectEntry(entry), _damageEntryBuffSetIds[entryId] ?? [], _buffSets)
 }
 
 /** @desc ── Entry-BuffConf 绑定 ── */
@@ -1919,7 +1910,7 @@ export function rebindGlobalBuffs() {
         entries: _entries.map((entry) => ({
             id: entry.id,
             character: entry.character ?? null,
-            isEffect: entry.isEffect
+            isEffect: isEffectEntry(entry)
         })),
         team: _initTeam ?? [],
         buffs: _buffSets,

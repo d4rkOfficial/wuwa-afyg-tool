@@ -4,6 +4,7 @@
      * 三列结构：倍率名 / 伤害类型多选 / 同步到所有同名伤害；顶部标题右侧为帮助按钮
      */
     import Icon from '@iconify/svelte'
+    import { isEffectEntry } from '$lib/calc/registry/formulas'
     import { fade, slide } from 'svelte/transition'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import type { ComponentsProps } from '$lib/types'
@@ -163,7 +164,7 @@
     }
 
     /** @desc 效应 / 谐度类条目伤害类型由结算方式决定，不参与编辑 */
-    const isEditable = (entry: DamageEntry) => !entry.isEffect && !entry.isTuneBreak && !entry.isTuneResponse
+    const isEditable = (entry: DamageEntry) => entry.formula === 'direct'
 
     const shortTypes = (types: string[]) => types.map((t) => DAMAGE_TYPE_SHORT[t] ?? t).join('/')
 
@@ -189,7 +190,7 @@
 
     /** @desc 第一列副标题里的倍率摘要：百分比 / 固定值 / 效应层数 */
     const ratioLabel = (entry: DamageEntry) => {
-        if (entry.isEffect) return `${Math.round(entry.ratioValue)} 层`
+        if (isEffectEntry(entry)) return `${Math.round(entry.ratioValue)} 层`
         if (entry.ratioUnit === 'fixed') return `固定值 ${Math.round(entry.ratioValue)}`
         return `${Math.round(entry.ratioValue * 100) / 100}%`
     }
@@ -350,7 +351,7 @@
                                     {/if}
                                 {:else}
                                     <span class="text-[11px] text-(--theme-modal-text)/45"
-                                        >{entry.isEffect ? '效应结算' : '谐度结算'}：伤害类型由结算方式决定</span
+                                        >{isEffectEntry(entry) ? '效应结算' : '谐度结算'}：伤害类型由结算方式决定</span
                                     >
                                     {#if inferred.length > 0}
                                         <span class="text-[11px] text-(--theme-modal-text)/60"

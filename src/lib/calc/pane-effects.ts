@@ -11,24 +11,17 @@
 import type { BuffInstance, BuffZoneValue } from './calculation.types'
 import type { CharSlot } from '$lib/types/project'
 import { parseValueString } from '$lib/utils/parse-value-string'
+import { REF_SOURCES, refWrittenBy } from './registry/actions'
 
-/** @desc 面板属性 id（ref 可引用的乘区）→ 会改写该面板的乘区键（与 compute 的 ZONE_OPS 口径一致） */
-export const PANEL_TO_ZONES: Record<string, string[]> = {
-    baseAtk: ['atkFlat', 'atkPct'],
-    totalAtk: ['atkFlat', 'atkPct'],
-    baseHp: ['hpFlat', 'hpPct'],
-    totalHp: ['hpFlat', 'hpPct'],
-    baseDef: ['defFlat', 'defPct'],
-    totalDef: ['defFlat', 'defPct'],
-    recharge: ['recharge'],
-    tuneBreakBoost: ['tuneBreakBoost'],
-    offTuneBuildupRate: ['offTuneBuildupRate'],
-    critRate: ['critRate'],
-    critDmg: ['critDmg'],
-    // 层数类来源（角色独立）：改写它的乘区就是它自己 —— 让「会改该角色层数」的 Buff
-    // 能被识别成引用方这一段的影响源（否则层数引用会被当成没有影响源）
-    unisonBoonLayer: ['unisonBoonLayer']
-}
+/**
+ * @desc 引用来源 id → 会改写该面板属性的作用 id。
+ *
+ * 由注册表推导（三维维度看 `panel` 声明、其余按 id 同名），不再手抄 ——
+ * 新增一个能改写面板的作用时，影响源识别自动跟上。
+ */
+export const PANEL_TO_ZONES: Record<string, string[]> = Object.fromEntries(
+    REF_SOURCES.map((source) => [source.id, refWrittenBy(source.id)])
+)
 
 /** @desc 作用域是否作用于给定角色槽位（与引擎 scopeMatches 同口径；charIdx < 0 表示非角色条目/效应伤害） */
 export const scopeTouches = (scope: 'all' | number[], charIdx: number, isEffect: boolean): boolean => {

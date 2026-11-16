@@ -95,7 +95,8 @@ async function buildComputeContext(projectId?: string): Promise<{
         p.team,
         charInfoMap,
         weaponInfoMap,
-        conditionProfile
+        conditionProfile,
+        getEchoSkillText()
     )
     return {
         entries,

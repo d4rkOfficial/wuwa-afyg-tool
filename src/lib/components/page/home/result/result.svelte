@@ -207,7 +207,8 @@
             team,
             charInfoMap,
             weaponInfoMap,
-            getConditionProfile()
+            getConditionProfile(),
+            getEchoSkillText()
         )
         applyModes(cleanEntries)
     }

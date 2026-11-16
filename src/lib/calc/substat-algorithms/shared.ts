@@ -29,6 +29,8 @@ export interface AnalysisInputs {
     noCritEntryIds: Set<string>
     missEntryIds: Set<string>
     conditionProfile: ConditionProfile
+    /** @desc 声骸技能文案索引（伤害类型推导规则2）；缺省 = 规则2 不参与 */
+    echoSkillText?: Record<string, string>
     /** @desc 调用方已算好的全量引擎结果：给了就不在内部再跑一次 `computeAll`（见 `ContributionAnalysisRequest`） */
     baselineEntries?: ResultEntry[]
 }
@@ -136,7 +138,8 @@ export const prepareAnalysis = (inputs: AnalysisInputs): CharacterDamageContext[
             inputs.team,
             inputs.charInfoMap,
             inputs.weaponInfoMap,
-            inputs.conditionProfile
+            inputs.conditionProfile,
+            inputs.echoSkillText ?? {}
         )
 
     return inputs.team.flatMap((slot, index) => {
@@ -168,7 +171,8 @@ export const prepareAnalysis = (inputs: AnalysisInputs): CharacterDamageContext[
                     inputs.team,
                     inputs.charInfoMap,
                     inputs.weaponInfoMap,
-                    inputs.conditionProfile
+                    inputs.conditionProfile,
+                    inputs.echoSkillText ?? {}
                 )
                 totals = {
                     norm: totals.norm + re.totalDamageRaw,

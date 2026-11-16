@@ -57,7 +57,7 @@ const CHARACTER_INFO: CharacterInfo = {
     chains: []
 } as unknown as CharacterInfo
 
-const responseEntryOf = () => getAllDamageEntries().find((e) => e.isTuneResponse)
+const responseEntryOf = () => getAllDamageEntries().find((e) => e.formula === 'tune')
 
 describe('偏谐响应倍率：技能缓存补齐后要重建条目', () => {
     it('进工程首帧建设条目（缓存冷）后，缓存补齐时倍率恢复为正确值', async () => {

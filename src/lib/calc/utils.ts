@@ -2,6 +2,7 @@ import type { ResultEntry } from './result.types'
 import type { DamageEntry } from './calculation.types'
 import type { CharacterInfo } from '$lib/api/types'
 import { inferFromSkillText, matchHitNamePrefix } from './skill-infer'
+import { isEffectEntry } from '$lib/calc/registry/formulas'
 
 /**
  * @desc 自动推导伤害类型（优先级从高到低）：
@@ -37,7 +38,9 @@ const fallbackDamageType = (entry: DamageEntry): string => {
 
 export function inferDamageTypes(entry: DamageEntry, charInfo?: CharacterInfo | null, echoDesc?: string): string[] {
     // 效应结算条目自动推导为「效应伤害」
-    if (entry.isEffect) return ['效应伤害']
+    if (isEffectEntry(entry)) return ['效应伤害']
+    // 处决 / 偏谐响应：它们不是「其它」，是独立的「处决」类型（决议 D25）
+    if (entry.formula === 'tune') return ['处决']
     // 规则2：技能文案「视为/为 XX 伤害」（富文本先剥标签再匹配）
     const fromText = inferFromSkillText(charInfo, entry, echoDesc ? [echoDesc] : [])
     const fromName = matchHitNamePrefix(entry.hitName)
@@ -60,6 +63,7 @@ export const DAMAGE_TYPE_CATEGORIES = [
     '声骸技能',
     '协同',
     '效应',
+    '处决',
     '其它'
 ] as const
 
@@ -75,6 +79,7 @@ export const TYPE_COLORS: Record<DamageTypeCategory, string> = {
     声骸技能: '#cd93b8',
     协同: '#e0a458',
     效应: '#c978e0',
+    处决: '#c46b6b',
     其它: '#9aa3ad'
 }
 
@@ -87,7 +92,8 @@ const FULL_TO_CATEGORY: Record<string, DamageTypeCategory> = {
     延奏技能伤害: '延奏技能',
     声骸技能伤害: '声骸技能',
     协同攻击伤害: '协同',
-    效应伤害: '效应'
+    效应伤害: '效应',
+    处决: '处决'
 }
 
 export interface DirectDamageTypeSlice {

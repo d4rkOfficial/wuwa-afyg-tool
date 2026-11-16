@@ -36,7 +36,7 @@ describe('each-key 唯一性证据', () => {
     })
 
     it('character-detail-modal 的 TYPE_DMG_ORDER 过滤后仍无重复', () => {
-        const TYPE_DMG_ORDER = DAMAGE_TYPES.filter((dt) => dt !== '效应伤害' && dt !== '其它类型伤害')
+        const TYPE_DMG_ORDER = DAMAGE_TYPES.filter((dt) => dt !== '效应伤害' && dt !== '处决' && dt !== '其它类型伤害')
         assertUnique('TYPE_DMG_ORDER', TYPE_DMG_ORDER)
     })
 

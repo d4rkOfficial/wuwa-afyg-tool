@@ -10,12 +10,13 @@
         "package:standalone": "node scripts/build-standalone.mjs",
         "preview": "vite preview",
         "prepare": "svelte-kit sync || echo ''",
-        "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && node scripts/check-mdi-icons.mjs && node scripts/check-surfaces.mjs && node scripts/check-components.mjs && node scripts/check-scrollbar.mjs && node scripts/generate-components-doc.mjs --check && node scripts/generate-tools-doc.mjs --check && node scripts/check-motion.mjs",
+        "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && node scripts/check-mdi-icons.mjs && node scripts/check-surfaces.mjs && node scripts/check-components.mjs && node scripts/check-scrollbar.mjs && node scripts/generate-components-doc.mjs --check && node scripts/generate-tools-doc.mjs --check && node scripts/check-motion.mjs && node scripts/check-no-hardcoded-ids.mjs && node scripts/check-calc-core.mjs",
         "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
         "check:surfaces": "node scripts/check-surfaces.mjs",
         "check:components": "node scripts/check-components.mjs",
         "check:scrollbar": "node scripts/check-scrollbar.mjs",
         "check:motion": "node scripts/check-motion.mjs",
+        "check:hardcoded": "node scripts/check-no-hardcoded-ids.mjs",
         "check:tools-doc": "node scripts/generate-tools-doc.mjs --check",
         "lint": "prettier --check \"src\" \"test\" \"docs\" \"scripts\" \"*.{js,mjs,cjs,ts,json,md}\"",
         "lint:eslint": "eslint .",
@@ -29,7 +30,9 @@
         "generate-icons": "node scripts/generate-icons.mjs",
         "generate-components-doc": "node scripts/generate-components-doc.mjs",
         "generate-tools-doc": "node scripts/generate-tools-doc.mjs",
-        "collect-icons": "node scripts/collect-mdi-icons.mjs"
+        "collect-icons": "node scripts/collect-mdi-icons.mjs",
+        "check:core": "node scripts/check-calc-core.mjs",
+        "build:calc-lib": "node scripts/build-calc-lib.mjs"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",

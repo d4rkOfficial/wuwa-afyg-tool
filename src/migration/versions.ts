@@ -292,6 +292,36 @@ const migrateV8toV9: Migration = {
     }
 }
 
+/**
+ * @desc 迁移 v9 → v10：**作用的条件能力位生效**。
+ *
+ * 只有 \`damageMatchable\` 的作用才能挂「伤害匹配」条件（伤害属性 / 伤害类型）——
+ * 「热熔共鸣效率」「热熔集谐层数」这类组合在模型上不存在。清理本身由幂等的
+ * \`normalizeZones\`（\`migration/buff.ts\`）在每次载入时完成，这里只负责推进版本号并
+ * 把两份视图都洗一遍。
+ */
+const migrateV9toV10: Migration = {
+    from: 9,
+    to: 10,
+    migrate(raw) {
+        const encounter = asRecord(raw.encounter)
+        const phases = asRecord(raw.phases)
+        const encounterCalc = asRecord(encounter.calculation)
+        const phasesCalc = asRecord(phases.calculation)
+        const source = encounterCalc.data !== undefined ? encounterCalc.data : (phasesCalc.data ?? asRecord(raw.calc))
+        const calcState = migrateCalcState(source)
+        return {
+            ...raw,
+            version: 10,
+            buffs: calcState.buffSets,
+            encounter: { ...encounter, calculation: { ...encounterCalc, data: calcState } },
+            ...(phasesCalc.data !== undefined
+                ? { phases: { ...phases, calculation: { ...phasesCalc, data: calcState } } }
+                : {})
+        }
+    }
+}
+
 export const PROJECT_MIGRATIONS: Migration[] = [
     migrateV0toV1,
     migrateV1toV2,
@@ -301,5 +331,6 @@ export const PROJECT_MIGRATIONS: Migration[] = [
     migrateV5toV6,
     migrateV6toV7,
     migrateV7toV8,
-    migrateV8toV9
+    migrateV8toV9,
+    migrateV9toV10
 ]

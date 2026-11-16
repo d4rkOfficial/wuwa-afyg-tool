@@ -35,9 +35,10 @@
     import { enemyDefenseForLevel } from '$lib/calc/config.consts'
     import type { ConfigState, EchoSlotConfig } from '$lib/calc/config.types'
     import type { ResultEntry } from '$lib/calc/result.types'
+    import { formatMultiplierDisplay } from '$lib/calc/result.styles'
     import type { TimelineData } from '$lib/calc/timeline.types'
     import { ensureSkillCache } from '$lib/calc/timeline.store.svelte'
-    import { ensureEchoSkillText } from '$lib/data/char-info.svelte'
+    import { ensureEchoSkillText, getEchoSkillText } from '$lib/data/char-info.svelte'
     import { ensureCharElements } from '$lib/data/char-elements.svelte'
     import type { CharSlot } from '$lib/types/project'
     import { ELEMENTS, ENEMY_TYPES, CHAIN_MAX, REFINE_MAX, type EnemyType } from '$lib/consts/game-terms'
@@ -339,7 +340,8 @@
                 project.team,
                 charInfoMap,
                 weaponInfoMap,
-                { chains: [...chains], refinements: [...refinements] }
+                { chains: [...chains], refinements: [...refinements] },
+                getEchoSkillText()
             )
             const computeMs = performance.now() - computeStarted
             baseResults = computed
@@ -401,7 +403,7 @@
             zones: entry.multiplierZones.map((zone) => ({
                 label: zone.label,
                 value: zone.value,
-                detail: zone.detail
+                detail: formatMultiplierDisplay(zone.value, zone.display)
             })),
             trace: traceOf(entry)
         })

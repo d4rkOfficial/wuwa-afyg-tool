@@ -46,6 +46,7 @@ import { LEGACY_ZONE_IDS, resolveZoneId, ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import { cyclePathOf, isRuleDraft, normalizeRule } from '$lib/calc/rules'
 import type { BuffRule, ZoneRef } from '$lib/calc/calculation.types'
+import { isEffectEntry } from '$lib/calc/registry/formulas'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 
@@ -167,7 +168,7 @@ defineTool('get_damage_entries', {
                     damageElement: entry.damageElement,
                     damageBaseType: entry.damageBaseType,
                     damageTypes: [...damageTypesOf(entry.id)],
-                    kind: entry.isEffect ? '效应' : entry.isTuneBreak ? '处决' : entry.isTuneResponse ? '响应' : '直伤',
+                    kind: isEffectEntry(entry) ? '效应' : entry.formula === 'tune' ? '处决' : '直伤',
                     buffs: [...buffNamesOf(entry.id)],
                     pos: posOf(entry) ?? null
                 }))
@@ -475,7 +476,7 @@ defineTool('unbind_buff_conf_from_entry', {
 
 defineTool('set_entry_damage_types', {
     description:
-        '设置指定伤害条目的伤害类型列表（覆盖，按**序号**）。取值：普攻伤害/重击伤害/共鸣技能伤害/共鸣解放伤害/声骸技能伤害/变奏技能伤害/延奏技能伤害/协同攻击伤害/效应伤害/其它类型伤害。',
+        '设置指定伤害条目的伤害类型列表（覆盖，按**序号**）。取值：普攻伤害/重击伤害/共鸣技能伤害/共鸣解放伤害/声骸技能伤害/变奏技能伤害/延奏技能伤害/协同攻击伤害/效应伤害/处决/其它类型伤害。',
     parameters: {
         type: 'object',
         properties: {
@@ -943,7 +944,7 @@ defineTool('get_damage_entry_buff_sources', {
             const charIdx = entry.character ? project.team.findIndex((s) => s.character === entry.character) : -1
             const sources = paneEffectSourcesOf(
                 charIdx,
-                entry.isEffect,
+                isEffectEntry(entry),
                 calc.damageEntryBuffSetIds[entry.id] ?? [],
                 calc.buffSets
             )

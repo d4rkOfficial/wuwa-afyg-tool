@@ -1,150 +1,95 @@
-import type { ZoneDef, BuffConf } from './calculation.types'
+import type { BuffConf } from './calculation.types'
+import {
+    ACTION_GROUPS,
+    BUFF_ACTIONS,
+    REF_SOURCES,
+    REF_SOURCE_MAP,
+    type ActionId,
+    type BuffActionDef,
+    type RefSourceDef
+} from './registry/actions'
 
-/** @desc 全部乘区定义（拉表页可配置的 Buff 乘区清单）：按「基本固定值 → 基本百分比 → 双暴 → 增伤拐 → 特殊终伤 → 倍率 → 使目标 → 对目标 → 层数」分区排列（见 ZONE_SECTIONS） */
-export const ZONE_DEFS = [
-    { id: 'atkFlat', label: '攻击固定值', unit: 'flat' },
-    { id: 'hpFlat', label: '生命固定值', unit: 'flat' },
-    { id: 'defFlat', label: '防御固定值', unit: 'flat' },
-    { id: 'tuneBreakBoost', label: '谐度破坏增幅', unit: 'flat' },
+/**
+ * @desc 界面与迁移共用的兼容层：作用注册表（`registry/actions.ts`）派生出的
+ * 「乘区形态」视图。命名沿用旧口径（`ZONE_*`），语义已改为「Buff 作用」——
+ * 「乘区」一词现在只指公式链上的乘子（增伤区 / 防御区 / 暴击区…），不再是这里的实体。
+ */
+export type { ActionId, ActionCombine, ActionSide, BuffActionDef, PanelDim, RefSourceDef } from './registry/actions'
+export {
+    ACTION_GROUPS,
+    ACTION_MAP,
+    BUFF_ACTIONS,
+    REF_SOURCES,
+    REF_SOURCE_MAP,
+    refWrittenBy,
+    writtenByOf
+} from './registry/actions'
 
-    { id: 'atkPct', label: '攻击百分比', unit: '%' },
-    { id: 'hpPct', label: '生命百分比', unit: '%' },
-    { id: 'defPct', label: '防御百分比', unit: '%' },
-    { id: 'recharge', label: '共鸣效率', unit: '%' },
-    { id: 'offTuneBuildupRate', label: '偏谐值累积效率', unit: '%' },
+/** @desc 全部作用定义（顺序 = 界面「添加作用」右栏；与旧 `ZONE_DEFS` 逐项对齐） */
+export const ZONE_DEFS = BUFF_ACTIONS
 
-    { id: 'critRate', label: '暴击率', unit: '%' },
-    { id: 'critDmg', label: '暴击伤害', unit: '%' },
+/** @desc 作用 id 联合类型（由注册表推导） */
+export type ZoneId = ActionId
 
-    { id: 'bonusDmg', label: '加成(增伤区)', unit: '%' },
-    { id: 'deepenDmg', label: '加深(加深区)', unit: '%' },
-    { id: 'dmgTakenInc', label: '伤害提升(易伤区)', unit: '%' },
-    { id: 'finalDmg', label: '最终伤害(终伤区)', unit: '%' },
+/** @desc 作用定义查询表（key 用宽 string：历史 id / 导入数据可能不在当前清单内，取不到即为 undefined） */
+export const ZONE_MAP: Map<string, BuffActionDef> = new Map(BUFF_ACTIONS.map((a) => [a.id, a]))
 
-    { id: 'specialFinal1', label: '特殊终伤(1)', unit: '%' },
-    { id: 'specialFinal2', label: '特殊终伤(2)', unit: '%' },
+/** @desc 作用分组（「添加作用」与 Buff 集编辑器按此分区展示；顺序即展示顺序） */
+export const ZONE_SECTIONS: readonly { title: string; ids: readonly string[] }[] = ACTION_GROUPS.map((title) => ({
+    title,
+    ids: BUFF_ACTIONS.filter((a) => a.group === title).map((a) => a.id)
+}))
 
-    { id: 'extraRatio', label: '额外倍率', unit: '%' },
-
-    { id: 'defDown', label: '防御降低(减防)', unit: '%' },
-    { id: 'resDown', label: '抗性降低(减抗)', unit: '%' },
-
-    { id: 'resPen', label: '属性抗性无视(穿抗)', unit: '%' },
-    { id: 'defPen', label: '防御无视(穿防)', unit: '%' },
-    { id: 'dmgRedPen', label: '免伤无视(穿免)', unit: '%' },
-
-    { id: 'tuneStrainLayer', label: '集谐干涉层数', unit: 'flat' },
-    { id: 'unisonBoonLayer', label: '同奏增益层数', unit: 'flat' }
-] as const satisfies readonly ZoneDef[]
-
-/** @desc ZoneId 联合类型与查询 Map（由 ZONE_DEFS 派生，供界面与计算引擎快速查乘区定义） */
-export type ZoneId = (typeof ZONE_DEFS)[number]['id']
-
-/** @desc 乘区定义查询表（key 用宽 string：历史 id / 导入数据可能不在当前清单内，取不到即为 undefined） */
-export const ZONE_MAP: Map<string, ZoneDef> = new Map(ZONE_DEFS.map((z) => [z.id, z]))
-
-/** @desc 乘区分组（「添加乘区」与工坊 Buff 集编辑器按此分区展示；顺序即展示顺序） */
-export const ZONE_SECTIONS = [
-    { title: '基本固定值', ids: ['atkFlat', 'hpFlat', 'defFlat', 'tuneBreakBoost'] },
-    { title: '基本百分比', ids: ['atkPct', 'hpPct', 'defPct', 'recharge', 'offTuneBuildupRate'] },
-    { title: '双暴', ids: ['critRate', 'critDmg'] },
-    { title: '常见增伤拐', ids: ['bonusDmg', 'deepenDmg', 'dmgTakenInc', 'finalDmg'] },
-    { title: '特殊增伤拐或倍率提升', ids: ['specialFinal1', 'specialFinal2'] },
-    { title: '倍率追加或锚定', ids: ['extraRatio'] },
-    { title: '使目标', ids: ['defDown', 'resDown'] },
-    { title: '对目标', ids: ['resPen', 'defPen', 'dmgRedPen'] },
-    { title: '层数相关独立终伤', ids: ['tuneStrainLayer', 'unisonBoonLayer'] }
-] as const satisfies readonly { title: string; ids: readonly ZoneId[] }[]
-
-/** @desc 分区后的乘区清单（每个分区一组定义，顺序与 ZONE_SECTIONS 一致；未列入分区的乘区兜底进「其它」） */
-export const ZONE_SECTION_VIEWS: { title: string; defs: ZoneDef[] }[] = (() => {
+/** @desc 分区后的作用清单（每个分区一组定义，顺序与 `ZONE_SECTIONS` 一致；未列入分区的兜底进「其它」） */
+export const ZONE_SECTION_VIEWS: { title: string; defs: BuffActionDef[] }[] = (() => {
     const listed = new Set<string>(ZONE_SECTIONS.flatMap((s) => [...s.ids]))
-    const views: { title: string; defs: ZoneDef[] }[] = ZONE_SECTIONS.map((s) => ({
+    const views: { title: string; defs: BuffActionDef[] }[] = ZONE_SECTIONS.map((s) => ({
         title: s.title,
-        defs: s.ids.map((id) => ZONE_MAP.get(id)).filter((d): d is ZoneDef => Boolean(d))
+        defs: s.ids.map((id) => ZONE_MAP.get(id)).filter((d): d is BuffActionDef => Boolean(d))
     }))
-    const rest = ZONE_DEFS.filter((z) => !listed.has(z.id))
+    const rest = BUFF_ACTIONS.filter((z) => !listed.has(z.id))
     if (rest.length > 0) views.push({ title: '其它', defs: [...rest] })
     return views
 })()
 
-/** @desc 乘区 id → 所属分区标题（界面分组与提示用） */
+/** @desc 作用 id → 所属分区标题（界面分组与提示用） */
 export const ZONE_SECTION_OF: Map<string, string> = new Map(
     ZONE_SECTION_VIEWS.flatMap((s) => s.defs.map((d) => [d.id, s.title] as const))
 )
 
-/** @desc 旧乘区 id → 现乘区 id 别名表（历史工程 / 工坊 Buff 集 / 分享数据里的旧 id 在归一化时重映射） */
+/** @desc 旧作用 id → 现作用 id 别名表（历史工程 / 工坊 Buff 集 / 分享数据里的旧 id 在归一化时重映射） */
 export const LEGACY_ZONE_IDS: Record<string, string> = {
     customFinalDmg: 'specialFinal1',
     customFinalDmgMul: 'specialFinal2'
 }
 
-/** @desc 把历史乘区 id 归一化为当前 id（已是当前 id 或无法识别的 id 原样返回） */
+/** @desc 把历史作用 id 归一化为当前 id（已是当前 id 或无法识别的 id 原样返回） */
 export const resolveZoneId = (id: string): string => LEGACY_ZONE_IDS[id] ?? id
 
 /**
- * @desc 不支持 ref 引用/转模的乘区（引擎/UI/AI 共用判定）。
+ * @desc **不能作为引用写入目标**的作用：目标侧作用（值挂在目标面板上，由 Buff 直接聚合，
+ * 不接受「按面板读数回写」这种形态）。目前只有集谐干涉层数。
  *
- * 目前**只有集谐干涉层数**在名单里：它只允许直接填固定层数。同奏增益层数可以引用；
- * 新增乘区默认即可引用，只有确实需要「只允许固定值」时才加进来。
+ * 注意与「能作为引用**来源**」区分：后者是 `REF_SOURCES`（可被读取的面板属性）。
  */
-export const ZONE_NO_REF_IDS = new Set<string>(['tuneStrainLayer'])
+export const ZONE_NO_REF_IDS = new Set<string>(BUFF_ACTIONS.filter((a) => a.side === 'target').map((a) => a.id))
 
-/** @desc 不支持「覆盖」语义的乘区：百分比类与额外倍率恒为追加（界面不显示覆盖按钮，store/工坊/导入共用判定） */
-export const ZONE_NO_OVERRIDE_IDS = new Set<string>(['atkPct', 'hpPct', 'defPct', 'extraRatio'])
+/** @desc 界面不提供「覆盖」写入的作用（引擎侧写模式恒合法，不构成 gate） */
+export const ZONE_NO_OVERRIDE_IDS = new Set<string>(BUFF_ACTIONS.filter((a) => !a.overridable).map((a) => a.id))
 
 /**
- * @desc **系数基类条目**（处决 / 响应 / 效应 / 偏谐系数直伤）上「只有覆盖写入才生效」的乘区：双暴。
+ * @desc 目标侧作用：数值挂在**目标/怪物**身上，全队共用一份，没有「某角色的」这一说。
  *
- * 这些条目不吃角色面板双暴（基准 0% / 100%，见 `compute.ts` 的 `critBase`），
- * 面板式累加对它们没有意义，所以**追加（含引用/转模）一律不生效** —— 想把双暴定到某个值，
- * 必须由一条明确写「覆盖」的 buff 来做（覆盖是绝对值写入：`critRate = 50` 即 50%）。
- * 带引用的「覆盖」按引用处理，同样不生效（引用属追加语义，见 `zoneAppliesToCoeffEntry`）。
- *
- * 引擎（`compute.ts` 的 `activeZonesOf` / `refZonesOf`）与拉表可用性判定
- * （`spread-table.utils.ts` 的 `buffUsableByEntry`）**共用本表**，避免两边口径漂移。
+ * 引擎聚合这些作用时**不按作用域过滤**（一条「作用域=角色1」的集谐 buff 也照样给全队提供层数），
+ * 因此不存在「某某角色的集谐干涉层数」。
  */
-export const COEFF_OVERRIDE_ONLY_ZONE_IDS = new Set<string>(['critRate', 'critDmg'])
+export const TARGET_SIDE_ZONE_IDS = new Set<string>(BUFF_ACTIONS.filter((a) => a.side === 'target').map((a) => a.id))
 
-/** @desc 系数基类条目上该乘区是否生效：双暴只认**纯覆盖**写入（带引用的覆盖按引用处理），其余乘区照旧追加 */
-export const zoneAppliesToCoeffEntry = (zone: { zoneId: string; override?: boolean; ref?: unknown }): boolean =>
-    !COEFF_OVERRIDE_ONLY_ZONE_IDS.has(zone.zoneId) || (zone.override === true && !zone.ref)
-
-/**
- * @desc 目标侧乘区：数值挂在**目标/怪物**身上，全队共用一份，没有「某角色的」这一说。
- *
- * 目前只有集谐·干涉层数（`tuneStrainLayer`）：由队伍施加在目标身上。
- * 引擎聚合这些乘区时**不按作用域过滤**（一条「作用域=角色1」的集谐 buff 也照样给全队提供层数），
- * 因此不存在「某某角色的集谐干涉层数」。它也因此不能配引用、不能作为引用来源。
- */
-export const TARGET_SIDE_ZONE_IDS = new Set<string>(['tuneStrainLayer'])
-
-/**
- * @desc 可被「引用」的来源清单（ZoneRef 的目标）：角色白值/当前面板/充能/谐度/双暴，
- * 以及**按角色独立**的同奏增益层数。
- */
-export const ZONE_REF_DEFS = [
-    { id: 'baseAtk', label: '攻击白值', unit: 'flat' },
-    { id: 'totalAtk', label: '当前攻击', unit: 'flat' },
-    { id: 'baseHp', label: '生命白值', unit: 'flat' },
-    { id: 'totalHp', label: '生命上限', unit: 'flat' },
-    { id: 'baseDef', label: '防御白值', unit: 'flat' },
-    { id: 'totalDef', label: '当前防御', unit: 'flat' },
-    { id: 'recharge', label: '共鸣效率', unit: '%' },
-    { id: 'tuneBreakBoost', label: '谐度破坏增幅', unit: 'flat' },
-    { id: 'offTuneBuildupRate', label: '偏谐值累积效率', unit: '%' },
-    { id: 'critRate', label: '暴击率', unit: '%' },
-    { id: 'critDmg', label: '暴击伤害', unit: '%' },
-
-    /**
-     * @desc 层数类来源：读**被引用角色**自己累计的同奏增益层数（每个角色独立）。
-     * 集谐干涉层数挂在目标身上、不属于角色，故不作为引用来源。
-     */
-    { id: 'unisonBoonLayer', label: '同奏增益层数', unit: 'flat' }
-] as const satisfies readonly ZoneDef[]
+/** @desc 可作为引用（转模）来源的面板属性清单 */
+export const ZONE_REF_DEFS = REF_SOURCES
 
 /** @desc 引用属性的查询 Map（同上，供 ZoneRef 目标查表） */
-export const ZONE_REF_MAP: Map<string, ZoneDef> = new Map(ZONE_REF_DEFS.map((z) => [z.id, z]))
+export const ZONE_REF_MAP: Map<string, RefSourceDef> = REF_SOURCE_MAP
 
 /** @desc 把 "15%" 之类的字符串解析为小数（15% → 0.15） */
 export function parseRatio(r: string): number {

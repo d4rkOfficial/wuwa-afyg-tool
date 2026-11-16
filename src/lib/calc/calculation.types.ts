@@ -13,6 +13,9 @@ export interface DamageRatioPart {
     baseType: string
 }
 
+/** @desc 条目走哪条公式（基值来源 + 乘子链）：见 `registry/formulas.ts` 的 `FORMULAS` */
+export type CalculationFormulaId = 'direct' | 'tune' | 'effect' | 'fixed'
+
 /** @desc 拉表页的伤害条目：由排轴时间线中的伤害块/非直伤条目派生而来，是「给谁配 Buff」的最小粒度 */
 export interface DamageEntry {
     id: string
@@ -20,9 +23,8 @@ export interface DamageEntry {
     skillType?: string
     hitName: string
     displayName: string
-    isEffect: boolean
-    isTuneBreak: boolean
-    isTuneResponse: boolean
+    /** @desc 该条目走哪条公式（唯一的重叠判据，取代原先的三个布尔 + 基值类型组合） */
+    formula: CalculationFormulaId
     ratioValue: number
     ratioUnit: '%' | 'fixed'
     damageBaseType: string

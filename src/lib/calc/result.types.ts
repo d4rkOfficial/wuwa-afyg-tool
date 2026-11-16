@@ -1,7 +1,25 @@
+import type { CalculationFormulaId } from './calculation.types'
+
+/**
+ * @desc 乘区的展示参数（结构化）：引擎只给**原始量纲**，格式化留给界面层
+ * （`result.styles.ts` 的 `formatMultiplierDisplay`）。
+ *
+ * - `delta`：显示成「1 + x%」形态（加深 / 增伤 / 易伤 / 终伤 / 谐度）；
+ * - `factor`：显示成乘数（抗性 / 防御 / 免伤 / 特殊）；
+ * - `deltaWhenActive`：生效时显示 delta、未生效时显示乘数（集谐 / 同奏 / 暴击这类值可能恰为 1 的乘区）。
+ */
+export type MultiplierDisplay =
+    | { mode: 'delta'; pct: number; digits: number }
+    | { mode: 'factor'; digits: number }
+    | { mode: 'deltaWhenActive'; pct: number; active: boolean; activeDigits: number; idleDigits: number }
+
 export interface MultiplierZone {
+    /** @desc 乘子 id（公式注册表 `MULTIPLIERS` 的键，溯源段按它选来源收集器） */
+    id: string
     label: string
     value: number
-    detail: string
+    /** @desc 结构化展示参数（不含本地化字符串） */
+    display: MultiplierDisplay
 }
 
 export interface ResultEntry {
@@ -14,6 +32,20 @@ export interface ResultEntry {
     ratioNum: number
     hits: number
     sourceTimelineBlockId: string
+
+    /** @desc 该条目走哪条公式（`registry/formulas.ts` 的 `CalculationFormulaId`） */
+    formula: CalculationFormulaId
+    /**
+     * @desc 面板摘要（结构化真源）：三维白值 / 合计 / 作用落值。
+     *
+     * 下面的 `baseAtk` / `totalAtk` / `atkPctSum` … 是它的**派生兼容层**，
+     * 新代码优先读 `panel`，旧字段逐阶段下线。
+     */
+    panel: {
+        base: { atk: number; hp: number; def: number }
+        total: { atk: number; hp: number; def: number }
+        zones: Record<string, number>
+    }
 
     // computed
     baseValue: number

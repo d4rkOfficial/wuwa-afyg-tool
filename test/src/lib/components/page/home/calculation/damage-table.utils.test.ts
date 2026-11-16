@@ -1,7 +1,8 @@
 // 拉表可用性门槛回归，两块：
 //
 // ① 「追加型双暴 buff 不允许勾到处决/响应/效应条目」——
-//    引擎口径（`COEFF_OVERRIDE_ONLY_ZONE_IDS`）：系数基类条目不参与面板式双暴累加，双暴只有「覆盖」写入生效。
+//    引擎口径（`formulaAcceptsRef`）：系数基类条目的双暴是它自己临时的一份，直接写入（追加 / 覆盖）都生效，
+//    只有「引用写入」被剔除 —— 所以判断可用性时要看过不过 `formulaAcceptsRef`。
 //    拉表的可用性判定（`buffUsableByEntry`，铺开表与下拉表共用）必须同步挡住，否则是「勾得上、数值毫无变化」的假可勾。
 //
 // ② 「非直伤条目的乘区条件必须带条目上下文」——
@@ -26,9 +27,7 @@ const effectEntry: DamageEntry = {
     id: 'eff',
     hitName: '光噪效应',
     displayName: '光噪效应3层',
-    isEffect: true,
-    isTuneBreak: false,
-    isTuneResponse: false,
+    formula: 'effect',
     ratioValue: 3,
     ratioUnit: '%',
     damageBaseType: '效应系数',
@@ -40,18 +39,17 @@ const effectEntry: DamageEntry = {
 const tuneEntry: DamageEntry = {
     ...effectEntry,
     id: 'tune',
-    isEffect: false,
-    isTuneBreak: true,
+    formula: 'tune',
     damageBaseType: '偏谐系数'
 }
 
 const directEntry: DamageEntry = {
     ...effectEntry,
     id: 'direct',
+    formula: 'direct',
     character: '测试角色',
     skillType: '常态攻击',
     hitName: '常态攻击第1段伤害',
-    isEffect: false,
     damageBaseType: '攻击',
     damageElement: '冷凝'
 }
@@ -85,16 +83,16 @@ const conditionAgrees = (bs: BuffInstance, entry: DamageEntry): { ui: boolean; e
     }
 }
 
-describe('非直伤条目的可用性门槛：追加型双暴 buff 不允许勾', () => {
-    it('效应条目：追加型暴击率/暴击伤害 → 不可用；覆盖型 → 可用', () => {
-        assert.equal(buffUsableByEntry(buff([zone('critRate', 20)]), effectEntry), false, '追加暴击率不生效')
-        assert.equal(buffUsableByEntry(buff([zone('critDmg', 30)]), effectEntry), false, '追加暴击伤害不生效')
-        assert.equal(buffUsableByEntry(buff([zone('critRate', 100, true)]), effectEntry), true, '覆盖型暴击率生效')
-        assert.equal(buffUsableByEntry(buff([zone('critDmg', 200, true)]), effectEntry), true, '覆盖型暴击伤害生效')
+describe('非直伤条目的可用性门槛：双暴只挡「引用写入」', () => {
+    it('效应条目：直接写入的双暴（追加 / 覆盖）都可用', () => {
+        assert.equal(buffUsableByEntry(buff([zone('critRate', 20)]), effectEntry), true, '追加暴击率是条目自己的一份')
+        assert.equal(buffUsableByEntry(buff([zone('critDmg', 30)]), effectEntry), true, '追加暴击伤害同上')
+        assert.equal(buffUsableByEntry(buff([zone('critRate', 100, true)]), effectEntry), true, '覆盖型暴击率可用')
+        assert.equal(buffUsableByEntry(buff([zone('critDmg', 200, true)]), effectEntry), true, '覆盖型暴击伤害可用')
     })
 
     it('处决/响应条目同一口径', () => {
-        assert.equal(buffUsableByEntry(buff([zone('critRate', 20)]), tuneEntry), false)
+        assert.equal(buffUsableByEntry(buff([zone('critRate', 20)]), tuneEntry), true)
         assert.equal(buffUsableByEntry(buff([zone('critDmg', 20, true)]), tuneEntry), true)
     })
 
@@ -168,8 +166,8 @@ describe('非直伤条目也要带条目上下文判乘区条件（含属性/类
         assert.deepEqual(conditionAgrees(wrongType, conductiveEffectEntry), { ui: false, engine: false })
     })
 
-    it('处决/响应条目：按推断出的伤害类型判（谐度破坏 → 其它类型伤害）', () => {
-        const otherType: BuffInstance = buff([condZone('finalDmg', 8, { damageTypes: ['其它类型伤害'] })])
+    it('处决/响应条目：按推断出的伤害类型判（谐度破坏 → 处决）', () => {
+        const otherType: BuffInstance = buff([condZone('finalDmg', 8, { damageTypes: ['处决'] })])
         assert.deepEqual(conditionAgrees(otherType, tuneEntry), { ui: true, engine: true })
         const normalAttack: BuffInstance = buff([condZone('finalDmg', 8, { damageTypes: ['普攻伤害'] })])
         assert.deepEqual(conditionAgrees(normalAttack, tuneEntry), { ui: false, engine: false })
@@ -178,7 +176,7 @@ describe('非直伤条目也要带条目上下文判乘区条件（含属性/类
     it('`buildDamageTypesByEntry` 必须覆盖非直伤条目（否则条件判定没有上下文）', () => {
         const map = buildDamageTypesByEntry([effectEntry, tuneEntry, directEntry], {}, {}, {})
         assert.deepEqual(map.get('eff'), ['效应伤害'], '效应结算 → 效应伤害')
-        assert.deepEqual(map.get('tune'), ['其它类型伤害'], '处决 → 推断类型')
+        assert.deepEqual(map.get('tune'), ['处决'], '处决 → 推断为「处决」类型')
         assert.deepEqual(map.get('direct'), ['普攻伤害'], '直伤按技能类型兜底')
     })
 })
