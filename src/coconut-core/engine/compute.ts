@@ -1045,7 +1045,7 @@ const effectRatioFactors = (effect: NonNullable<ResolvedBase['effect']>, hits: n
  * 结构：`公式（基值配方 + 有序乘子链）` → `基值 × ∏乘子`。四条公式的差异全部在注册表里，
  * 这里只剩「基值怎么解析」与「`ResultEntry` 字段怎么物化」两件事。
  */
-const computeFormulaEntry = (
+export const computeFormulaEntry = (
     entry: DamageEntry,
     panel: CharacterPanel,
     target: TargetPanel,

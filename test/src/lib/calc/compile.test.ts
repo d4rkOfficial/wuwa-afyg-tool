@@ -11,6 +11,7 @@ import type { ConfigState, EchoSlotConfig } from '$coconut/engine/config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
 import { compileGeneralTable } from '$lib/calc/compile'
+import { computeAllViaCore } from '$lib/calc/compute-facade'
 
 const CHAR = '甲'
 const WEAPON = '武器W'
@@ -255,6 +256,41 @@ describe('编译 → 内核 与引擎数值对账', () => {
                     assert.equal(coreZones.get(id), engineZones.get(id), `${expected.displayName} 乘区 ${id} 不一致`)
                 }
             }
+        }
+    })
+
+    it('门面：ResultEntry 与引擎 computeAll 逐字段相等', () => {
+        const facadeResult = computeAllViaCore(request)
+        assert.equal(facadeResult.length, engineResult.length)
+        const numericKeys = [
+            'baseValue',
+            'totalMultiplier',
+            'expectedPerHit',
+            'nonCritPerHit',
+            'critPerHit',
+            'totalDamage',
+            'rawPerHit',
+            'critRate',
+            'critDmg',
+            'dmgBonus',
+            'defMulti',
+            'resMulti',
+            'dmgRedMulti',
+            'finalDmg',
+            'extraRatio',
+            'vulnerability'
+        ] as const
+        for (const [index, expected] of engineResult.entries()) {
+            const actual = facadeResult[index]!
+            for (const key of numericKeys) {
+                assert.equal(actual[key], expected[key], `${expected.displayName} 字段 ${key} 不一致`)
+            }
+            assert.equal(actual.id, expected.id)
+            assert.equal(actual.hits, expected.hits)
+            assert.deepEqual(
+                (actual.multiplierZones ?? []).map((zone) => [zone.id, zone.value]),
+                (expected.multiplierZones ?? []).map((zone) => [zone.id, zone.value])
+            )
         }
     })
 })
