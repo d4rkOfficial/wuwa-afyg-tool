@@ -399,8 +399,18 @@ export const formulaAcceptsRef = (critBase: CritBase, actionId: string): boolean
 /** @desc 公式 id（内核的 `CalculationFormula`，对外沿用旧名以免调用方大改） */
 export type CalculationFormulaId = CalculationFormula
 
-/** @desc 基值配方：基值从哪来（面板三维 / 敌人类型系数 / 效应表系数 / 固定值） */
-export type BaseRecipe = { kind: 'panelStat' } | { kind: 'enemyCoeff' } | { kind: 'effectTable' } | { kind: 'fixed' }
+/**
+ * @desc 基值配方：**只表达「读哪块面板的哪个属性」**，不再有「效应表系数」「敌人类型系数」这类特例。
+ *
+ * - `panelStat / auto`：直伤——属性由倍率串后缀决定（攻击 / 生命 / 防御，缺省攻击）
+ * - `panelStat / effectCoeff`：效应——读**虚角色**面板的「效应系数」（= 效应基础值），倍率是该段层数倍率
+ * - `targetStat / coefficient`：处决、偏谐响应——读**敌人**面板的「偏谐系数」（按敌人类型注册）
+ * - `fixed`：固定值——字面伤害，旁路整条链
+ */
+export type BaseRecipe =
+    | { kind: 'panelStat'; dim: 'auto' | 'effectCoeff' }
+    | { kind: 'targetStat'; field: 'coefficient' }
+    | { kind: 'fixed' }
 
 export interface FormulaDef {
     id: CalculationFormulaId
@@ -427,7 +437,7 @@ export const FORMULAS: Record<CalculationFormulaId, FormulaDef> = {
     direct: {
         id: 'direct',
         label: '直伤',
-        base: { kind: 'panelStat' },
+        base: { kind: 'panelStat', dim: 'auto' },
         ratioBoosts: ['extraRatio'],
         chain: multiplierChain([
             'deepen',
@@ -450,13 +460,19 @@ export const FORMULAS: Record<CalculationFormulaId, FormulaDef> = {
     tune: {
         id: 'tune',
         label: '处决 / 偏谐响应',
-        base: { kind: 'enemyCoeff' },
+        base: { kind: 'targetStat', field: 'coefficient' },
         ratioBoosts: ['extraRatio'],
+        /**
+         * @desc 处决 / 偏谐响应：除**增伤区**外全部乘区都吃（与直伤同一条链，只少 `bonus`）。
+         * 它们自己另有「谐度区」这一条额外乘子。
+         */
         chain: multiplierChain([
+            'deepen',
             'vuln',
             'resist',
             'defense',
             'dmgRed',
+            'tuneStrain',
             'tuneBreak',
             'unison',
             'final',
@@ -471,9 +487,22 @@ export const FORMULAS: Record<CalculationFormulaId, FormulaDef> = {
     effect: {
         id: 'effect',
         label: '效应',
-        base: { kind: 'effectTable' },
+        base: { kind: 'panelStat', dim: 'effectCoeff' },
         ratioBoosts: ['extraRatio'],
-        chain: multiplierChain(['deepen', 'resist', 'defense', 'dmgRed', 'unison', 'final', 'special', 'crit']),
+        /** @desc 效应：同样除**增伤区**外全部乘区都吃（与处决/响应同一条链） */
+        chain: multiplierChain([
+            'deepen',
+            'vuln',
+            'resist',
+            'defense',
+            'dmgRed',
+            'tuneStrain',
+            'tuneBreak',
+            'unison',
+            'final',
+            'special',
+            'crit'
+        ]),
         critBase: 'coefficient',
         canCrit: (panel) => panel.zones.critRate > 0,
         critFallback: 'expected',
@@ -518,6 +547,10 @@ export const formulaActionClosure = (id: CalculationFormulaId): Set<string> => {
         }
     }
     for (const boost of FORMULAS[id].ratioBoosts) out.add(boost)
+    // 基值也是面板属性：效应读角色面板的「效应系数」、处决/响应读目标面板的「偏谐系数」
+    const base = FORMULAS[id].base
+    if (base.kind === 'panelStat' && base.dim !== 'auto') out.add(base.dim)
+    if (base.kind === 'targetStat') out.add('enemyCoeff')
     return out
 }
 

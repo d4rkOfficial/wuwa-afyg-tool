@@ -157,11 +157,43 @@ const entries: DamageEntry[] = [
         damageBaseType: '攻击',
         hits: 1,
         sourceTimelineBlockId: 'op1'
+    } as unknown as DamageEntry,
+    {
+        // 处决：基值读**敌人面板**的偏谐系数（BOSS 10027）
+        id: 'e3',
+        character: CHAR,
+        displayName: '谐度破坏',
+        damageElement: '物理',
+        hitName: '谐度破坏',
+        skillType: '谐度破坏',
+        formula: 'tune',
+        ratioValue: 1600,
+        ratioUnit: '%',
+        ratioParts: [{ ratioValue: 1600, ratioUnit: '%' }],
+        damageBaseType: '偏谐系数',
+        hits: 1,
+        sourceTimelineBlockId: 'op1'
+    } as unknown as DamageEntry,
+    {
+        // 效应：无源角色，编译成「虚角色·效应系数」，倍率 = 层数倍率
+        id: 'e4',
+        character: '',
+        displayName: '光噪效应10层',
+        damageElement: '衍射',
+        hitName: '光噪效应',
+        skillType: '效应结算',
+        formula: 'effect',
+        ratioValue: 10,
+        ratioUnit: '%',
+        ratioParts: [],
+        damageBaseType: '效应系数',
+        hits: 1,
+        sourceTimelineBlockId: 'op1'
     } as unknown as DamageEntry
 ]
 
-const bindings: Record<string, string[]> = { e1: ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'], e2: ['b1'] }
-const damageTypes: Record<string, string[]> = { e1: ['共鸣解放伤害'], e2: [] }
+const bindings: Record<string, string[]> = { e1: ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'], e2: ['b1'], e3: ['b1'], e4: [] }
+const damageTypes: Record<string, string[]> = { e1: ['共鸣解放伤害'], e2: [], e3: [], e4: [] }
 
 const PROFILE = { chains: [2, 0, 0], refinements: [1, 1, 1] }
 
@@ -182,8 +214,11 @@ const coreOf = () => {
     const core = new CoconutCore()
     core.registerCharacterBaseStats((id) => {
         const info = charInfoMap[id]
-        if (!info) return null
-        return { ...info.lv90BaseStats, element: info.element }
+        if (info) return { ...info.lv90BaseStats, element: info.element }
+        if (id.startsWith('效应·')) {
+            return { atk: 0, hp: 0, def: 0, element: '衍射', coefficient: 3674 }
+        }
+        return null
     })
     core.registerWeaponBaseStats((id) => {
         const info = weaponInfoMap[id]
@@ -209,10 +244,10 @@ describe('编译 → 内核 与引擎数值对账', () => {
     const coreResult = coreOf().compute(table)
 
     it('结构：角色/词条/段数都按编译器口径铺开', () => {
-        assert.deepEqual(table.characters, [CHAR, '', ''])
-        assert.deepEqual(table.weapons, [WEAPON, '', ''])
+        assert.deepEqual(table.characters, [CHAR, '', '', '效应·光噪效应'])
+        assert.deepEqual(table.weapons, [WEAPON, '', '', ''])
         assert.ok(table.sub_stats[0]!.some((stat) => stat.key === '攻击%'))
-        assert.equal(table.damage_entries.length, 2)
+        assert.equal(table.damage_entries.length, 4)
         assert.equal(table.damage_entries[0]!.damages.length, 3, 'hits=3 应展开成 3 段')
         assert.equal(table.damage_entries[1]!.damages.length, 1)
         assert.match(table.damage_entries[0]!.damages[0]!.value, /^200%生命$/)

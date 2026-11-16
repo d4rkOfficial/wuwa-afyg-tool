@@ -112,12 +112,15 @@ describe('非直伤条目的可用性门槛：双暴只挡「引用写入」', (
     })
 })
 
-describe('非直伤条目的可用性门槛：其余乘区口径不变', () => {
-    it('白名单外的乘区（增伤等）依旧不可用', () => {
+describe('非直伤条目的可用性门槛：只排除增伤区', () => {
+    it('增伤区不可用，其余乘区（加深 / 谐度 / 易伤 / 集谐）都可用', () => {
         assert.equal(buffUsableByEntry(buff([zone('bonusDmg', 20)]), effectEntry), false, '效应不吃增伤区')
         assert.equal(buffUsableByEntry(buff([zone('deepenDmg', 15)]), effectEntry), true, '效应吃加深')
+        assert.equal(buffUsableByEntry(buff([zone('dmgTakenInc', 10)]), effectEntry), true, '效应吃易伤')
         assert.equal(buffUsableByEntry(buff([zone('tuneBreakBoost', 10)]), tuneEntry), true, '处决吃谐度增幅')
-        assert.equal(buffUsableByEntry(buff([zone('deepenDmg', 15)]), tuneEntry), false, '处决不吃加深')
+        assert.equal(buffUsableByEntry(buff([zone('deepenDmg', 15)]), tuneEntry), true, '处决吃加深')
+        assert.equal(buffUsableByEntry(buff([zone('tuneStrainLayer', 3)]), tuneEntry), true, '处决吃集谐层数')
+        assert.equal(buffUsableByEntry(buff([zone('bonusDmg', 20)]), tuneEntry), false, '处决不吃增伤区')
     })
 
     it('直伤条目：任何乘区都可用（新规则只针对系数基类条目）', () => {

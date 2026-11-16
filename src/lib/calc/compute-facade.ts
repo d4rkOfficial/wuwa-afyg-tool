@@ -9,22 +9,36 @@
  */
 import { CoconutCore, type GeneralTable } from '$coconut'
 import type { ComputeRequest } from '$lib/calc/core'
-import { computeFormulaEntry } from '$lib/calc/compute'
+import { TUNE_COEFF_MAP, computeFormulaEntry } from '$lib/calc/compute'
 import type { ResultEntry } from '$lib/calc/result.types'
-import { compileGeneralTable } from '$lib/calc/compile'
+import { VIRTUAL_EFFECT_PREFIX, compileGeneralTable } from '$lib/calc/compile'
+import { NON_DIRECT_ELEMENT } from '$lib/consts/game-terms'
+import { EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
 
-/** @desc 用工程里的基础数据建内核（角色/武器白值、敌人偏谐系数由工程提供） */
+/** @desc 用工程里的基础数据建内核（角色/武器白值、效应虚角色、敌人偏谐系数均由工程提供） */
 export const coreOfRequest = (request: ComputeRequest): CoconutCore => {
     const core = new CoconutCore()
     core.registerCharacterBaseStats((id) => {
         const info = request.charInfo[id]
-        if (!info) return null
-        return { ...info.lv90BaseStats, element: info.element }
+        if (info) return { ...info.lv90BaseStats, element: info.element }
+        if (id.startsWith(VIRTUAL_EFFECT_PREFIX)) {
+            // 效应虚角色：只有「效应系数」这一维度（= 效应基础值），不参与三维面板
+            const name = id.slice(VIRTUAL_EFFECT_PREFIX.length)
+            return {
+                atk: 0,
+                hp: 0,
+                def: 0,
+                element: (NON_DIRECT_ELEMENT as Record<string, string>)[name] ?? '',
+                coefficient: EFFECT_BASE_VALUE
+            }
+        }
+        return null
     })
     core.registerWeaponBaseStats((id) => {
         const info = request.weaponInfo[id]
         return info ? { atk: info.lv90BaseAtk } : null
     })
+    core.registerEnemyCoefficients(TUNE_COEFF_MAP)
     return core
 }
 

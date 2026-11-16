@@ -456,14 +456,16 @@ describe('数值基线：工程 fixture 的逐条目快照（重构期间必须�
         }
     })
 
-    it('fixture 自检：处决不吃增伤 / 效应不吃易伤（口径抽样）', () => {
+    it('fixture 自检：处决 / 效应只不吃增伤区，其余乘区照吃（口径抽样）', () => {
         const rows = new Map(project().map((r) => [r.id, r]))
         const labels = (id: string) => rows.get(id)!.zones.map(([label]) => label)
-        assert.ok(!labels('e4').includes('增伤区'), '处决（tune）不该有增伤区')
-        assert.ok(!labels('e4').includes('集谐区'), '处决（tune）不该有集谐区')
-        assert.ok(labels('e4').includes('谐度区'), '处决（tune）必须有谐度区')
-        assert.ok(!labels('e6').includes('易伤区'), '效应不该有易伤区')
-        assert.ok(labels('e6').includes('加深区'), '效应必须吃加深')
+        assert.ok(!labels('e4').includes('增伤区'), '处决（tune）不吃增伤区')
+        assert.ok(labels('e4').includes('集谐区'), '处决（tune）吃集谐区')
+        assert.ok(labels('e4').includes('谐度区'), '处决（tune）吃谐度区')
+        assert.ok(labels('e4').includes('加深区'), '处决（tune）吃加深区')
+        assert.ok(!labels('e6').includes('增伤区'), '效应不吃增伤区')
+        assert.ok(labels('e6').includes('易伤区'), '效应吃易伤区')
+        assert.ok(labels('e6').includes('加深区'), '效应吃加深区')
         assert.deepEqual(labels('e7'), [], '固定值条目不应有任何乘区')
     })
 
@@ -507,8 +509,7 @@ describe('数值基线：工程 fixture 的逐条目快照（重构期间必须�
  *
  * 这份数据不是「应该等于多少」的手算结果，而是**重构前的实测值**：它的唯一职责是
  * 让任何一次重构都必须显式承认「数值变了」，从而无法悄悄改坏。
- */
-const GOLDEN: GoldenEntry[] = [
+ */ const GOLDEN: GoldenEntry[] = [
     {
         id: 'e1',
         baseUnit: '攻击',
@@ -637,20 +638,22 @@ const GOLDEN: GoldenEntry[] = [
         baseUnit: '偏谐系数',
         ratioNum: 16,
         baseValue: 160432,
-        totalMultiplier: 27.860165,
-        expectedPerHit: 279354,
-        nonCritPerHit: 186236,
-        critPerHit: 372472,
-        totalDamage: 279354,
+        totalMultiplier: 34.825206,
+        expectedPerHit: 349192,
+        nonCritPerHit: 232795,
+        critPerHit: 465590,
+        totalDamage: 349192,
         canCrit: true,
         damageTypes: ['处决'],
         elBonus: 0,
         typeBonus: 0,
         zones: [
+            ['加深区', 1.25],
             ['易伤区', 1.12],
             ['抗性区', 1.04],
             ['防御区', 0.690909],
             ['免伤区', 0.9],
+            ['集谐区', 1],
             ['谐度区', 1.4],
             ['同奏区', 1.06],
             ['终伤区', 1.08],
@@ -658,15 +661,17 @@ const GOLDEN: GoldenEntry[] = [
             ['暴击区', 1.5]
         ],
         traces: [
+            ['deepen', 1.25],
             ['vuln', 1.12],
             ['resist', 1.04],
             ['defense', 0.690909],
             ['dmgRed', 0.9],
+            ['tuneStrain', 1],
             ['tuneBreak', 1.4],
             ['unison', 1.06],
             ['final', 1.08],
             ['special', 1],
-            ['crit', 1.5]
+            ['crit', 1.499998]
         ]
     },
     {
@@ -684,10 +689,12 @@ const GOLDEN: GoldenEntry[] = [
         elBonus: 0,
         typeBonus: 0,
         zones: [
+            ['加深区', 1],
             ['易伤区', 1.12],
             ['抗性区', 1.04],
             ['防御区', 0.690909],
             ['免伤区', 0.9],
+            ['集谐区', 1],
             ['谐度区', 1.4],
             ['同奏区', 1.06],
             ['终伤区', 1.08],
@@ -695,10 +702,12 @@ const GOLDEN: GoldenEntry[] = [
             ['暴击区', 1.5]
         ],
         traces: [
+            ['deepen', 1],
             ['vuln', 1.12],
             ['resist', 1.04],
             ['defense', 0.690909],
             ['dmgRed', 0.9],
+            ['tuneStrain', 1],
             ['tuneBreak', 1.4],
             ['unison', 1.06],
             ['final', 1.08],
@@ -711,20 +720,23 @@ const GOLDEN: GoldenEntry[] = [
         baseUnit: '效应系数',
         ratioNum: 2.4951,
         baseValue: 9167,
-        totalMultiplier: 2.105357,
-        expectedPerHit: 7735,
-        nonCritPerHit: 7735,
-        critPerHit: 7735,
-        totalDamage: 7735,
+        totalMultiplier: 2.358,
+        expectedPerHit: 8663,
+        nonCritPerHit: 8663,
+        critPerHit: 8663,
+        totalDamage: 8663,
         canCrit: false,
         damageTypes: ['效应伤害'],
         elBonus: 0,
         typeBonus: 0,
         zones: [
             ['加深区', 1.25],
+            ['易伤区', 1.12],
             ['抗性区', 1],
             ['防御区', 0.655172],
             ['免伤区', 0.9],
+            ['集谐区', 1],
+            ['谐度区', 1],
             ['同奏区', 1.06],
             ['终伤区', 1.08],
             ['特殊区', 1],
@@ -732,9 +744,12 @@ const GOLDEN: GoldenEntry[] = [
         ],
         traces: [
             ['deepen', 1.25],
+            ['vuln', 1.12],
             ['resist', 1],
             ['defense', 0.655172],
             ['dmgRed', 0.9],
+            ['tuneStrain', 1],
+            ['tuneBreak', 1],
             ['unison', 1.06],
             ['final', 1.08],
             ['special', 1]

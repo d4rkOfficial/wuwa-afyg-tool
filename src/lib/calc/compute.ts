@@ -711,6 +711,7 @@ export const buildTargetPanel = (
         type: enemy.type,
         defense: enemy.defense,
         dmgReduction: enemy.dmgReduction,
+        coefficient: TUNE_COEFF_MAP[enemy.type] ?? 716.2,
         resistances: enemy.resistances,
         zones: {}
     }
@@ -889,17 +890,18 @@ const withExtraRatioFactor = (factors: RatioFactor[], extraRatio: number, hits: 
 // ────────────────────────────── 公式求值（直伤 / 处决 / 效应 / 固定值 共用） ──────────────────────────────
 
 /** @desc 偏谐系数（处决 / 偏谐系数直伤）的基值系数：按敌人类型取表 */
-const TUNE_COEFF_MAP: Record<string, number> = {
+export const TUNE_COEFF_MAP: Record<string, number> = {
     BOSS: 10027,
     精英怪: 2149,
     小怪: 716.2
 }
 
+/** @desc 是否「系数来自面板属性」的效应条目（内核 `panelStat / effectCoeff` 配方） */
+const isEffectBase = (def: FormulaDef): boolean => def.base.kind === 'panelStat' && def.base.dim === 'effectCoeff'
+
 /** @desc 条目实际生效的伤害属性：效应条目用效应自身的属性映射，其余用条目属性 */
 const elementOfFormula = (def: FormulaDef, entry: DamageEntry): string =>
-    def.base.kind === 'effectTable'
-        ? ((NON_DIRECT_ELEMENT as Record<string, string>)[entry.hitName] ?? '')
-        : entry.damageElement
+    isEffectBase(def) ? ((NON_DIRECT_ELEMENT as Record<string, string>)[entry.hitName] ?? '') : entry.damageElement
 
 /** @desc 组装公式求值上下文（增伤区的元素 / 类型加成在此按条目一次性求和） */
 const formulaCtxOf = (
@@ -951,7 +953,7 @@ const resolveBase = (def: FormulaDef, entry: DamageEntry, panel: CharacterPanel,
         }
     }
 
-    if (def.base.kind === 'effectTable') {
+    if (isEffectBase(def)) {
         const layers = Math.round(entry.ratioValue)
         const burstLayers = entry.burstLayers ?? 0
         const effectMult = getEffectMultiplier(entry.hitName, layers)
@@ -970,7 +972,7 @@ const resolveBase = (def: FormulaDef, entry: DamageEntry, panel: CharacterPanel,
     const ratio = entry.ratioUnit === '%' ? entry.ratioValue / 100 : entry.ratioValue
     const effectiveRatio = ratio + (extraRatio / 100) * hits
 
-    if (def.base.kind === 'enemyCoeff') {
+    if (def.base.kind === 'targetStat') {
         const coeff = TUNE_COEFF_MAP[ctx.target.type] ?? 716.2
         return {
             baseUnit: '偏谐系数',

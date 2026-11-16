@@ -202,18 +202,34 @@ describe('CoconutCore：公式与暴击三列', () => {
         assert.equal(result.damages[0]!.baseValue, 10027 * 10)
     })
 
-    it('效应：基值 = 效应基础值 × 系数', () => {
-        const result = coreOf().compute(
+    it('效应：基值 = 虚角色面板的「效应系数」× 该段层数倍率', () => {
+        const core = new CoconutCore()
+        core.registerCharacterBaseStats({
+            A: { atk: 400, hp: 10000, def: 500, element: '冷凝', tuneBreakBoost: 100 },
+            // 虚角色：效应基础值挂在「效应系数」这一维度上，不混进攻击
+            '效应·电磁效应': { atk: 0, hp: 0, def: 0, element: '导电', coefficient: 3674 }
+        })
+        core.registerWeaponBaseStats({})
+        core.registerEnemyCoefficients({ BOSS: 10027 })
+
+        const result = core.compute(
             tableOf({
+                characters: ['A', '效应·电磁效应'],
+                weapons: ['', ''],
+                main_stats: [[], []],
+                sub_stats: [[], []],
                 damage_entries: [
                     {
-                        source: 'A',
-                        damages: [{ value: '1.5', activated_buffs: [], element: '热熔', formula: 'effect' }]
+                        source: '效应·电磁效应',
+                        damages: [{ value: '1.5', activated_buffs: [], element: '导电', formula: 'effect' }]
                     }
                 ]
             })
         )
-        assert.equal(result.damages[0]!.baseValue, 3674 * 1.5)
+        const damage = result.damages[0]!
+        assert.equal(damage.panel.zones.effectCoeff, 3674, '效应系数来自虚角色注册')
+        assert.equal(damage.panel.total.atk, 0, '虚角色没有攻击面板')
+        assert.equal(damage.baseValue, 3674 * 1.5)
     })
 
     it('合计 = 各段之和', () => {

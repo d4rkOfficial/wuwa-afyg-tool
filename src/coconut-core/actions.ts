@@ -64,8 +64,8 @@ export interface BuffActionDef {
         /** @desc 引用下拉里的显示名（与作用名可能不同，如「攻击固定值」→「攻击白值」这类三维来源在 `REF_SOURCES`） */
         label: string
     }
-    /** @desc 目标面板上的**标量**字段（不落 `zones` 的那种）：目前只有免伤 */
-    targetField?: 'dmgReduction'
+    /** @desc 目标面板上的**标量**字段（不落 `zones` 的那种）：免伤、偏谐系数 */
+    targetField?: 'dmgReduction' | 'coefficient'
 }
 
 /**
@@ -393,6 +393,33 @@ const ACTION_TABLE = [
         damageMatchable: false,
         init: 0,
         ref: { label: '同奏增益层数' }
+    },
+
+    // ── 系数类基值（效应 / 处决响应的「系数」各自是面板属性，不混进三维）──
+    {
+        id: 'effectCoeff',
+        label: '效应系数',
+        unit: 'flat',
+        group: '基本固定值',
+        side: 'character',
+        combine: 'sum',
+        overridable: true,
+        damageMatchable: false,
+        init: 0,
+        ref: { label: '效应系数' }
+    },
+    {
+        id: 'enemyCoeff',
+        label: '偏谐系数',
+        unit: 'flat',
+        group: '使目标',
+        side: 'target',
+        combine: 'sum',
+        overridable: true,
+        damageMatchable: false,
+        init: 0,
+        ref: { label: '偏谐系数' },
+        targetField: 'coefficient'
     }
 ] as const satisfies readonly BuffActionDef[]
 

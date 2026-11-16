@@ -129,13 +129,11 @@ describe('处决/响应：谐度破坏增幅进「谐度区」，不写进「集
         assert.equal(result.finalTuneBreakZone, 0.5)
     })
 
-    it('集谐区不在处决公式链上 → 溯源里没有该段', () => {
+    it('集谐区在处决公式链上 → 溯源里有该段（无层数时值为 1）', () => {
         const { segs } = run(tuneEntry, [boost], [])
-        assert.equal(
-            segs.segments.some((s) => s.id === 'tuneStrain'),
-            false,
-            '处决/响应不吃集谐区，溯源不应出现该段（membership 由公式链决定）'
-        )
+        const tuneStrain = segs.segments.find((s) => s.id === 'tuneStrain')
+        assert.ok(tuneStrain, '处决/响应吃集谐区，溯源必须出现该段（membership 由公式链决定）')
+        assert.equal(tuneStrain!.value, 1, '没有集谐层数时为 1')
     })
 
     it('谐度区确实参与了结算：带上增幅的伤害 = 不带增幅 × 1.5', () => {

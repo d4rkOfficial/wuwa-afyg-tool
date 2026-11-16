@@ -114,6 +114,12 @@ describe('公式注册表：链顺序与清单', () => {
                     id,
                     {
                         base: def.base.kind,
+                        baseAttr:
+                            def.base.kind === 'panelStat'
+                                ? def.base.dim
+                                : def.base.kind === 'targetStat'
+                                  ? def.base.field
+                                  : null,
                         critBase: def.critBase,
                         reportsDamageTypes: def.reportsDamageTypes,
                         chain: def.chain.map((handle) => handle.id)
@@ -132,6 +138,7 @@ describe('公式注册表：链顺序与清单', () => {
 const FORMULA_MANIFEST = {
     direct: {
         base: 'panelStat',
+        baseAttr: 'auto',
         critBase: 'panel',
         reportsDamageTypes: true,
         chain: [
@@ -149,19 +156,46 @@ const FORMULA_MANIFEST = {
         ]
     },
     tune: {
-        base: 'enemyCoeff',
+        base: 'targetStat',
+        baseAttr: 'coefficient',
         critBase: 'coefficient',
         reportsDamageTypes: true,
-        chain: ['vuln', 'resist', 'defense', 'dmgRed', 'tuneBreak', 'unison', 'final', 'special', 'crit']
+        chain: [
+            'deepen',
+            'vuln',
+            'resist',
+            'defense',
+            'dmgRed',
+            'tuneStrain',
+            'tuneBreak',
+            'unison',
+            'final',
+            'special',
+            'crit'
+        ]
     },
     effect: {
-        base: 'effectTable',
+        base: 'panelStat',
+        baseAttr: 'effectCoeff',
         critBase: 'coefficient',
         reportsDamageTypes: true,
-        chain: ['deepen', 'resist', 'defense', 'dmgRed', 'unison', 'final', 'special', 'crit']
+        chain: [
+            'deepen',
+            'vuln',
+            'resist',
+            'defense',
+            'dmgRed',
+            'tuneStrain',
+            'tuneBreak',
+            'unison',
+            'final',
+            'special',
+            'crit'
+        ]
     },
     fixed: {
         base: 'fixed',
+        baseAttr: null,
         critBase: 'panel',
         reportsDamageTypes: true,
         chain: []

@@ -92,13 +92,14 @@ describe('层数类乘区：清单与可引用性', () => {
         assert.equal([...ZONE_SECTION_OF.values()].includes('自定义层数'), false, '「自定义层数」栏目应一并移除')
     })
 
-    it('只有目标侧「层数」与「免伤」被禁止引用；同奏增益层数可以引用', () => {
+    it('目标侧作用都被禁止引用；同奏增益层数可以引用', () => {
         assert.equal(ZONE_NO_REF_IDS.has('unisonBoonLayer'), false, '同奏增益层数应可配引用/转模')
         assert.equal(ZONE_NO_REF_IDS.has('tuneStrainLayer'), true, '集谐干涉层数只允许填固定层数')
         assert.equal(ZONE_NO_REF_IDS.has('enemyDmgReduction'), true, '敌人免伤只允许填固定数值')
+        assert.equal(ZONE_NO_REF_IDS.has('enemyCoeff'), true, '偏谐系数是敌人面板属性，只允许填固定数值')
         assert.deepEqual(
             [...ZONE_NO_REF_IDS].sort(),
-            ['enemyDmgReduction', 'tuneStrainLayer'],
+            ['enemyCoeff', 'enemyDmgReduction', 'tuneStrainLayer'],
             '禁引用名单 = 目标侧作用'
         )
     })

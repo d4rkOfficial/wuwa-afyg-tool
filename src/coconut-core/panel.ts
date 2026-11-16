@@ -48,6 +48,8 @@ export interface TargetPanel {
     defense: number
     /** @desc 敌人免伤（%） */
     dmgReduction: number
+    /** @desc 偏谐系数（处决 / 偏谐响应的基值来源，按敌人类型注册，也可被 Buff 写入） */
+    coefficient: number
     /** @desc 各属性抗性（%） */
     resistances: Record<string, number>
     /** @desc 目标侧作用的落值（`side: 'target'`，由 Buff 写入） */
@@ -58,6 +60,7 @@ export const emptyTargetPanel = (): TargetPanel => ({
     type: '',
     defense: 0,
     dmgReduction: 0,
+    coefficient: 0,
     resistances: {},
     zones: {}
 })

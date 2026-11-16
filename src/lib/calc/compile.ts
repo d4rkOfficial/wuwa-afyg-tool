@@ -20,7 +20,8 @@ import {
     type ConditionProfile,
     type ZoneCtx
 } from '$lib/calc/compute'
-import { ELEMENTS, TYPE_BONUS_MAP } from '$lib/consts/game-terms'
+import { ELEMENTS, NON_DIRECT_ELEMENT, TYPE_BONUS_MAP } from '$lib/consts/game-terms'
+import { getEffectBurstMultiplier, getEffectMultiplier } from '$lib/consts/effect-data'
 import { BASE_SUFFIXES, BONUS_DMG_ACTION, DEFAULT_PANEL_DIM } from '$coconut/stats'
 import { PANEL_BASE_TYPES } from '$coconut/formulas'
 import type { Buff, Damage, DamageEntry, GeneralTable, Stat } from '$coconut'
@@ -32,12 +33,22 @@ const toMutableList = (record: Readonly<Record<string, readonly string[]>> | und
 /** @desc 词条键是否属于「伤害类型加成」（这类词条要按段挂成 `bonusDmg`） */
 const isTypeBonusStat = (key: string): boolean => TYPE_BONUS_MAP[key] !== undefined
 
+/** @desc 效应虚角色的 id 前缀：效应没有源角色，内核里用虚角色承载「效应系数」面板属性 */
+export const VIRTUAL_EFFECT_PREFIX = '效应·'
+
+/** @desc 效应的层数倍率（普通 + 爆发），即该段送进内核的倍率 */
+const effectFactorOf = (entry: EngineDamageEntry): number =>
+    getEffectMultiplier(entry.hitName, Math.round(entry.ratioValue)) +
+    getEffectBurstMultiplier(entry.hitName, Math.round(entry.burstLayers ?? 0))
+
 /** @desc 面板基值维度 → 倍率串的基准后缀（由内核注册表派生，不自己列实体名） */
 const BASE_SUFFIX_OF: Record<string, string> = Object.fromEntries(BASE_SUFFIXES.map(([suffix, dim]) => [dim, suffix]))
 
 /** @desc 条目 → 内核的倍率串 */
 const valueOf = (entry: EngineDamageEntry): string => {
     if (entry.formula === 'fixed') return String(entry.ratioValue)
+    // 系数类基值（处决/响应）读的是面板系数，倍率是**纯倍数**，不带「%」也不带基准后缀
+    if (entry.formula === 'tune') return String(entry.ratioUnit === '%' ? entry.ratioValue / 100 : entry.ratioValue)
     const suffix = BASE_SUFFIX_OF[PANEL_BASE_TYPES[entry.damageBaseType]?.dim ?? DEFAULT_PANEL_DIM] ?? ''
     if (entry.ratioUnit === '%') return `${entry.ratioValue}%${suffix}`
     return `${entry.ratioValue}${suffix}`
@@ -135,6 +146,7 @@ export const compileGeneralTable = (request: ComputeRequest): GeneralTable => {
         ...(request.echoSkillText ? { echoSkillText: { ...request.echoSkillText } } : {})
     }
 
+    const virtualIds = new Set<string>()
     const damageEntries: DamageEntry[] = request.entries.map((entry) => {
         const charIndex = characters.indexOf(entry.character ?? '')
         const damageTypes = request.damageTypes?.[entry.id] ?? []
@@ -159,16 +171,28 @@ export const compileGeneralTable = (request: ComputeRequest): GeneralTable => {
             ...typeBonusBuffsOf(typeBonusStats[charIndex] ?? [], ctx)
         ]
 
+        const isEffect = entry.formula === 'effect'
         const damage: Damage = {
-            value: valueOf(entry),
+            value: isEffect ? String(effectFactorOf(entry)) : valueOf(entry),
             activated_buffs: buffs,
-            element: entry.damageElement,
+            element: isEffect
+                ? ((NON_DIRECT_ELEMENT as Record<string, string>)[entry.hitName] ?? entry.damageElement)
+                : entry.damageElement,
             formula: formulaOf(entry)
         }
         // 段数由编译器展开：内核一段一条，合计即引擎的「每段 × 段数」
         const hits = Math.max(1, Math.trunc(entry.hits || 1))
-        return { source: entry.character ?? '', damages: Array.from({ length: hits }, () => ({ ...damage })) }
+        const source = isEffect ? `${VIRTUAL_EFFECT_PREFIX}${entry.hitName}` : (entry.character ?? '')
+        if (isEffect) virtualIds.add(source)
+        return { source, damages: Array.from({ length: hits }, () => ({ ...damage })) }
     })
+
+    for (const id of virtualIds) {
+        characters.push(id)
+        weapons.push('')
+        mainStats.push([])
+        subStats.push([])
+    }
 
     return {
         characters,

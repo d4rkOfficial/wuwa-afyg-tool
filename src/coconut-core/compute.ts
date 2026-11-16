@@ -5,7 +5,6 @@
  * 「哪些 buff 属于这一段」是调用方在编译表时求的值，内核不做二次判断。
  */
 import { ELEMENTS, ELEMENT_BONUS_MAP } from '$lib/consts/game-terms'
-import { EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
 import { ACTION_MAP, REF_SOURCE_MAP } from '$coconut/actions'
 import { CRIT_ACTION_IDS, FORMULAS, FORMULAS_DEFAULT_COEFF, type FormulaDef } from '$coconut/formulas'
 import { evaluateFormula } from '$coconut/evaluate'
@@ -36,6 +35,11 @@ export interface CharacterBaseStats {
     element: string
     /** @desc 谐度破坏增幅（缺省 0） */
     tuneBreakBoost?: number
+    /**
+     * @desc 效应系数（缺省 0）：效应的「虚角色」用它承载效应基础值（3674），
+     * 伤害倍率是该段的层数倍率 —— 系数始终是面板属性，不混进攻击 / 生命 / 防御。
+     */
+    coefficient?: number
 }
 
 /** @desc 武器基础属性（只提供白值；副属性由调用方编译进词条） */
@@ -111,6 +115,7 @@ const basePanelOf = (
         panel.base.hp = Math.round(char.hp)
         panel.base.def = Math.round(char.def)
         panel.zones.tuneBreakBoost = Math.round(char.tuneBreakBoost ?? 0)
+        panel.zones.effectCoeff = char.coefficient ?? 0
     }
     // 系数基类条目：双暴是它自己临时的一份，词条双暴不参与（决议 D1）
     const skipCrit = critBase === 'coefficient'
@@ -129,12 +134,14 @@ const basePanelOf = (
 /** @desc 目标面板：敌人配置 + 目标侧 buff（免伤落在 `dmgReduction`，其余落在 `zones`） */
 const targetPanelOf = (
     table: GeneralTable,
+    registries: KernelRegistries,
     buffs: readonly { effect: { applyTo: string; value: unknown } }[]
 ): TargetPanel => {
     const panel = emptyTargetPanel()
     const [type, , defense, resistances] = table.enemy
     panel.type = type
     panel.defense = num(defense)
+    panel.coefficient = registries.enemyCoefficientOf(type) ?? FORMULAS_DEFAULT_COEFF
     ELEMENTS.forEach((element, index) => {
         panel.resistances[element] = num(resistances[index])
     })
@@ -190,20 +197,17 @@ const panelOfDamage = (
 /** @desc 一段伤害的公式（`fixed` 由 `formula` 字段直接给出） */
 const formulaOfDamage = (damage: Damage): CalculationFormula => damage.formula
 
-/** @desc 基值解析（四条公式的唯一分支点） */
-const baseValueOf = (
-    def: FormulaDef,
-    damage: Damage,
-    panel: CharacterPanel,
-    target: TargetPanel,
-    registries: KernelRegistries
-): number => {
+/** @desc 基值解析（四条公式的唯一分支点：读哪块面板的哪个属性 × 倍率） */
+const baseValueOf = (def: FormulaDef, damage: Damage, panel: CharacterPanel, target: TargetPanel): number => {
     const extraRatio = (panel.zones.extraRatio ?? 0) / 100
     if (def.base.kind === 'fixed') return num(damage.value)
-    if (def.base.kind === 'effectTable') return EFFECT_BASE_VALUE * (num(damage.value) + extraRatio)
-    if (def.base.kind === 'enemyCoeff') {
-        const coeff = registries.enemyCoefficientOf(target.type) ?? FORMULAS_DEFAULT_COEFF
-        return coeff * (num(damage.value) + extraRatio)
+    if (def.base.kind === 'targetStat') {
+        // 处决 / 偏谐响应：系数是**敌人面板属性**
+        return target[def.base.field] * (num(damage.value) + extraRatio)
+    }
+    if (def.base.dim === 'effectCoeff') {
+        // 效应：系数是**虚角色面板属性**，倍率是该段的层数倍率
+        return Math.round((panel.zones.effectCoeff ?? 0) * (num(damage.value) + extraRatio))
     }
     const parsed = parseValue(damage.value)
     return panel.total[parsed.base] * (parsed.ratio + extraRatio)
@@ -227,9 +231,9 @@ const computeDamage = (
     const def = FORMULAS[formula]
     const critBase = def.critBase
     const { targetSide } = splitBuffs(damage)
-    const target = targetPanelOf(table, targetSide)
+    const target = targetPanelOf(table, registries, targetSide)
     const panel = panelOfDamage(table, registries, charIndex, critBase, damage, target)
-    const baseValue = baseValueOf(def, damage, panel, target, registries)
+    const baseValue = baseValueOf(def, damage, panel, target)
     const evaluation = evaluateFormula({ formula, baseValue, element: damage.element, panel, target })
 
     const nonCritRaw = baseValue * evaluation.productNoCrit
