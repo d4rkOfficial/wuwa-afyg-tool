@@ -4,7 +4,7 @@
 它不依赖 Svelte / 浏览器 / 上游 API，可以直接在 Node、Worker 或外部项目里 import。
 
 ```ts
-import { computeProject } from '$coconut/engine/core'
+import { computeProject } from '$lib/calc/core'
 
 const entries = computeProject({
     entries, // DamageEntry[]
@@ -35,13 +35,13 @@ const entries = computeProject({
 
 ## 2. 调用方需要提供的数据契约
 
-| 类型                                            | 含义                                               | 从哪来                    |
-| ----------------------------------------------- | -------------------------------------------------- | ------------------------- |
-| `CharacterInfo`（`$lib/api/types`）             | 90 级白值（攻 / 生 / 防 / 谐度破坏增幅）+ 技能文案 | 上游角色接口              |
-| `WeaponInfo`（`$lib/api/types`）                | 90 级基础攻击 + 副词条（`{ name, value }` 字符串） | 上游武器接口              |
-| `CharSlot`（`$lib/types/project`）              | 角色名 / 武器名 / `chain` / `refinement`           | 工程队伍配置              |
-| `ConfigState`（`$coconut/engine/config.types`） | 五件声骸 + 敌人配置                                | 工程配置                  |
-| `DamageEntry` / `BuffInstance`                  | 条目与 Buff 实例                                   | 时间线派生 / 工程拉表配置 |
+| 类型                                      | 含义                                               | 从哪来                    |
+| ----------------------------------------- | -------------------------------------------------- | ------------------------- |
+| `CharacterInfo`（`$lib/api/types`）       | 90 级白值（攻 / 生 / 防 / 谐度破坏增幅）+ 技能文案 | 上游角色接口              |
+| `WeaponInfo`（`$lib/api/types`）          | 90 级基础攻击 + 副词条（`{ name, value }` 字符串） | 上游武器接口              |
+| `CharSlot`（`$lib/types/project`）        | 角色名 / 武器名 / `chain` / `refinement`           | 工程队伍配置              |
+| `ConfigState`（`$lib/calc/config.types`） | 五件声骸 + 敌人配置                                | 工程配置                  |
+| `DamageEntry` / `BuffInstance`            | 条目与 Buff 实例                                   | 时间线派生 / 工程拉表配置 |
 
 数值口径：`CharacterInfo.lv90BaseStats` 与 `WeaponInfo.lv90BaseAtk` 是**整数白值**；
 `WeaponInfo.substat.value` 是上游原样的字符串（`攻击` 这类词条会被归一成 `攻击%`，

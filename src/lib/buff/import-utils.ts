@@ -4,8 +4,8 @@
 import type { BuffLibraryEntity, BuffLibraryBuff, BuffLibraryScope } from '$lib/data/buff-library.svelte'
 import type { CharSlot } from '$lib/types/project'
 import type { ImportBuffInput } from '$lib/project/calculation.store.svelte'
-import type { BuffRule } from '$coconut/engine/calculation.types'
-import type { LegacyGateCondition } from '$coconut/engine/rules'
+import type { BuffRule } from '$lib/calc/calculation.types'
+import type { LegacyGateCondition } from '$lib/calc/rules'
 import { ownerIdxFor, ownerIdxOfItem } from './owner'
 import { resolveImportTarget, type ImportOrigin } from './import-target'
 

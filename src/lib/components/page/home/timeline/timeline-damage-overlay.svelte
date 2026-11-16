@@ -17,7 +17,7 @@
      *   与 `damage-list` / `skill-picker` 等同目录组件一致 —— 这些是全局单例状态，不是宿主私有状态。
      */
     import type { CharSlot } from '$lib/types/project'
-    import type { OpBlock, DamageBlock } from '$coconut/engine/timeline.types'
+    import type { OpBlock, DamageBlock } from '$lib/calc/timeline.types'
     import type { ComponentsProps } from '$lib/types'
     import { mergeClass } from '$lib/utils/component-style'
     import {

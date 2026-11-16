@@ -13,7 +13,7 @@
  * 反之若 `skillHits` 被 `bind_damage_to_block` 整体覆盖，标识自然随内容重算，不会错误命中旧条目。
  */
 import { shortKeyOf } from './short-key'
-import type { SkillHit } from '$coconut/engine/timeline.types'
+import type { SkillHit } from '$lib/calc/timeline.types'
 
 /** @desc 命中的身份（不含倍率 / 属性 / 段数，这三项可以改而身份不变） */
 const hitIdentity = (hit: Pick<SkillHit, 'character' | 'skillType' | 'hitName'>): string =>

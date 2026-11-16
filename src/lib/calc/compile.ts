@@ -9,8 +9,8 @@
  *
  * 内核侧因此完全无条件：拿到什么就加什么。
  */
-import type { BuffInstance, DamageEntry as EngineDamageEntry } from '$coconut/engine/calculation.types'
-import type { ComputeRequest } from '$coconut/engine/core'
+import type { BuffInstance, DamageEntry as EngineDamageEntry } from '$lib/calc/calculation.types'
+import type { ComputeRequest } from '$lib/calc/core'
 import {
     DEFAULT_CONDITION_PROFILE,
     entryActiveBuffs,
@@ -19,8 +19,10 @@ import {
     zoneConditionMet,
     type ConditionProfile,
     type ZoneCtx
-} from '$coconut/engine/compute'
+} from '$lib/calc/compute'
 import { ELEMENTS, TYPE_BONUS_MAP } from '$lib/consts/game-terms'
+import { BASE_SUFFIXES, BONUS_DMG_ACTION, DEFAULT_PANEL_DIM } from '$coconut/stats'
+import { PANEL_BASE_TYPES } from '$coconut/formulas'
 import type { Buff, Damage, DamageEntry, GeneralTable, Stat } from '$coconut'
 
 /** @desc 只读列表 Record → 可变列表 Record（引擎入参是可变形态） */
@@ -30,13 +32,13 @@ const toMutableList = (record: Readonly<Record<string, readonly string[]>> | und
 /** @desc 词条键是否属于「伤害类型加成」（这类词条要按段挂成 `bonusDmg`） */
 const isTypeBonusStat = (key: string): boolean => TYPE_BONUS_MAP[key] !== undefined
 
-/** @desc 面板基值类型 → 倍率串的基准后缀（与内核 `BASE_SUFFIXES` 一致） */
-const BASE_SUFFIX_OF: Record<string, string> = { 生命: '生命', 防御: '防御' }
+/** @desc 面板基值维度 → 倍率串的基准后缀（由内核注册表派生，不自己列实体名） */
+const BASE_SUFFIX_OF: Record<string, string> = Object.fromEntries(BASE_SUFFIXES.map(([suffix, dim]) => [dim, suffix]))
 
 /** @desc 条目 → 内核的倍率串 */
 const valueOf = (entry: EngineDamageEntry): string => {
     if (entry.formula === 'fixed') return String(entry.ratioValue)
-    const suffix = BASE_SUFFIX_OF[entry.damageBaseType] ?? ''
+    const suffix = BASE_SUFFIX_OF[PANEL_BASE_TYPES[entry.damageBaseType]?.dim ?? DEFAULT_PANEL_DIM] ?? ''
     if (entry.ratioUnit === '%') return `${entry.ratioValue}%${suffix}`
     return `${entry.ratioValue}${suffix}`
 }
@@ -88,7 +90,7 @@ const typeBonusBuffsOf = (stats: readonly Stat[], ctx: ZoneCtx): Buff[] =>
     stats.flatMap((stat) => {
         const type = TYPE_BONUS_MAP[stat.key]
         const hit = (ctx.damageTypes ?? []).some((damageType) => damageType.replace('伤害', '') === type)
-        return hit ? [{ id: `statBonus:${stat.key}`, effect: { applyTo: 'bonusDmg', value: stat.value } }] : []
+        return hit ? [{ id: `statBonus:${stat.key}`, effect: { applyTo: BONUS_DMG_ACTION, value: stat.value } }] : []
     })
 
 /** @desc 敌人配置里「不属于表元组」的部分：免伤（内核用目标侧作用表达，故按段挂一条 buff） */

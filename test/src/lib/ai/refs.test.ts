@@ -24,7 +24,7 @@ import { init as initTimeline, setOpBlockPos } from '$lib/project/timeline.store
 import { createProjectData, __seedProjectsForTest } from '$lib/data/project.svelte'
 import { init as initCalculation, getAllBuffConfs, createBuffSet } from '$lib/project/calculation.store.svelte'
 import type { CharSlot } from '$lib/types/project'
-import type { TimelineData } from '$coconut/engine/timeline.types'
+import type { TimelineData } from '$lib/calc/timeline.types'
 
 const SIDE_PAD = 40
 const PPS = 80

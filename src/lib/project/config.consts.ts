@@ -1,4 +1,4 @@
-import type { EchoSlotConfig, CharEchoConfig, EnemyConfig, ConfigState } from '$coconut/engine/config.types'
+import type { EchoSlotConfig, CharEchoConfig, EnemyConfig, ConfigState } from '$lib/calc/config.types'
 import { ELEMENTS } from '$lib/consts/game-terms'
 import { SECOND_MAIN_STAT } from '$lib/consts/stat-data'
 

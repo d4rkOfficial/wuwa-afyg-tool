@@ -10,25 +10,25 @@ import type {
     DamageEntryConfig,
     DamageRatioPart,
     BuffCondition
-} from '$coconut/engine/calculation.types'
-import type { TimelineData } from '$coconut/engine/timeline.types'
+} from '$lib/calc/calculation.types'
+import type { TimelineData } from '$lib/calc/timeline.types'
 import type { CharSlot } from '$lib/types/project'
 import { parseValueString } from '$lib/utils/parse-value-string'
 import { NON_DIRECT_ELEMENT } from '$lib/timeline/consts'
 import { getSkillCache, ensureSkillCache } from './timeline.store.svelte'
 import { getCharElementMap, ensureCharElements } from '$lib/data/char-elements.svelte'
 import { addToast } from '$lib/data/toast.svelte'
-import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_NO_OVERRIDE_IDS, ZONE_REF_MAP } from '$coconut/engine/calculation.consts'
-import type { ZoneId } from '$coconut/engine/calculation.consts'
-import type { ConditionProfile } from '$coconut/engine/compute'
-import { isConditionEmpty, normalizeCondition, normalizeZoneCondition } from '$coconut/engine/condition'
+import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_NO_OVERRIDE_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
+import type { ZoneId } from '$lib/calc/calculation.consts'
+import type { ConditionProfile } from '$lib/calc/compute'
+import { isConditionEmpty, normalizeCondition, normalizeZoneCondition } from '$lib/calc/condition'
 import {
     cascadeDeleteIdsOf,
     normalizeRules,
     pruneRuleDependencies,
     rulesFromLegacyCondition,
     type LegacyGateCondition
-} from '$coconut/engine/rules'
+} from '$lib/calc/rules'
 import { paneEffectSourcesOf, type PaneEffectSource } from '$lib/buff/pane-effects'
 import { rebuildGlobalBindings } from '$lib/buff/global-bindings'
 import {
@@ -1092,7 +1092,7 @@ export function setZoneOverrideAt(setId: string, zoneIndex: number, override: bo
 export function setZoneRefAt(
     setId: string,
     zoneIndex: number,
-    ref: import('$coconut/engine/calculation.types').ZoneRef | null
+    ref: import('$lib/calc/calculation.types').ZoneRef | null
 ): void {
     updateZoneAt(setId, zoneIndex, (z) => ({ ...z, ref: ref ?? undefined, override: ref ? undefined : z.override }))
 }
@@ -1131,7 +1131,7 @@ export function setBuffSetZoneCondition(setId: string, zoneId: string, condition
 export function setBuffSetZoneRef(
     setId: string,
     zoneId: string,
-    ref: import('$coconut/engine/calculation.types').ZoneRef | null
+    ref: import('$lib/calc/calculation.types').ZoneRef | null
 ) {
     if (!assertUnlocked()) return
     markTableDirty()

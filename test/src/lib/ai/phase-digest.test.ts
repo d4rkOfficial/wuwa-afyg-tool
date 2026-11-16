@@ -13,8 +13,8 @@ import {
     renderDamageRatioList,
     renderTimelineDigest
 } from '$lib/ai/phase-digest'
-import type { DamageBlock, OpBlock, RefLine } from '$coconut/engine/timeline.types'
-import type { DamageEntry } from '$coconut/engine/calculation.types'
+import type { DamageBlock, OpBlock, RefLine } from '$lib/calc/timeline.types'
+import type { DamageEntry } from '$lib/calc/calculation.types'
 
 const op = (id: string, trackIndex: number, pos: number, key: string, extra: Partial<OpBlock> = {}): OpBlock => ({
     id,

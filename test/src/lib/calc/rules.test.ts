@@ -6,7 +6,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import type { BuffInstance, BuffRule } from '$coconut/engine/calculation.types'
+import type { BuffInstance, BuffRule } from '$lib/calc/calculation.types'
 import {
     cascadeDeleteIdsOf,
     cyclePathOf,
@@ -21,7 +21,7 @@ import {
     resolveActiveBuffIds,
     rulesFromLegacyCondition,
     type RuleContext
-} from '$coconut/engine/rules'
+} from '$lib/calc/rules'
 
 const buff = (id: string, rules?: BuffRule[]): BuffInstance => ({
     id,

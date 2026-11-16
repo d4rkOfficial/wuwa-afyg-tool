@@ -2,15 +2,8 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import {
-    decodeBuff,
-    decodeEffect,
-    decodeValue,
-    encodeBuff,
-    encodeEffect,
-    encodeValue
-} from '$coconut/engine/core/codec'
-import type { BuffInstance } from '$coconut/engine/calculation.types'
+import { decodeBuff, decodeEffect, decodeValue, encodeBuff, encodeEffect, encodeValue } from '$lib/calc/core/codec'
+import type { BuffInstance } from '$lib/calc/calculation.types'
 
 describe('交换格式：数值字符串 ↔ 数值 + 单位', () => {
     it('带 % 即百分比，不带即固定值', () => {

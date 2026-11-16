@@ -1,5 +1,5 @@
-import type { EchoContribution, CharSubstatAnalysis, SubstatContribution } from '$coconut/engine/result.types'
-import { cloneEchoesWithoutAllSubstats, cloneEchoesWithoutSubstat } from '$coconut/engine/compute'
+import type { EchoContribution, CharSubstatAnalysis, SubstatContribution } from '$lib/calc/result.types'
+import { cloneEchoesWithoutAllSubstats, cloneEchoesWithoutSubstat } from '$lib/calc/compute'
 import {
     aggregateSubstats,
     assembleSubstatAnalysis,

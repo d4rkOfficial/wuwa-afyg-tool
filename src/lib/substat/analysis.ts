@@ -1,5 +1,5 @@
-import type { BuffConf, DamageEntry } from '$coconut/engine/calculation.types'
-import type { ConfigState } from '$coconut/engine/config.types'
+import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
+import type { ConfigState } from '$lib/calc/config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
 import type {
@@ -7,13 +7,13 @@ import type {
     CharContributionAnalysis,
     CharSubstatAnalysis,
     ResultEntry
-} from '$coconut/engine/result.types'
-import { DEFAULT_CONDITION_PROFILE, type ConditionProfile } from '$coconut/engine/compute'
+} from '$lib/calc/result.types'
+import { DEFAULT_CONDITION_PROFILE, type ConditionProfile } from '$lib/calc/compute'
 import type { AlgorithmId } from './types'
 import { getAlgorithm, ALGORITHMS_INFO } from '$lib/substat'
 import { prepareAnalysis, type AnalysisInputs, type CharacterDamageContext } from './shared'
 import { analyzeCharacterBuffs } from './buff-contribution'
-import { buildEchoDescByEntry } from '$coconut/engine/skill-infer'
+import { buildEchoDescByEntry } from '$lib/calc/skill-infer'
 import { getEchoSkillText, setEchoSkillText } from '$lib/data/char-info.svelte'
 
 /**

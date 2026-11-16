@@ -1,11 +1,11 @@
 import { browser } from '$app/environment'
 import { dbGet, dbSet } from './db'
 import { getShareBase } from './workshop.svelte'
-import { ZONE_MAP, ZONE_NO_REF_IDS, resolveZoneId } from '$coconut/engine/calculation.consts'
-import { normalizeZoneCondition } from '$coconut/engine/condition'
-import { normalizeRules, rulesFromLegacyCondition } from '$coconut/engine/rules'
+import { ZONE_MAP, ZONE_NO_REF_IDS, resolveZoneId } from '$lib/calc/calculation.consts'
+import { normalizeZoneCondition } from '$lib/calc/condition'
+import { normalizeRules, rulesFromLegacyCondition } from '$lib/calc/rules'
 import { sanitizeLibraryRules, sanitizeRefOwner, type LibraryRefOwner } from '$lib/buff/library-condition'
-import type { BuffCondition, BuffRule } from '$coconut/engine/calculation.types'
+import type { BuffCondition, BuffRule } from '$lib/calc/calculation.types'
 import { CHAIN_MAX, REFINE_MAX } from '$lib/consts/game-terms'
 import {
     buffFolderPath,

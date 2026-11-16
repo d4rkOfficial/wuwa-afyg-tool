@@ -1,8 +1,8 @@
 <script lang="ts">
     import type { CharSlot } from '$lib/types/project'
     import type { ComponentsProps } from '$lib/types'
-    import type { ConfigState } from '$coconut/engine/config.types'
-    import type { CalcState } from '$coconut/engine/calculation.types'
+    import type { ConfigState } from '$lib/calc/config.types'
+    import type { CalcState } from '$lib/calc/calculation.types'
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
     import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/api/data-cache'
     import { ELEMENT_ORDER, DAMAGE_TYPES } from '$lib/consts/game-terms'

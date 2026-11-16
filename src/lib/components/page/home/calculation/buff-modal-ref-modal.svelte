@@ -16,7 +16,7 @@
     import type { CharSlot } from '$lib/types/project'
     import Modal from '$lib/components/layout/modal.svelte'
     import BuffModalRefConfig from './buff-modal-ref-config.svelte'
-    import { ZONE_REF_DEFS } from '$coconut/engine/calculation.consts'
+    import { ZONE_REF_DEFS } from '$lib/calc/calculation.consts'
     import { fallbackIcon } from '$lib/utils/icons'
     import { refTargetDefOf, zoneUnitLabel, type RefModalState } from './buff-modal.utils'
 

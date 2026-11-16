@@ -13,15 +13,15 @@ import {
     ZONE_REF_DEFS,
     ZONE_REF_MAP,
     ZONE_SECTION_OF
-} from '$coconut/engine/calculation.consts'
-import { computeOneEntry, DEFAULT_CONDITION_PROFILE } from '$coconut/engine/compute'
+} from '$lib/calc/calculation.consts'
+import { computeOneEntry, DEFAULT_CONDITION_PROFILE } from '$lib/calc/compute'
 import { paneEffectSourcesOf } from '$lib/buff/pane-effects'
 import { dedupeImportItems } from '$lib/buff/import-utils'
 import { getAllBuffConfs, importBuffSetsWithDecisions } from '$lib/project/calculation.store.svelte'
-import type { BuffInstance, DamageEntry } from '$coconut/engine/calculation.types'
+import type { BuffInstance, DamageEntry } from '$lib/calc/calculation.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
-import type { ConfigState, EchoSlotConfig } from '$coconut/engine/config.types'
+import type { ConfigState, EchoSlotConfig } from '$lib/calc/config.types'
 
 const CHAR = '测试角色'
 const ENTRY_ID = 'e1'

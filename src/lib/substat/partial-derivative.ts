@@ -1,6 +1,6 @@
-import type { EchoContribution, CharSubstatAnalysis, SubstatContribution } from '$coconut/engine/result.types'
-import type { EchoSlotConfig } from '$coconut/engine/config.types'
-import { cloneEchoesWithoutAllSubstats } from '$coconut/engine/compute'
+import type { EchoContribution, CharSubstatAnalysis, SubstatContribution } from '$lib/calc/result.types'
+import type { EchoSlotConfig } from '$lib/calc/config.types'
+import { cloneEchoesWithoutAllSubstats } from '$lib/calc/compute'
 import {
     aggregateSubstats,
     assembleSubstatAnalysis,

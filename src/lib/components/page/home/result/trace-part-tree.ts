@@ -6,7 +6,7 @@
  */
 
 import { BUFF_PATH_SEP, splitBuffPath } from '$lib/buff/name'
-import type { TracePart } from '$coconut/engine/damage-trace'
+import type { TracePart } from '$lib/calc/damage-trace'
 
 interface TraceRowBase {
     /** 缩进层级：顶层 = 0 */

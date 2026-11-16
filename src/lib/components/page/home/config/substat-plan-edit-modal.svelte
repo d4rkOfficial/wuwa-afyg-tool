@@ -8,7 +8,7 @@
     import Modal from '$lib/components/layout/modal.svelte'
     import SubstatPlanEditor from './substat-plan-editor.svelte'
     import { STANDARD_PLAN_NAME } from '$lib/substat/standard'
-    import type { EchoSlotConfig } from '$coconut/engine/config.types'
+    import type { EchoSlotConfig } from '$lib/calc/config.types'
 
     interface Props extends ComponentsProps {
         open: boolean

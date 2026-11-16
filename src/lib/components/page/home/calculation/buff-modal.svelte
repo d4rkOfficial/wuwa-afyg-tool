@@ -33,8 +33,8 @@
         restoreCalcSnapshot,
         setShowBuffModal
     } from '$lib/project/calculation.store.svelte'
-    import { ZONE_REF_DEFS } from '$coconut/engine/calculation.consts'
-    import type { GroupedBuffConfItem } from '$coconut/engine/calculation.consts'
+    import { ZONE_REF_DEFS } from '$lib/calc/calculation.consts'
+    import type { GroupedBuffConfItem } from '$lib/calc/calculation.consts'
     import { buildStoredBuffTree } from '$lib/buff/tree'
     import { findBuffPlacement, findNode } from '$lib/buff/tree-state'
     import { buffLeafName } from '$lib/buff/name'
@@ -46,8 +46,8 @@
         BuffCondition,
         BuffTreeNode,
         CalcState
-    } from '$coconut/engine/calculation.types'
-    import { cyclePathOf } from '$coconut/engine/rules'
+    } from '$lib/calc/calculation.types'
+    import { cyclePathOf } from '$lib/calc/rules'
     import { slide } from 'svelte/transition'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import type { BuffEditorTab } from './buff-modal-editor.svelte'

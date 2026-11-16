@@ -11,7 +11,7 @@ import {
 } from '$lib/project/calculation.store.svelte'
 import { collectFolders } from '$lib/buff/tree-state'
 import { buffLeafName } from '$lib/buff/name'
-import type { BuffTreeNode } from '$coconut/engine/calculation.types'
+import type { BuffTreeNode } from '$lib/calc/calculation.types'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 

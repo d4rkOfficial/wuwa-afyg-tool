@@ -9,7 +9,7 @@ import {
     collectBuffFolderKeys,
     flattenBuffTreeRows
 } from '$lib/components/page/home/result/analysis/buff-contribution-tree'
-import type { BuffContribution, BuffFolderContribution, CharBuffAnalysis } from '$coconut/engine/result.types'
+import type { BuffContribution, BuffFolderContribution, CharBuffAnalysis } from '$lib/calc/result.types'
 
 const buff = (id: string, name: string, contribution: number): BuffContribution => ({
     id,

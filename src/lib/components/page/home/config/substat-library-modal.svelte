@@ -44,7 +44,7 @@
     import { getActiveProject, updateConfig } from '$lib/data/project.svelte'
     import { getCharacterIcons, getCharacterList, getElementIcons } from '$lib/api/data-cache'
     import type { Character } from '$lib/api/types'
-    import type { EchoSlotConfig } from '$coconut/engine/config.types'
+    import type { EchoSlotConfig } from '$lib/calc/config.types'
     import { addToast } from '$lib/data/toast.svelte'
     import {
         isKuroLoggedIn,

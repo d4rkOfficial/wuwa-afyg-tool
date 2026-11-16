@@ -1,5 +1,5 @@
 import type { AnalysisInputs, CharacterDamageContext } from './shared'
-import type { CharSubstatAnalysis } from '$coconut/engine/result.types'
+import type { CharSubstatAnalysis } from '$lib/calc/result.types'
 
 export type AlgorithmId = 'single-loss' | 'shapley' | 'partial-derivative'
 

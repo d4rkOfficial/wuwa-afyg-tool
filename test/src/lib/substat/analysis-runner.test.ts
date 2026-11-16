@@ -8,11 +8,11 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { computeAll, computeOneEntry, DEFAULT_CONDITION_PROFILE } from '$coconut/engine/compute'
-import type { BuffConf, DamageEntry } from '$coconut/engine/calculation.types'
+import { computeAll, computeOneEntry, DEFAULT_CONDITION_PROFILE } from '$lib/calc/compute'
+import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
-import type { ConfigState, EchoSlotConfig } from '$coconut/engine/config.types'
+import type { ConfigState, EchoSlotConfig } from '$lib/calc/config.types'
 import {
     prepareContributionAnalysis,
     runContributionAnalysis,

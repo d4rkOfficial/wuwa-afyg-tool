@@ -3,7 +3,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { buildStandardSlots, planSubstatTotal, type StandardPlanInput } from '$lib/substat/standard'
-import type { EchoSlotConfig } from '$coconut/engine/config.types'
+import type { EchoSlotConfig } from '$lib/calc/config.types'
 
 const allSubstats = (slots: EchoSlotConfig[]) => slots.flatMap((s) => s.substats)
 const substatTypes = (slots: EchoSlotConfig[]) => allSubstats(slots).map((s) => s.type)

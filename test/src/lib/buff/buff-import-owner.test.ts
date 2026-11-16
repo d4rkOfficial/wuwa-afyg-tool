@@ -9,7 +9,7 @@ import assert from 'node:assert/strict'
 import { buildEntityImportItems, dedupeImportItems, toImportItem } from '$lib/buff/import-utils'
 import { resolveImportTarget } from '$lib/buff/import-target'
 import { getAllBuffConfs, importBuffSetsWithDecisions, mapImportedScope } from '$lib/project/calculation.store.svelte'
-import { classifyBuffScope } from '$coconut/engine/calculation.consts'
+import { classifyBuffScope } from '$lib/calc/calculation.consts'
 import type { BuffLibraryEntity } from '$lib/data/buff-library.svelte'
 import type { CharSlot } from '$lib/types/project'
 

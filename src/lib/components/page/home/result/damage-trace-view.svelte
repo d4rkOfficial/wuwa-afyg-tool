@@ -5,8 +5,8 @@
         type CritDisplayMode,
         type DamageTraceCtx,
         type TracePart
-    } from '$coconut/engine/damage-trace'
-    import type { ResultEntry } from '$coconut/engine/result.types'
+    } from '$lib/calc/damage-trace'
+    import type { ResultEntry } from '$lib/calc/result.types'
     import type { ComponentsProps } from '$lib/types'
     import Icon from '@iconify/svelte'
     import DamageFactorList from './damage-factor-list.svelte'
@@ -30,7 +30,7 @@
 
     // 来源色刻意**不**走主题变量：它们承担「来源类型」的辨识功能（基值/武器/声骸/敌方），
     // 语义与元素色、伤害类型色同源，昼夜切换时不应改色。
-    // 其中 4 个色值逐字取自 `$coconut/engine/utils.ts` 的 `TYPE_COLORS`（base/weapon/echo/enemy
+    // 其中 4 个色值逐字取自 `$lib/calc/utils.ts` 的 `TYPE_COLORS`（base/weapon/echo/enemy
     // 对应「其它/协同/变奏技能/共鸣解放」）——这是刻意的同一套来源色，改一处要同步另一处。
     const SRC_COLOR: Record<TracePart['sourceType'], string> = {
         base: '#9aa3ad',

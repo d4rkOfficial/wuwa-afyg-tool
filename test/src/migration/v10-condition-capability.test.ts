@@ -7,7 +7,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { normalizeZones } from '$src/migration'
-import type { BuffInstance } from '$coconut/engine/calculation.types'
+import type { BuffInstance } from '$lib/calc/calculation.types'
 
 const zonesOf = (zones: unknown[]) => normalizeZones({ id: 'b1', name: '测试', zones } as Partial<BuffInstance>)
 

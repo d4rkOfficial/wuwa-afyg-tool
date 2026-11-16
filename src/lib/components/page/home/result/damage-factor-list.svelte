@@ -7,7 +7,7 @@
      * 不暴击 / 暴击 / 期望是该因子**单段**的伤害（成分乘数与条目段数都归一到 1 段），
      * 与「单段倍率」同口径；条目的全部段数合计见上方溯源汇总。
      */
-    import type { DamageFactorRow } from '$coconut/engine/damage-trace'
+    import type { DamageFactorRow } from '$lib/calc/damage-trace'
     import type { ComponentsProps } from '$lib/types'
     import { mergeClass } from '$lib/utils/component-style'
 

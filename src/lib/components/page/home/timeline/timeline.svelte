@@ -2,7 +2,7 @@
     import { untrack } from 'svelte'
     import type { ComponentsProps } from '$lib/types'
     import type { CharSlot } from '$lib/types/project'
-    import type { TimelineData } from '$coconut/engine/timeline.types'
+    import type { TimelineData } from '$lib/calc/timeline.types'
     import {
         init,
         getRefLines,
@@ -91,7 +91,7 @@
     } from '$lib/project/timeline.store.svelte'
     import { remapDuplicatedDamageBuffs } from '$lib/project/calculation.store.svelte'
     import { SIDE_PAD, NON_DIRECT_ELEMENT, TRACK_COLORS, GAMEPAD_BUTTONS } from '$lib/timeline/consts'
-    import type { OpBlock, DamageBlock } from '$coconut/engine/timeline.types'
+    import type { OpBlock, DamageBlock } from '$lib/calc/timeline.types'
     import ContextMenu from './timeline-menus.svelte'
     import SkillPicker from './skill-picker.svelte'
     import NonDirectPicker from './non-direct-picker.svelte'

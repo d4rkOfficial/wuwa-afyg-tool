@@ -8,7 +8,7 @@
  */
 import { CLONE_SELECTION_NONE } from './consts'
 import type { PhaseSelectionMap, TeamSlots } from './types'
-import type { TimelineData } from '$coconut/engine/timeline.types'
+import type { TimelineData } from '$lib/calc/timeline.types'
 import type { PhaseKey, Project } from '$lib/types/project'
 
 /** @desc 队伍是否已配置（至少一个槽位同时有角色与武器） */

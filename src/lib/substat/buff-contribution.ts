@@ -1,12 +1,12 @@
-import type { BuffConf } from '$coconut/engine/calculation.types'
+import type { BuffConf } from '$lib/calc/calculation.types'
 import type {
     BuffContribution,
     BuffFolderContribution,
     BuffZoneContribution,
     CharBuffAnalysis
-} from '$coconut/engine/result.types'
-import { getBoundBuffSets, getTargetSideSourceBuffs, type RuleEvalDeps } from '$coconut/engine/compute'
-import { ZONE_MAP } from '$coconut/engine/calculation.consts'
+} from '$lib/calc/result.types'
+import { getBoundBuffSets, getTargetSideSourceBuffs, type RuleEvalDeps } from '$lib/calc/compute'
+import { ZONE_MAP } from '$lib/calc/calculation.consts'
 import { BUFF_PATH_SEP, buffFolderPath } from '$lib/buff/name'
 import { diffTotals, pctOf, type AnalysisInputs, type CharacterDamageContext } from './shared'
 

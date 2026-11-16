@@ -9,7 +9,7 @@
  * 放在任一侧都会造成 store ↔ utils 的循环依赖。
  */
 
-import type { BuffRule, BuffZoneValue } from '$coconut/engine/calculation.types'
+import type { BuffRule, BuffZoneValue } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 
 /** @desc 定位实体归属的角色槽位（0/1/2）：character 按实体名匹配；武器/声骸/套装找配装里用它的角色（可能多人共用） */

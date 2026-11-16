@@ -8,7 +8,7 @@ import {
     scopeTextOf,
     type DamageTypeEntrySnapshot
 } from '$lib/components/page/home/calculation/unsaved-changes.utils'
-import type { BuffInstance, BuffTreeState, CalcState } from '$coconut/engine/calculation.types'
+import type { BuffInstance, BuffTreeState, CalcState } from '$lib/calc/calculation.types'
 
 const buff = (id: string, name: string, extra: Partial<BuffInstance> = {}): BuffInstance =>
     ({

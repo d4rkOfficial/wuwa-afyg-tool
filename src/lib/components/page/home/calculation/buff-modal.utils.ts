@@ -5,16 +5,10 @@
  * 放置约定与同目录 `spread-table.utils.ts` 一致：
  * 纯函数住同目录 `*.utils.ts`，落进 ESLint 的「纯逻辑层」享受函数式约束。
  */
-import {
-    ZONE_REF_DEFS,
-    ZONE_REF_MAP,
-    ZONE_MAP,
-    classifyBuffScope,
-    groupBuffSets
-} from '$coconut/engine/calculation.consts'
-import type { GroupedBuffConfItem, ZoneId } from '$coconut/engine/calculation.consts'
+import { ZONE_REF_DEFS, ZONE_REF_MAP, ZONE_MAP, classifyBuffScope, groupBuffSets } from '$lib/calc/calculation.consts'
+import type { GroupedBuffConfItem, ZoneId } from '$lib/calc/calculation.consts'
 import type { BuffTreeNode } from '$lib/buff/tree'
-import type { BuffConf, ZoneRef } from '$coconut/engine/calculation.types'
+import type { BuffConf, ZoneRef } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 
 /** @desc 右栏「添加乘区」清单的固定宽度（不做拖拽调宽） */

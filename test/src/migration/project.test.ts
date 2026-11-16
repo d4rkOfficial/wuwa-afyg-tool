@@ -16,8 +16,8 @@ import { parseProjectFile, importProjects, getProjects, __seedProjectsForTest } 
 import { readVersion, VERSIONLESS_ASSUME_CURRENT_AFTER, migrateProject } from '$src/migration'
 import { PROJECT_VERSION } from '$lib/types/project'
 import type { CharSlot } from '$lib/types/project'
-import type { CalcState } from '$coconut/engine/calculation.types'
-import type { TimelineData } from '$coconut/engine/timeline.types'
+import type { CalcState } from '$lib/calc/calculation.types'
+import type { TimelineData } from '$lib/calc/timeline.types'
 
 const OWNER = '甲'
 const TARGET = '乙'

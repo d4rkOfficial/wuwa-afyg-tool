@@ -1,4 +1,4 @@
-import type { ConfigState, EchoSlotConfig } from '$coconut/engine/config.types'
+import type { ConfigState, EchoSlotConfig } from '$lib/calc/config.types'
 import { defaultConfig, totalCost } from './config.consts'
 import { cloneSlots, normalizeAnyPlanSlots } from '$lib/substat/standard'
 import { SECOND_MAIN_STAT, SUBSTAT_OPTIONS } from '$lib/consts/stat-data'

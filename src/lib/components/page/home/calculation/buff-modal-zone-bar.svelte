@@ -9,8 +9,8 @@
      */
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
-    import type { BuffZoneValue } from '$coconut/engine/calculation.types'
-    import { ZONE_SECTION_VIEWS } from '$coconut/engine/calculation.consts'
+    import type { BuffZoneValue } from '$lib/calc/calculation.types'
+    import { ZONE_SECTION_VIEWS } from '$lib/calc/calculation.consts'
     import { mergeClass } from '$lib/utils/component-style'
     import { ZONE_BAR_WIDTH } from './buff-modal.utils'
 

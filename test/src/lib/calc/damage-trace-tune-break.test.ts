@@ -11,12 +11,12 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { computeOneEntry, DEFAULT_CONDITION_PROFILE } from '$coconut/engine/compute'
-import { buildDamageSegments, type DamageTraceCtx, type DamageSegment } from '$coconut/engine/damage-trace'
-import type { BuffInstance, BuffZoneValue, DamageEntry } from '$coconut/engine/calculation.types'
+import { computeOneEntry, DEFAULT_CONDITION_PROFILE } from '$lib/calc/compute'
+import { buildDamageSegments, type DamageTraceCtx, type DamageSegment } from '$lib/calc/damage-trace'
+import type { BuffInstance, BuffZoneValue, DamageEntry } from '$lib/calc/calculation.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
-import type { ConfigState, EchoSlotConfig } from '$coconut/engine/config.types'
+import type { ConfigState, EchoSlotConfig } from '$lib/calc/config.types'
 
 const CHAR = '测试角色'
 

@@ -9,7 +9,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import type { CharSlot } from '$lib/types/project'
-import type { TimelineData } from '$coconut/engine/timeline.types'
+import type { TimelineData } from '$lib/calc/timeline.types'
 import {
     canUndoTable,
     getAllDamageEntries,

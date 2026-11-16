@@ -1,5 +1,5 @@
 import type { CharSlot } from '$lib/types/project'
-import type { ConfigState } from '$coconut/engine/config.types'
+import type { ConfigState } from '$lib/calc/config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { AlgorithmId } from '$lib/substat/types'
 

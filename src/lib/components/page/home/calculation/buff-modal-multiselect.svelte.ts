@@ -20,7 +20,7 @@ import {
 import { sortedSelectionOrder, toggledSet, toggledGroupSet } from './buff-modal.utils'
 import { addToast } from '$lib/data/toast.svelte'
 import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
-import type { BuffConf } from '$coconut/engine/calculation.types'
+import type { BuffConf } from '$lib/calc/calculation.types'
 import type { ComponentsProps } from '$lib/types'
 
 /** @desc 内置默认全局块的 id 前缀：既不可删除、也不可移出全局，故多选里一律不可勾选 */

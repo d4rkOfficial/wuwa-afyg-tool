@@ -13,7 +13,7 @@
 export { computeEntry, computeProject, type ComputeRequest } from './engine'
 
 // ── 结果形状 ──
-export type { MultiplierDisplay, MultiplierZone, RatioFactor, ResultEntry } from '$coconut/engine/result.types'
+export type { MultiplierDisplay, MultiplierZone, RatioFactor, ResultEntry } from '$lib/calc/result.types'
 
 // ── 输入形状 ──
 export type {
@@ -25,9 +25,9 @@ export type {
     DamageEntry,
     EnemyTypeKind,
     ZoneRef
-} from '$coconut/engine/calculation.types'
-export type { CharEchoConfig, ConfigState, EchoSlotConfig, EnemyConfig } from '$coconut/engine/config.types'
-export { DEFAULT_CONDITION_PROFILE, type ConditionProfile } from '$coconut/engine/compute'
+} from '$lib/calc/calculation.types'
+export type { CharEchoConfig, ConfigState, EchoSlotConfig, EnemyConfig } from '$lib/calc/config.types'
+export { DEFAULT_CONDITION_PROFILE, type ConditionProfile } from '$lib/calc/compute'
 
 // ── 注册表（自描述能力：作用 / 乘子 / 公式 / 引用来源）──
 export {
@@ -75,7 +75,7 @@ export {
     type DamageSegments,
     type DamageTraceCtx,
     type TracePart
-} from '$coconut/engine/damage-trace'
+} from '$lib/calc/damage-trace'
 
 // ── 面板（两侧）──
 export type { CharacterPanel, PanelTriple, TargetPanel } from '$coconut/panel'

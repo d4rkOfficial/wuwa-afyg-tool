@@ -10,7 +10,7 @@ import assert from 'node:assert/strict'
 
 import { dedupeDamageBlockIds, migrateProject } from '$src/migration'
 import { buildDamageEntriesFromTimeline } from '$lib/project/calculation.store.svelte'
-import type { DamageBlock, TimelineData } from '$coconut/engine/timeline.types'
+import type { DamageBlock, TimelineData } from '$lib/calc/timeline.types'
 import type { CharSlot } from '$lib/types/project'
 
 const HIT = {

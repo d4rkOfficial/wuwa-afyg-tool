@@ -4,12 +4,12 @@
  * 这一层是「导出库」的稳定契约：`src/coconut-core/engine/core/index.ts` 只暴露这里的东西，
  * 调用方（外部项目 / Worker / AI 工具）不需要知道引擎内部函数签名。
  */
-import type { BuffInstance, DamageEntry } from '$coconut/engine/calculation.types'
-import type { ConfigState } from '$coconut/engine/config.types'
-import type { ResultEntry } from '$coconut/engine/result.types'
+import type { BuffInstance, DamageEntry } from '$lib/calc/calculation.types'
+import type { ConfigState } from '$lib/calc/config.types'
+import type { ResultEntry } from '$lib/calc/result.types'
 import type { CharSlot } from '$lib/types/project'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-import { DEFAULT_CONDITION_PROFILE, computeAll, computeOneEntry, type ConditionProfile } from '$coconut/engine/compute'
+import { DEFAULT_CONDITION_PROFILE, computeAll, computeOneEntry, type ConditionProfile } from '$lib/calc/compute'
 
 /** @desc 一次完整结算的输入 */
 export interface ComputeRequest {

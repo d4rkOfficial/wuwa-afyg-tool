@@ -15,7 +15,7 @@
     import Select from '$lib/components/ui/select.svelte'
     import type { ComponentsProps } from '$lib/types'
     import type { CharSlot } from '$lib/types/project'
-    import type { BuffRule, ZoneCompareId, ZoneCompareOp } from '$coconut/engine/calculation.types'
+    import type { BuffRule, ZoneCompareId, ZoneCompareOp } from '$lib/calc/calculation.types'
     import {
         CHAIN_MAX,
         ENEMY_TYPE_OPTIONS,
@@ -27,7 +27,7 @@
         isRuleDraft,
         isValidRegex,
         ruleKindLabel
-    } from '$coconut/engine/rules'
+    } from '$lib/calc/rules'
     import { addToast } from '$lib/data/toast.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import { mergeClass } from '$lib/utils/component-style'

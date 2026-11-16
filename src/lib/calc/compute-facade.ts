@@ -8,9 +8,9 @@
  * 属于 app 的展示需求，不进内核。
  */
 import { CoconutCore, type GeneralTable } from '$coconut'
-import type { ComputeRequest } from '$coconut/engine/core'
-import { computeFormulaEntry } from '$coconut/engine/compute'
-import type { ResultEntry } from '$coconut/engine/result.types'
+import type { ComputeRequest } from '$lib/calc/core'
+import { computeFormulaEntry } from '$lib/calc/compute'
+import type { ResultEntry } from '$lib/calc/result.types'
 import { compileGeneralTable } from '$lib/calc/compile'
 
 /** @desc 用工程里的基础数据建内核（角色/武器白值、敌人偏谐系数由工程提供） */

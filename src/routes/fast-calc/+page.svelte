@@ -23,20 +23,20 @@
     import { onDestroy, onMount } from 'svelte'
     import { getCharacterInfo, getWeaponInfo, setApiBase } from '$lib/api/data-cache'
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
-    import { computeAll } from '$coconut/engine/compute'
+    import { computeAll } from '$lib/calc/compute'
     import {
         buildDamageSegments,
         type DamageSegments,
         type DamageTraceCtx,
         type TracePart
-    } from '$coconut/engine/damage-trace'
+    } from '$lib/calc/damage-trace'
     import { getAllDamageEntries, getCalcState, init as initCalculation } from '$lib/project/calculation.store.svelte'
-    import type { CalcState } from '$coconut/engine/calculation.types'
+    import type { CalcState } from '$lib/calc/calculation.types'
     import { enemyDefenseForLevel } from '$lib/project/config.consts'
-    import type { ConfigState, EchoSlotConfig } from '$coconut/engine/config.types'
-    import type { ResultEntry } from '$coconut/engine/result.types'
+    import type { ConfigState, EchoSlotConfig } from '$lib/calc/config.types'
+    import type { ResultEntry } from '$lib/calc/result.types'
     import { formatMultiplierDisplay } from '$lib/result/styles'
-    import type { TimelineData } from '$coconut/engine/timeline.types'
+    import type { TimelineData } from '$lib/calc/timeline.types'
     import { ensureSkillCache } from '$lib/project/timeline.store.svelte'
     import { ensureEchoSkillText, getEchoSkillText } from '$lib/data/char-info.svelte'
     import { ensureCharElements } from '$lib/data/char-elements.svelte'

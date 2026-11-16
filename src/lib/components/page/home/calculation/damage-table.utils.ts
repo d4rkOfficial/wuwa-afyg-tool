@@ -9,8 +9,8 @@
  * 文件列表内（该层只覆盖 `calc/ api/ utils/ consts/ types/ ai/generate/ ai/tools/`），
  * 故此处按该层的写法自律（纯函数、入参不可重赋值、只用 `const` 与箭头函数），但规则本身不强制。
  */
-import { resolveDamageTypes, zoneConditionMet, type ConditionProfile } from '$coconut/engine/compute'
-import { inferDamageTypes } from '$coconut/engine/utils'
+import { resolveDamageTypes, zoneConditionMet, type ConditionProfile } from '$lib/calc/compute'
+import { inferDamageTypes } from '$lib/calc/utils'
 import {
     isEffectEntry,
     formulaAcceptsRef,
@@ -19,8 +19,8 @@ import {
     FORMULAS,
     type CritBase
 } from '$coconut/formulas'
-import { DAMAGE_TYPE_SHORT, ZONE_REF_MAP } from '$coconut/engine/calculation.consts'
-import type { BuffConf, BuffZoneValue, DamageEntry } from '$coconut/engine/calculation.types'
+import { DAMAGE_TYPE_SHORT, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
+import type { BuffConf, BuffZoneValue, DamageEntry } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 
 /** @desc 直伤判定的最小入参（两个表的入参都是 `DamageEntry`，此处放宽便于共用） */

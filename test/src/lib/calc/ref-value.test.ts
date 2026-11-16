@@ -6,11 +6,11 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { computeOneEntry } from '$coconut/engine/compute'
-import type { BuffInstance, DamageEntry } from '$coconut/engine/calculation.types'
+import { computeOneEntry } from '$lib/calc/compute'
+import type { BuffInstance, DamageEntry } from '$lib/calc/calculation.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
-import type { ConfigState, EchoSlotConfig } from '$coconut/engine/config.types'
+import type { ConfigState, EchoSlotConfig } from '$lib/calc/config.types'
 
 const CHAR = '测试角色'
 const ENTRY_ID = 'e1'

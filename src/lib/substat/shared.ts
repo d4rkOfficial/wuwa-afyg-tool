@@ -1,19 +1,9 @@
-import type { BuffConf, DamageEntry } from '$coconut/engine/calculation.types'
-import type { ConfigState, EchoSlotConfig } from '$coconut/engine/config.types'
+import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
+import type { ConfigState, EchoSlotConfig } from '$lib/calc/config.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
-import type {
-    CharSubstatAnalysis,
-    EchoContribution,
-    ResultEntry,
-    SubstatContribution
-} from '$coconut/engine/result.types'
-import {
-    cloneEchoesWithoutAllSubstats,
-    computeAll,
-    computeOneEntry,
-    type ConditionProfile
-} from '$coconut/engine/compute'
+import type { CharSubstatAnalysis, EchoContribution, ResultEntry, SubstatContribution } from '$lib/calc/result.types'
+import { cloneEchoesWithoutAllSubstats, computeAll, computeOneEntry, type ConditionProfile } from '$lib/calc/compute'
 import { buildStandardSlots } from './standard'
 
 /**

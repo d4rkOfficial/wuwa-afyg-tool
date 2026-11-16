@@ -140,8 +140,8 @@ const REGISTRY_SOURCES = [
     'src/coconut-core/actions.ts',
     'src/coconut-core/formulas.ts',
     'src/coconut-core/stats.ts',
-    'src/coconut-core/engine/calculation.consts.ts',
-    'src/coconut-core/engine/rules.ts',
+    'src/lib/calc/calculation.consts.ts',
+    'src/lib/calc/rules.ts',
     'src/lib/consts/game-terms.ts',
     'src/lib/consts/stat-data.ts'
 ]
@@ -150,15 +150,15 @@ const REGISTRY_SOURCES = [
 
 /**
  * @desc 注册表文件：**允许**（且必须）出现实体名，不计入棘轮。
- * 后续阶段会收敛成 `src/coconut-core/engine/registry/**` 下的若干注册域。
+ * 后续阶段会收敛成 `src/lib/calc/registry/**` 下的若干注册域。
  */
 const REGISTRY = new Set([
     'src/coconut-core/actions.ts',
     'src/coconut-core/formulas.ts',
     'src/coconut-core/stats.ts',
-    'src/coconut-core/engine/calculation.consts.ts',
-    'src/coconut-core/engine/calculation.types.ts',
-    'src/coconut-core/engine/rules.ts'
+    'src/lib/calc/calculation.consts.ts',
+    'src/lib/calc/calculation.types.ts',
+    'src/lib/calc/rules.ts'
 ])
 
 /**
@@ -169,6 +169,7 @@ const REGISTRY = new Set([
  */
 const SCAN_DIRS = [
     'src/coconut-core',
+    'src/lib/calc',
     'src/lib/buff',
     'src/lib/timeline',
     'src/lib/project',
@@ -194,12 +195,12 @@ const SCAN_DIRS = [
  */
 const BASELINE = new Map(
     Object.entries({
-        'src/coconut-core/engine/damage-trace.ts': 53,
-        'src/coconut-core/engine/compute.ts': 26,
-        'src/coconut-core/engine/utils.ts': 38,
+        'src/lib/calc/damage-trace.ts': 53,
+        'src/lib/calc/compute.ts': 26,
+        'src/lib/calc/utils.ts': 38,
         'src/lib/components/page/home/calculation/damage-table.utils.ts': 0,
         'src/lib/components/page/home/config/character-detail-utils.ts': 23,
-        'src/coconut-core/engine/skill-infer.ts': 21,
+        'src/lib/calc/skill-infer.ts': 21,
         'src/lib/substat/standard.ts': 9,
         'src/lib/buff/library-condition.ts': 7,
         'src/lib/timeline/consts.ts': 4,
@@ -207,14 +208,14 @@ const BASELINE = new Map(
         'src/lib/buff/pane-effects.ts': 2,
         'src/lib/components/page/home/calculation/spread-table.utils.ts': 2,
         'src/lib/project/config.consts.ts': 1,
-        'src/coconut-core/engine/config.types.ts': 1,
+        'src/lib/calc/config.types.ts': 1,
         'src/lib/timeline/custom-hit.ts': 1,
-        'src/coconut-core/engine/timeline.types.ts': 1,
+        'src/lib/calc/timeline.types.ts': 1,
         // 已清零（登记为 0 表示「一旦出现即失败」）
-        'src/coconut-core/engine/condition.ts': 0,
-        'src/coconut-core/engine/zone-ops.ts': 0,
-        'src/coconut-core/engine/result.types.ts': 0,
-        'src/coconut-core/engine/calculation.consts.ts': 0,
+        'src/lib/calc/condition.ts': 0,
+        'src/lib/calc/zone-ops.ts': 0,
+        'src/lib/calc/result.types.ts': 0,
+        'src/lib/calc/calculation.consts.ts': 0,
         'src/lib/components/page/home/calculation/buff-modal.types.ts': 0
     })
 )

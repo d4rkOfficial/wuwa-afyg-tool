@@ -13,7 +13,7 @@
     import { openHelp } from '$lib/data/help.svelte'
     import { CARD_SURFACE_STYLE } from '$lib/result/styles'
     import type { CharSlot } from '$lib/types/project'
-    import type { RefLine } from '$coconut/engine/timeline.types'
+    import type { RefLine } from '$lib/calc/timeline.types'
     import { joinStyle, mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
     import type { DpsSegment, SegTotals, Timing } from './types'

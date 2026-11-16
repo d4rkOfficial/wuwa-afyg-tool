@@ -13,7 +13,7 @@
     } from '$lib/data/buff-library.svelte'
     import type { BuffLibraryEntity } from '$lib/data/buff-library.svelte'
     import { importBuffSetsWithDecisions, type ImportBuffInput } from '$lib/project/calculation.store.svelte'
-    import { ZONE_MAP } from '$coconut/engine/calculation.consts'
+    import { ZONE_MAP } from '$lib/calc/calculation.consts'
     import { buildBuffImportItems, dedupeImportItems } from '$lib/buff/import-utils'
     import { buffFolderPath, buffLeafName } from '$lib/buff/name'
     import { addToast } from '$lib/data/toast.svelte'

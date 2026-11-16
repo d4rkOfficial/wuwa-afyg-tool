@@ -12,7 +12,7 @@
  * 避免把无关条目的绑定表撑大、也避免差异视图把全局自 Buff 误列到其它角色行。
  */
 
-import type { BuffConf } from '$coconut/engine/calculation.types'
+import type { BuffConf } from '$lib/calc/calculation.types'
 import { scopeTouches } from './pane-effects'
 
 export interface GlobalBindingEntry {

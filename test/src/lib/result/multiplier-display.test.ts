@@ -8,7 +8,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { formatMultiplierDisplay } from '$lib/result/styles'
-import type { MultiplierDisplay } from '$coconut/engine/result.types'
+import type { MultiplierDisplay } from '$lib/calc/result.types'
 
 describe('乘区展示：结构化参数 → 界面文案', () => {
     it('delta 模式：1 + x%，位数由参数决定', () => {

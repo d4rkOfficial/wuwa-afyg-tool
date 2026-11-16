@@ -2,9 +2,9 @@
 // 运行：node --import ./test/preload.mjs --test "test/src/coconut-core/engine/skill-infer.test.ts"
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { inferDamageTypes } from '$coconut/engine/utils'
-import { stripRichTags } from '$coconut/engine/skill-infer'
-import type { DamageEntry } from '$coconut/engine/calculation.types'
+import { inferDamageTypes } from '$lib/calc/utils'
+import { stripRichTags } from '$lib/calc/skill-infer'
+import type { DamageEntry } from '$lib/calc/calculation.types'
 import type { CharacterInfo } from '$lib/api/types'
 
 interface RawSkill {

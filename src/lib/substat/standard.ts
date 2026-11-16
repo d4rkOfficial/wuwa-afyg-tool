@@ -1,4 +1,4 @@
-import type { EchoSlotConfig } from '$coconut/engine/config.types'
+import type { EchoSlotConfig } from '$lib/calc/config.types'
 import { ELEMENT_BONUS_MAP } from '$lib/consts/game-terms'
 import { MAIN_STAT_POOL, SECOND_MAIN_STAT, SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
 import type { SubstatLabel } from '$lib/consts/stat-data'

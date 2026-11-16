@@ -11,7 +11,7 @@
  *   `charIdx` 收敛成两档：`0` = 本角色（导入时按实体归属重指）、`-1` = 出伤者）。
  */
 
-import type { BuffRule, ZoneCompareId } from '$coconut/engine/calculation.types'
+import type { BuffRule, ZoneCompareId } from '$lib/calc/calculation.types'
 import {
     RULE_KIND_OPTIONS,
     ZONE_COMPARE_OPS,
@@ -19,7 +19,7 @@ import {
     describeRule,
     isValidRegex,
     normalizeRules
-} from '$coconut/engine/rules'
+} from '$lib/calc/rules'
 
 /** @desc 库内允许的规则种类（顺序即「创建条件」菜单顺序） */
 export const LIBRARY_RULE_KINDS: BuffRule['kind'][] = [

@@ -8,7 +8,7 @@ import {
     STANDARD_PLAN_NAME,
     STANDARD_SUBSTAT_TOTAL
 } from '$lib/substat/standard'
-import type { EchoSlotConfig } from '$coconut/engine/config.types'
+import type { EchoSlotConfig } from '$lib/calc/config.types'
 
 /** @desc 一套声骸词条方案：标准14词条（每角色唯一、不可删除、唯一可同步）或用户自建方案 */
 export interface SubstatPlan {

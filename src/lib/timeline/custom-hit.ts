@@ -4,7 +4,7 @@
  * 抽出来的原因：这段格式化同时被「排轴倍率选择器」与「AI 自定义倍率工具」使用，
  * 两处各写一遍最容易出现「界面显示 ×2、AI 看到 ×1」这类口径漂移。
  */
-import type { CustomHit } from '$coconut/engine/timeline.types'
+import type { CustomHit } from '$lib/calc/timeline.types'
 
 /** @desc 百分比单位 → 倍率串后缀（攻击% 省略后缀，生命%/防御% 写成 `%生命` / `%防御`） */
 const pctUnitSuffix = (unit: string): string =>

@@ -15,7 +15,7 @@
     import { BUFF_ALGORITHM_HELP } from '$lib/result/consts'
     import { BUFF_PATH_SEP } from '$lib/buff/name'
     import { CARD_SURFACE_STYLE, SECTION_LABEL, STAT_VALUE_SM } from '$lib/result/styles'
-    import type { CharBuffAnalysis } from '$coconut/engine/result.types'
+    import type { CharBuffAnalysis } from '$lib/calc/result.types'
     import { joinStyle, mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
     import {

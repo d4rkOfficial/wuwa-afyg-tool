@@ -8,7 +8,7 @@ import { getSubstatPlans } from '$lib/data/substat-library.svelte'
 import { buildStandardSlots, cloneSlots } from '$lib/substat/standard'
 import { defaultConfig } from '$lib/project/config.consts'
 import { init as initConfig } from '$lib/project/config.store.svelte'
-import type { EchoSlotConfig } from '$coconut/engine/config.types'
+import type { EchoSlotConfig } from '$lib/calc/config.types'
 
 const run = async (name: string, args: Record<string, unknown> = {}) =>
     JSON.parse(await executeTool({ onConfirm: async () => true }, name, args))

@@ -5,7 +5,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { damageHitKeys, resolveDamageHitKey } from '$lib/ai/damage-hit-key'
-import type { SkillHit } from '$coconut/engine/timeline.types'
+import type { SkillHit } from '$lib/calc/timeline.types'
 
 const hit = (hitName: string, over: Partial<SkillHit> = {}): SkillHit => ({
     character: '甲',

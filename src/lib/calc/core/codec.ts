@@ -8,7 +8,7 @@
  * 为什么不把字符串当内部模型：引擎每处运算都要 parse，且单位真源会分裂成两份
  * （`ZONE_MAP` 的 `unit` 与字符串里的 `%`）。这份编解码只服务「表格 / JSON 交换」这一侧。
  */
-import type { BuffCondition, BuffInstance, BuffZoneValue, ZoneRef } from '$coconut/engine/calculation.types'
+import type { BuffCondition, BuffInstance, BuffZoneValue, ZoneRef } from '$lib/calc/calculation.types'
 import { ACTION_MAP, REF_SOURCE_MAP } from '$coconut/actions'
 
 /** @desc 单位：百分比 / 固定值 */

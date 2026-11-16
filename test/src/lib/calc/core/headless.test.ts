@@ -17,11 +17,11 @@ import {
     computeProject,
     buildDamageSegments,
     type ComputeRequest
-} from '$coconut/engine/core'
-import { computeAll, DEFAULT_CONDITION_PROFILE } from '$coconut/engine/compute'
+} from '$lib/calc/core'
+import { computeAll, DEFAULT_CONDITION_PROFILE } from '$lib/calc/compute'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
-import type { ConfigState, EchoSlotConfig } from '$coconut/engine/config.types'
+import type { ConfigState, EchoSlotConfig } from '$lib/calc/config.types'
 
 const CHAR = '甲'
 

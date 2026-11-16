@@ -49,7 +49,7 @@ import { opBlockKey, opBlocksInOrder, refLineKey, refLinesInOrder, resolveOpBloc
 import { shortKeyOf } from '$lib/ai/short-key'
 import { damageHitKeys, resolveDamageHitKey } from '$lib/ai/damage-hit-key'
 import { BLOCK_W, parsePositionArgs } from '$lib/ai/timeline-position'
-import type { CustomHit, DamageBlock, SkillHit, NonDirectEntry, OpBlock, RefLine } from '$coconut/engine/timeline.types'
+import type { CustomHit, DamageBlock, SkillHit, NonDirectEntry, OpBlock, RefLine } from '$lib/calc/timeline.types'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 

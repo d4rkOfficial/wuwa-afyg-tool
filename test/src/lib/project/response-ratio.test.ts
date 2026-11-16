@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import { init as initTimeline } from '$lib/project/timeline.store.svelte'
 import { init as initCalculation, getAllDamageEntries } from '$lib/project/calculation.store.svelte'
 import type { CharSlot } from '$lib/types/project'
-import type { TimelineData } from '$coconut/engine/timeline.types'
+import type { TimelineData } from '$lib/calc/timeline.types'
 import type { CharacterInfo } from '$lib/api/types'
 import { getCharElementMap } from '$lib/data/char-elements.svelte'
 

@@ -1,4 +1,4 @@
-import type { MultiplierDisplay } from '$coconut/engine/result.types'
+import type { MultiplierDisplay } from '$lib/calc/result.types'
 
 /**
  * @desc 结果页 / 结果页弹窗（数据分析、链阶对比）共用的展示样式口径。

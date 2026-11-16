@@ -19,7 +19,7 @@
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
     import Tabs from '$lib/components/ui/tabs.svelte'
-    import { ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP } from '$coconut/engine/calculation.consts'
+    import { ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
     import type { BuffEntityType, BuffLibraryZoneRef } from '$lib/data/buff-library.svelte'
     import {
         LIBRARY_REF_OWNER_TABS,

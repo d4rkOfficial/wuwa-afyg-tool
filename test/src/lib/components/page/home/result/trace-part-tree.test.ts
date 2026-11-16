@@ -5,7 +5,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { buildTracePartRows } from '$lib/components/page/home/result/trace-part-tree'
-import type { TracePart } from '$coconut/engine/damage-trace'
+import type { TracePart } from '$lib/calc/damage-trace'
 
 const part = (sourceType: TracePart['sourceType'], source: string, label = '', value = 10): TracePart => ({
     sourceType,

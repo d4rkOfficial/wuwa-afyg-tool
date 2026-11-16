@@ -51,3 +51,6 @@ export const STAT_WRITES: Record<string, StatWrite> = {
     ...Object.fromEntries(Object.keys(TYPE_BONUS_MAP).map((label) => [label, { kind: 'typeBonus' }])),
     治疗加成: { kind: 'none' }
 }
+
+/** @desc 通用增伤作用的 id：调用方把「伤害类型加成」折进通用增伤时用它（`bonusDmg`） */
+export const BONUS_DMG_ACTION = 'bonusDmg'

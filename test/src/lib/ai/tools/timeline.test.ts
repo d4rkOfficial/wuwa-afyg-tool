@@ -5,7 +5,7 @@ import { executeTool } from '$lib/ai/tools/registry'
 import '$lib/ai/tools/timeline'
 import { MIN_GAP } from '$lib/timeline/consts'
 import { getTimelineState, init, setBlockWidth } from '$lib/project/timeline.store.svelte'
-import type { TimelineData } from '$coconut/engine/timeline.types'
+import type { TimelineData } from '$lib/calc/timeline.types'
 import { __seedProjectsForTest, createProjectData } from '$lib/data/project.svelte'
 
 const setup = (t: TestContext, endPos: number) => {

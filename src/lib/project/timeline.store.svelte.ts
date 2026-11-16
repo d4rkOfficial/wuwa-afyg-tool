@@ -17,7 +17,7 @@ import type {
     DamageBlock,
     TimelineData,
     CustomHit
-} from '$coconut/engine/timeline.types'
+} from '$lib/calc/timeline.types'
 import {
     PPS,
     SIDE_PAD,

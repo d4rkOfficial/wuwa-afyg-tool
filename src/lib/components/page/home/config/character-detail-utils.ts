@@ -1,6 +1,6 @@
 import type { CharSlot } from '$lib/types/project'
-import type { ConfigState } from '$coconut/engine/config.types'
-import type { CalcState } from '$coconut/engine/calculation.types'
+import type { ConfigState } from '$lib/calc/config.types'
+import type { CalcState } from '$lib/calc/calculation.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import {
     ELEMENT_BONUS_MAP,
@@ -10,7 +10,7 @@ import {
 } from '$lib/consts/game-terms'
 import { SECOND_MAIN_STAT } from '$lib/consts/stat-data'
 import { getConditionProfile } from '$lib/project/calculation.store.svelte'
-import { buffRulesMet } from '$coconut/engine/compute'
+import { buffRulesMet } from '$lib/calc/compute'
 
 export interface CharStats {
     name: string

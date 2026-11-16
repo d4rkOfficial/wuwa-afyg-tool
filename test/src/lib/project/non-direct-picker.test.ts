@@ -19,7 +19,7 @@ import {
     getTimelineState
 } from '$lib/project/timeline.store.svelte'
 import type { CharSlot } from '$lib/types/project'
-import type { TimelineData } from '$coconut/engine/timeline.types'
+import type { TimelineData } from '$lib/calc/timeline.types'
 
 const TEAM = [
     { character: '甲', weapon: '武器A' },

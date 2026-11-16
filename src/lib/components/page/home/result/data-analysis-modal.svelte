@@ -5,7 +5,7 @@
         resolveRefLineSeconds,
         autoConfigureTimings as autoConfigureTimingsPure
     } from '$lib/timeline/ref-line-timing'
-    import type { ResultEntry, CharSummary, CharSubstatAnalysis, CharBuffAnalysis } from '$coconut/engine/result.types'
+    import type { ResultEntry, CharSummary, CharSubstatAnalysis, CharBuffAnalysis } from '$lib/calc/result.types'
     import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
     import type { AlgorithmId, AlgorithmInfo } from '$lib/substat/types'
     import Icon from '@iconify/svelte'

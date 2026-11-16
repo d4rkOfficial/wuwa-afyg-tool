@@ -9,7 +9,7 @@
  * - 数字文件夹只在迁移/导入时用于排序/相邻，运行时不按数字自动归并。
  */
 
-import type { BuffCondition, BuffInstance, BuffTreeState, BuffTreeNode } from '$coconut/engine/calculation.types'
+import type { BuffCondition, BuffInstance, BuffTreeState, BuffTreeNode } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 import {
     buffFolderPath,

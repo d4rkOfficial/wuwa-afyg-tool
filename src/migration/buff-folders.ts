@@ -3,7 +3,7 @@
  * 并把旧导入混在角色本体里的声骸 / 套装 / 武器 Buff 按实体归档。
  */
 
-import type { BuffInstance, BuffTreeNode, BuffTreeState, CalcState } from '$coconut/engine/calculation.types'
+import type { BuffInstance, BuffTreeNode, BuffTreeState, CalcState } from '$lib/calc/calculation.types'
 import { BUFF_PATH_SEP, joinBuffPath, splitBuffPath } from '$lib/buff/name'
 import {
     characterBodyFolderName,

@@ -6,8 +6,8 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { buffContributesToEntry, resolveDamageTypes, DEFAULT_CONDITION_PROFILE } from '$coconut/engine/compute'
-import type { BuffInstance, BuffRule, DamageEntry } from '$coconut/engine/calculation.types'
+import { buffContributesToEntry, resolveDamageTypes, DEFAULT_CONDITION_PROFILE } from '$lib/calc/compute'
+import type { BuffInstance, BuffRule, DamageEntry } from '$lib/calc/calculation.types'
 
 const entryWith = (element: string, damageTypes: string[]): DamageEntry =>
     ({

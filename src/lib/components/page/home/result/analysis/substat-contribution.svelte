@@ -11,7 +11,7 @@
     import { openHelp } from '$lib/data/help.svelte'
     import { ALGORITHM_HELP } from '$lib/result/consts'
     import { CARD_SURFACE_STYLE, SECTION_LABEL, STAT_VALUE_MD, STAT_VALUE_SM } from '$lib/result/styles'
-    import type { CharSubstatAnalysis } from '$coconut/engine/result.types'
+    import type { CharSubstatAnalysis } from '$lib/calc/result.types'
     import type { AlgorithmId, AlgorithmInfo } from '$lib/substat/types'
     import { joinStyle, mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'

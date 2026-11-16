@@ -2,7 +2,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import type { BuffInstance, BuffTreeState } from '$coconut/engine/calculation.types'
+import type { BuffInstance, BuffTreeState } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 import {
     appendBuffToTree,

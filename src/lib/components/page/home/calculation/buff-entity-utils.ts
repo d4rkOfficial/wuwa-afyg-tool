@@ -1,4 +1,4 @@
-import { ZONE_MAP } from '$coconut/engine/calculation.consts'
+import { ZONE_MAP } from '$lib/calc/calculation.consts'
 
 /** @desc 乘区 id → 显示名（未知 id 原样返回） */
 export const zoneLabel = (id: string) => ZONE_MAP.get(id as never)?.label ?? id

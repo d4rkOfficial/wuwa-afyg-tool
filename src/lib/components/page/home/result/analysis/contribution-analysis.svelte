@@ -10,7 +10,7 @@
     import { onMount } from 'svelte'
     import Icon from '@iconify/svelte'
     import { getCharElementMap, getCharIconMap } from '$lib/project/timeline.store.svelte'
-    import type { CharBuffAnalysis, CharSubstatAnalysis } from '$coconut/engine/result.types'
+    import type { CharBuffAnalysis, CharSubstatAnalysis } from '$lib/calc/result.types'
     import type { CharSlot } from '$lib/types/project'
     import type { AlgorithmId, AlgorithmInfo } from '$lib/substat/types'
     import { fallbackIcon } from '$lib/utils/icons'

@@ -18,10 +18,10 @@
     import type { ComponentsProps } from '$lib/types'
     import ZoneConditionPanel from './zone-condition-panel.svelte'
     import BuffModalRules from './buff-modal-rules.svelte'
-    import { ZONE_MAP, ZONE_NO_OVERRIDE_IDS, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$coconut/engine/calculation.consts'
+    import { ZONE_MAP, ZONE_NO_OVERRIDE_IDS, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
     import { actionAllowsCondition } from '$coconut/actions'
     import type { BuffLibraryBuff, BuffLibraryScope } from '$lib/data/buff-library.svelte'
-    import type { BuffRule } from '$coconut/engine/calculation.types'
+    import type { BuffRule } from '$lib/calc/calculation.types'
     import {
         LIBRARY_RULE_KINDS,
         LIBRARY_ZONE_COMPARE_OPTIONS,
@@ -29,7 +29,7 @@
         isActiveRefOwner
     } from '$lib/buff/library-condition'
     import BuffPathInput from './buff-path-input.svelte'
-    import { describeCondition, describeZoneConditionBadge } from '$coconut/engine/condition'
+    import { describeCondition, describeZoneConditionBadge } from '$lib/calc/condition'
     import { joinStyle, mergeClass } from '$lib/utils/component-style'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import { simplifyPct, zoneLabel, zoneUnit } from './buff-entity-utils'

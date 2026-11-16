@@ -7,9 +7,9 @@
      */
     import Icon from '@iconify/svelte'
     import type { ComponentsProps } from '$lib/types'
-    import type { BuffCondition } from '$coconut/engine/calculation.types'
+    import type { BuffCondition } from '$lib/calc/calculation.types'
     import { ELEMENTS, DAMAGE_TYPES, DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
-    import { isConditionEmpty } from '$coconut/engine/condition'
+    import { isConditionEmpty } from '$lib/calc/condition'
     import { slide } from 'svelte/transition'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
 

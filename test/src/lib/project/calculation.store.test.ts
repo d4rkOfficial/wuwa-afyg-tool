@@ -10,7 +10,7 @@ import {
     init
 } from '$lib/project/calculation.store.svelte'
 import type { CharSlot } from '$lib/types/project'
-import type { TimelineData } from '$coconut/engine/timeline.types'
+import type { TimelineData } from '$lib/calc/timeline.types'
 
 const TEAM = [
     { character: '复制测试甲', weapon: null },

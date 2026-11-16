@@ -10,10 +10,10 @@ import assert from 'node:assert/strict'
 
 import { computeCharStats } from '$lib/components/page/home/config/character-detail-utils'
 import { setConditionProfile } from '$lib/project/calculation.store.svelte'
-import type { BuffInstance, BuffRule, CalcState } from '$coconut/engine/calculation.types'
+import type { BuffInstance, BuffRule, CalcState } from '$lib/calc/calculation.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
-import type { ConfigState, EchoSlotConfig } from '$coconut/engine/config.types'
+import type { ConfigState, EchoSlotConfig } from '$lib/calc/config.types'
 
 const CHAR = '测试角色'
 const EMPTY_ECHO = (): EchoSlotConfig => ({ cost: 1, mainStat: null, secondMainStat: null, substats: [] })

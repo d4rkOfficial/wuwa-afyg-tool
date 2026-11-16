@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { CharSlot, ResultAnalysisData } from '$lib/types/project'
-    import type { CalcState } from '$coconut/engine/calculation.types'
-    import type { ConfigState } from '$coconut/engine/config.types'
+    import type { CalcState } from '$lib/calc/calculation.types'
+    import type { ConfigState } from '$lib/calc/config.types'
     import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
     import { getCharacterInfo, getWeaponInfo, getCharacterIcons, getWeaponIcons } from '$lib/api/data-cache'
     import { ensureEchoSkillText, getEchoSkillText } from '$lib/data/char-info.svelte'
@@ -18,7 +18,7 @@
         getTableVersion
     } from '$lib/project/calculation.store.svelte'
     import { getConfig } from '$lib/project/config.store.svelte'
-    import type { ResultEntry, CharSummary, CharSubstatAnalysis, CharBuffAnalysis } from '$coconut/engine/result.types'
+    import type { ResultEntry, CharSummary, CharSubstatAnalysis, CharBuffAnalysis } from '$lib/calc/result.types'
     import { DAMAGE_TYPE_SHORT } from '$lib/consts/game-terms'
     import { ALGORITHMS_INFO } from '$lib/substat'
     import type { AlgorithmId, AlgorithmInfo } from '$lib/substat/types'
@@ -42,7 +42,7 @@
     import ComparisonModal from './comparison-modal.svelte'
     import DamageTraceView from './damage-trace-view.svelte'
     import DamageFactorList from './damage-factor-list.svelte'
-    import { damageFactorRows, type DamageTraceCtx, type CritDisplayMode } from '$coconut/engine/damage-trace'
+    import { damageFactorRows, type DamageTraceCtx, type CritDisplayMode } from '$lib/calc/damage-trace'
     import {
         CARD,
         CARD_PAD,

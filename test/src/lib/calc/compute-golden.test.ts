@@ -17,12 +17,12 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { writeFileSync } from 'node:fs'
 
-import { computeAll } from '$coconut/engine/compute'
-import { buildDamageSegments, type DamageTraceCtx } from '$coconut/engine/damage-trace'
-import type { BuffInstance, DamageEntry } from '$coconut/engine/calculation.types'
+import { computeAll } from '$lib/calc/compute'
+import { buildDamageSegments, type DamageTraceCtx } from '$lib/calc/damage-trace'
+import type { BuffInstance, DamageEntry } from '$lib/calc/calculation.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
-import type { ConfigState, EchoSlotConfig } from '$coconut/engine/config.types'
+import type { ConfigState, EchoSlotConfig } from '$lib/calc/config.types'
 
 // ────────────────────────────── fixture ──────────────────────────────
 

@@ -1,6 +1,6 @@
-import type { BuffInstance, CalcState } from '$coconut/engine/calculation.types'
-import type { ConfigState } from '$coconut/engine/config.types'
-import type { TimelineData } from '$coconut/engine/timeline.types'
+import type { BuffInstance, CalcState } from '$lib/calc/calculation.types'
+import type { ConfigState } from '$lib/calc/config.types'
+import type { TimelineData } from '$lib/calc/timeline.types'
 
 export interface SelectedSet {
     name: string

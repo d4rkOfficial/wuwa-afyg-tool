@@ -10,9 +10,9 @@
 import assert from 'node:assert/strict'
 import { getProvider } from '$lib/api/provider'
 import { DAMAGE_TYPES as CANONICAL_DAMAGE_TYPES } from '$lib/consts/game-terms'
-import { inferDamageTypes } from '$coconut/engine/utils'
+import { inferDamageTypes } from '$lib/calc/utils'
 import type { CharacterInfo, SkillEntry } from '$lib/api/types'
-import type { DamageEntry } from '$coconut/engine/calculation.types'
+import type { DamageEntry } from '$lib/calc/calculation.types'
 
 /** @desc 权威伤害类型（`src/lib/consts/game-terms.ts`），用例的期望值必须是其中之一 */
 export type DamageTypeName = (typeof CANONICAL_DAMAGE_TYPES)[number]

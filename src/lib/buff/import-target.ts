@@ -1,8 +1,8 @@
-import type { BuffConf, BuffRule } from '$coconut/engine/calculation.types'
+import type { BuffConf, BuffRule } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 import { buffFolderPath, buffLeafName, joinBuffPath } from './name'
 import { characterEchoFolderName, characterSetFolderName, characterWeaponFolderName, coarsePathOf } from './tree-state'
-import { normalizeRules, rulesFromLegacyCondition, type LegacyGateCondition } from '$coconut/engine/rules'
+import { normalizeRules, rulesFromLegacyCondition, type LegacyGateCondition } from '$lib/calc/rules'
 import { rewriteOwnerInRules } from './owner'
 
 /** @desc 导入实体的来源类型：角色 / 武器 / 首位声骸 / 套装件数 */

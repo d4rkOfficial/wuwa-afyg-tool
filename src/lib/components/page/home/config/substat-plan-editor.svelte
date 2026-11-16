@@ -4,7 +4,7 @@
      * 用于词条集里修改标准14词条与自定义方案。数据在本地草稿上编辑，保存时交回父组件。
      */
     import type { ComponentsProps } from '$lib/types'
-    import type { EchoSlotConfig } from '$coconut/engine/config.types'
+    import type { EchoSlotConfig } from '$lib/calc/config.types'
     import EchoSlotCard from './echo-slot-card.svelte'
     import Button from '$lib/components/ui/button.svelte'
     import SubstatPickerModal from './substat-picker-modal.svelte'

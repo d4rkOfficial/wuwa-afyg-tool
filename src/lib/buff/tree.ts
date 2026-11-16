@@ -5,9 +5,9 @@
  * 迁移与导入的粗分类在 `buff-tree-state.ts` 完成，本文件只负责把已存好的树摊平成 UI 节点。
  */
 
-import type { BuffInstance, BuffTreeNode as StateTreeNode, BuffTreeState } from '$coconut/engine/calculation.types'
+import type { BuffInstance, BuffTreeNode as StateTreeNode, BuffTreeState } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
-import type { GroupedBuffConfItem } from '$coconut/engine/calculation.consts'
+import type { GroupedBuffConfItem } from '$lib/calc/calculation.consts'
 import { deriveFolderIcon, normalizeBuffTree, type FolderIconSpec } from './tree-state'
 
 /** @desc 归类树节点：复用左侧列表既有的「folder/item」渲染结构（GroupedBuffConfItem），并补充拖拽/样式所需信息 */

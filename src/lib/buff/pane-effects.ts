@@ -8,7 +8,7 @@
  * - v2 → v3 迁移用同一套判定，把「旧语义下通过 Y 的其它条目间接生效」的影响源补勾到引用它们的伤害段上。
  */
 
-import type { BuffInstance, BuffZoneValue } from '$coconut/engine/calculation.types'
+import type { BuffInstance, BuffZoneValue } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 import { parseValueString } from '$lib/utils/parse-value-string'
 import { REF_SOURCES, refWrittenBy } from '$coconut/actions'

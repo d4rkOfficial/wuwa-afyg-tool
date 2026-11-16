@@ -8,7 +8,7 @@
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import type { Snippet } from 'svelte'
     import type { ComponentsProps } from '$lib/types'
-    import type { EchoSlotConfig } from '$coconut/engine/config.types'
+    import type { EchoSlotConfig } from '$lib/calc/config.types'
     import { planSubstatTotal } from '$lib/substat/standard'
     import { abbrevMainStat, abbrevSubstat } from '$lib/utils/substat-abbrev'
 

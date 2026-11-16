@@ -42,16 +42,10 @@ import { paneEffectSourcesOf } from '$lib/buff/pane-effects'
 import { getOpBlocks, getRefLines } from '$lib/project/timeline.store.svelte'
 import { renderBuffConfList, renderCalculationDigest, scopeLabel } from '$lib/ai/phase-digest'
 import { asIndex, buffConfsInOrder, damageEntriesInOrder, resolveBuffConf, resolveDamageEntry } from '$lib/ai/refs'
-import {
-    LEGACY_ZONE_IDS,
-    resolveZoneId,
-    ZONE_MAP,
-    ZONE_NO_REF_IDS,
-    ZONE_REF_MAP
-} from '$coconut/engine/calculation.consts'
+import { LEGACY_ZONE_IDS, resolveZoneId, ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
-import { cyclePathOf, isRuleDraft, normalizeRule } from '$coconut/engine/rules'
-import type { BuffRule, ZoneRef } from '$coconut/engine/calculation.types'
+import { cyclePathOf, isRuleDraft, normalizeRule } from '$lib/calc/rules'
+import type { BuffRule, ZoneRef } from '$lib/calc/calculation.types'
 import { isEffectEntry } from '$coconut/formulas'
 
 const str = (v: unknown): string => String(v ?? '').trim()

@@ -16,7 +16,7 @@
     import { simulateEnhancement } from '$lib/consts/substat-roll-data'
     import { addToast } from '$lib/data/toast.svelte'
     import type { CharSlot } from '$lib/types/project'
-    import type { ConfigState } from '$coconut/engine/config.types'
+    import type { ConfigState } from '$lib/calc/config.types'
     import { getCharIconMap, elementColor } from '$lib/project/timeline.store.svelte'
     import { getActiveId } from '$lib/data/project.svelte'
     import { attachSessionScroll, readSessionScroll, readSessionTab, writeSessionTab } from '$lib/data/view-session'

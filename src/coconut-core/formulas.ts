@@ -12,8 +12,8 @@
 import { CHAR_LEVEL } from '$lib/consts/game-terms'
 import { TARGET_SCALARS } from '$coconut/actions'
 import type { CharacterPanel, TargetPanel } from '$coconut/panel'
-import type { CalculationFormulaId, DamageEntry } from '$coconut/engine/calculation.types'
-import type { MultiplierDisplay } from '$coconut/engine/result.types'
+import type { CalculationFormula } from '$coconut/general-table'
+import type { MultiplierDisplay } from '$coconut/result'
 
 /** @desc 公式求值上下文：两侧面板 + 条目身份 */
 export interface FormulaCtx {
@@ -396,7 +396,8 @@ export const formulaAcceptsRef = (critBase: CritBase, actionId: string): boolean
 
 // ────────────────────────────── 公式 ──────────────────────────────
 
-export type { CalculationFormulaId }
+/** @desc 公式 id（内核的 `CalculationFormula`，对外沿用旧名以免调用方大改） */
+export type CalculationFormulaId = CalculationFormula
 
 /** @desc 基值配方：基值从哪来（面板三维 / 敌人类型系数 / 效应表系数 / 固定值） */
 export type BaseRecipe = { kind: 'panelStat' } | { kind: 'enemyCoeff' } | { kind: 'effectTable' } | { kind: 'fixed' }
@@ -492,14 +493,14 @@ export const FORMULAS: Record<CalculationFormulaId, FormulaDef> = {
 }
 
 /** @desc 条目 → 公式 id（取代原先散在四处的 `isEffect / isTuneBreak / isTuneResponse / 偏谐系数` 组合判据） */
-export const formulaOf = (entry: DamageEntry): CalculationFormulaId =>
+export const formulaOf = (entry: { formula: CalculationFormula; ratioUnit: string }): CalculationFormulaId =>
     entry.formula === 'direct' && entry.ratioUnit === 'fixed' ? 'fixed' : entry.formula
 
 /** @desc 该条目是否效应伤害（作用域语义：效应条目没有角色槽位） */
-export const isEffectEntry = (entry: Pick<DamageEntry, 'formula'>): boolean => entry.formula === 'effect'
+export const isEffectEntry = (entry: { formula: CalculationFormula }): boolean => entry.formula === 'effect'
 
 /** @desc 条目是否走系数基类口径（双暴基准 0/100） */
-export const usesCoefficientFormula = (entry: DamageEntry): boolean =>
+export const usesCoefficientFormula = (entry: { formula: CalculationFormula; ratioUnit: string }): boolean =>
     FORMULAS[formulaOf(entry)].critBase === 'coefficient'
 
 /**
