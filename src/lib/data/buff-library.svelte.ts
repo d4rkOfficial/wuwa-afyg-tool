@@ -1,10 +1,10 @@
 import { browser } from '$app/environment'
-import { dbGet, dbSet } from '$lib/data/db'
+import { dbGet, dbSet } from './db'
 import { getShareBase } from './workshop.svelte'
 import { ZONE_MAP, ZONE_NO_REF_IDS, resolveZoneId } from '$lib/calc/calculation.consts'
 import { normalizeZoneCondition } from '$lib/calc/condition'
 import { normalizeRules, rulesFromLegacyCondition } from '$lib/calc/rules'
-import { sanitizeLibraryRules, sanitizeRefOwner, type LibraryRefOwner } from '$lib/calc/buff-library-condition'
+import { sanitizeLibraryRules, sanitizeRefOwner, type LibraryRefOwner } from '$lib/buff/library-condition'
 import type { BuffCondition, BuffRule } from '$lib/calc/calculation.types'
 import { CHAIN_MAX, REFINE_MAX } from '$lib/consts/game-terms'
 import {
@@ -14,7 +14,7 @@ import {
     isLeafNameValid,
     joinBuffPath,
     sanitizeLeafName
-} from '$lib/calc/buff-name'
+} from '$lib/buff/name'
 
 export type BuffEntityType = 'character' | 'weapon' | 'echo' | '1set' | '2set' | '3set' | '4set' | '5set'
 
@@ -144,7 +144,7 @@ export interface BuffLibraryItem {
     buffName: string
     scope?: BuffLibraryScope
     exclusive?: boolean
-    /** @desc Buff 级规则（库口径，见 `calc/buff-library-condition`） */
+    /** @desc Buff 级规则（库口径，见 `buff/library-condition`） */
     rules?: BuffRule[]
     zones: BuffLibraryZone[]
 }

@@ -7,7 +7,7 @@
  */
 import { ZONE_REF_DEFS, ZONE_REF_MAP, ZONE_MAP, classifyBuffScope, groupBuffSets } from '$lib/calc/calculation.consts'
 import type { GroupedBuffConfItem, ZoneId } from '$lib/calc/calculation.consts'
-import type { BuffTreeNode } from '$lib/calc/buff-tree'
+import type { BuffTreeNode } from '$lib/buff/tree'
 import type { BuffConf, ZoneRef } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 

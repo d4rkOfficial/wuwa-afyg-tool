@@ -16,7 +16,7 @@ import {
     setBuffSetsGlobal,
     reorderNonGlobalBuffSets,
     compareNatural
-} from '$lib/calc/calculation.store.svelte'
+} from '$lib/project/calculation.store.svelte'
 import { sortedSelectionOrder, toggledSet, toggledGroupSet } from './buff-modal.utils'
 import { addToast } from '$lib/data/toast.svelte'
 import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'

@@ -29,8 +29,8 @@
         setDamageWidths,
         getTRACKS,
         estimateDamageHeight
-    } from '$lib/calc/timeline.store.svelte'
-    import { NON_DIRECT_ELEMENT } from '$lib/calc/timeline.consts'
+    } from '$lib/project/timeline.store.svelte'
+    import { NON_DIRECT_ELEMENT } from '$lib/timeline/consts'
     import { damageStackStyle, nonDirectSortWeight } from './timeline-styles.utils'
 
     interface Props extends ComponentsProps {

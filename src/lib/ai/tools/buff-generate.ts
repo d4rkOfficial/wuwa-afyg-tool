@@ -8,18 +8,18 @@ import {
     loadBuffLibrary as loadBuffSet
 } from '$lib/data/buff-library.svelte'
 import { getCharacterList, getWeaponList, getEchoList, getEchoSetList } from '$lib/api/data-cache'
-import { importBuffSetsWithDecisions } from '$lib/calc/calculation.store.svelte'
-import type { ImportBuffInput } from '$lib/calc/calculation.store.svelte'
-import { generateBuffs } from '../generate'
+import { importBuffSetsWithDecisions } from '$lib/project/calculation.store.svelte'
+import type { ImportBuffInput } from '$lib/project/calculation.store.svelte'
+import { generateBuffs } from '$lib/ai/generate'
 import { getEnabledSkillBody, loadSkills, SKILL_IDS } from '$lib/data/ai-skills.svelte'
 import {
     createBuffSetDataSource,
     createProjectDataSource,
     type GenerateEntityType,
     type GeneratedBuff
-} from '../generate/tools'
-import { ownerIdxFor } from '$lib/calc/buff-import-utils'
-import { getAiConfig } from '../config.svelte'
+} from '$lib/ai/generate/tools'
+import { ownerIdxFor } from '$lib/buff/import-utils'
+import { getAiConfig } from '$lib/ai/config.svelte'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 

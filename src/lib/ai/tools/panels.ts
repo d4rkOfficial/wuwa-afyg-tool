@@ -1,6 +1,6 @@
 // 弹窗面板工具：AI 查看/开关所有已注册弹窗
 import { defineTool } from './registry'
-import { getPanelsState, openPanel } from '../panels.svelte'
+import { getPanelsState, openPanel } from '$lib/ai/panels.svelte'
 import { getActiveProject, setActiveProject } from '$lib/data/project.svelte'
 import { tick } from 'svelte'
 

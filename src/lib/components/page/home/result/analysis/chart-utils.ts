@@ -9,7 +9,7 @@
  * 本文件不 import 任何组件、不读写 store，只依赖 chart.js 与项目内的纯数据。
  */
 import Chart from 'chart.js/auto'
-import { COMPARISON_PALETTE } from '$lib/calc/comparison'
+import { COMPARISON_PALETTE } from '$lib/result/comparison'
 import type { CharSubstatAnalysis } from '$lib/calc/result.types'
 import type { DirectDamageByType } from '$lib/calc/utils'
 

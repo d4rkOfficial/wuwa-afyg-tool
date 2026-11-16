@@ -51,9 +51,7 @@ const directEntry: DamageEntry = {
     skillType: '常态攻击',
     hitName: '常态攻击第1段伤害',
     displayName: '常态攻击第1段(常态攻击)',
-    isEffect: false,
-    isTuneBreak: false,
-    isTuneResponse: false,
+    formula: 'direct',
     ratioValue: 100,
     ratioUnit: '%',
     damageBaseType: '攻击',
@@ -68,9 +66,7 @@ const tuneEntry: DamageEntry = {
     skillType: '谐度破坏',
     hitName: '谐度破坏',
     displayName: '谐度破坏',
-    isEffect: false,
-    isTuneBreak: true,
-    isTuneResponse: false,
+    formula: 'tune',
     ratioValue: 1600,
     ratioUnit: '%',
     damageBaseType: '偏谐系数',
@@ -133,12 +129,11 @@ describe('处决/响应：谐度破坏增幅进「谐度区」，不写进「集
         assert.equal(result.finalTuneBreakZone, 0.5)
     })
 
-    it('集谐区恒为 1 且不列任何来源（增幅不属于集谐区）', () => {
-        const { segmentOf } = run(tuneEntry, [boost], [])
-        const strain = segmentOf('tune')
-        assert.equal(strain.label, '集谐区')
-        assert.equal(strain.value, 1, '处决/响应不吃集谐区')
-        assert.deepEqual(strain.parts, [], '区值 1 时不得留下任何来源（幻影贡献）')
+    it('集谐区在处决公式链上 → 溯源里有该段（无层数时值为 1）', () => {
+        const { segs } = run(tuneEntry, [boost], [])
+        const tuneStrain = segs.segments.find((s) => s.id === 'tuneStrain')
+        assert.ok(tuneStrain, '处决/响应吃集谐区，溯源必须出现该段（membership 由公式链决定）')
+        assert.equal(tuneStrain!.value, 1, '没有集谐层数时为 1')
     })
 
     it('谐度区确实参与了结算：带上增幅的伤害 = 不带增幅 × 1.5', () => {
@@ -157,22 +152,23 @@ describe('直伤：谐度破坏增幅是集谐区的因子，谐度区恒为 1',
 
     it('集谐区 = 1 + 0.12% × 增幅 × 层数，来源含集谐层数与谐度破坏增幅', () => {
         const { segmentOf } = run(directEntry, [boost, layers], ['普攻伤害'])
-        const strain = segmentOf('tune')
+        const strain = segmentOf('tuneStrain')
         assert.equal(strain.value, 1 + 0.0012 * 500 * 3, '1 + 0.12% × 500 × 3 = 2.8')
         assert.deepEqual(strain.parts.map((p) => p.label).sort(), ['谐度破坏增幅', '集谐层数'].sort())
     })
 
-    it('谐度区恒为 1 且不列来源（直伤不读谐度区）', () => {
-        const { segmentOf } = run(directEntry, [boost, layers], ['普攻伤害'])
-        const tuneBreak = segmentOf('tuneBreak')
-        assert.equal(tuneBreak.label, '谐度区')
-        assert.equal(tuneBreak.value, 1)
-        assert.deepEqual(tuneBreak.parts, [])
+    it('谐度区不在直伤公式链上 → 溯源里没有该段', () => {
+        const { segs } = run(directEntry, [boost, layers], ['普攻伤害'])
+        assert.equal(
+            segs.segments.some((s) => s.id === 'tuneBreak'),
+            false,
+            '直伤不读谐度区，溯源不应出现该段（membership 由公式链决定）'
+        )
     })
 
     it('只有层数、没有增幅 → 集谐区保持 1 且不列来源', () => {
         const { segmentOf } = run(directEntry, [layers], ['普攻伤害'])
-        assert.equal(segmentOf('tune').value, 1)
-        assert.deepEqual(segmentOf('tune').parts, [])
+        assert.equal(segmentOf('tuneStrain').value, 1)
+        assert.deepEqual(segmentOf('tuneStrain').parts, [])
     })
 })

@@ -14,7 +14,7 @@
     import type { ComponentsProps } from '$lib/types'
     import type { UnsavedChangeItem } from '$lib/types/unsaved-change'
     import Modal from '$lib/components/layout/modal.svelte'
-    import Button from '$lib/components/ui/button.svelte'
+    import Button from './button.svelte'
     import { mergeClass } from '$lib/utils/component-style'
 
     interface Props extends ComponentsProps {

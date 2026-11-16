@@ -7,8 +7,9 @@
  */
 
 import type { BuffCondition, BuffInstance, BuffTreeState, BuffZoneValue, CalcState } from '$lib/calc/calculation.types'
-import { normalizeBuffTree } from '$lib/calc/buff-tree-state'
+import { normalizeBuffTree } from '$lib/buff/tree-state'
 import { ZONE_MAP, resolveZoneId } from '$lib/calc/calculation.consts'
+import { actionAllowsCondition } from '$lib/calc/core-config'
 import { isConditionEmpty, normalizeCondition, normalizeZoneCondition } from '$lib/calc/condition'
 import { normalizeRules, rulesFromLegacyCondition, type LegacyGateCondition } from '$lib/calc/rules'
 import { asRecord, genId, isLegacyAutoGlobal, isRecord, pickNum } from './shared'
@@ -26,7 +27,10 @@ export const normalizeZoneList = (zones: unknown): BuffZoneValue[] => {
         const next: BuffZoneValue = { zoneId: zoneId as BuffZoneValue['zoneId'], value: pickNum(z.value, 0) }
         if (z.ref) next.ref = z.ref as BuffZoneValue['ref']
         if (z.override) next.override = true
-        const zoneCondition = normalizeZoneCondition(asRecord(z.condition) as BuffCondition)
+        // 只有能挂「伤害匹配」条件的作用才保留条件（热熔共鸣效率这类组合在模型上不存在）
+        const zoneCondition = actionAllowsCondition(zoneId)
+            ? normalizeZoneCondition(asRecord(z.condition) as BuffCondition)
+            : undefined
         if (zoneCondition) next.condition = zoneCondition
         out.push(next)
     }
@@ -56,6 +60,7 @@ export const normalizeZones = (buff: Partial<BuffInstance> & Record<string, unkn
     const buffLevel = normalizeZoneCondition(asRecord(buff.condition) as BuffCondition) ?? {}
     /** @desc 与一段附加条件合并后写回条目（交集为空 = 永远不满足，返回 null 表示丢弃该条目） */
     const applyCondition = (zone: BuffZoneValue, extra: BuffCondition): BuffZoneValue | null => {
+        if (!actionAllowsCondition(zone.zoneId)) return zone
         const merged = andZoneConditions(extra, zone.condition ?? {})
         if (merged === null) return null
         const next: BuffZoneValue = { ...zone }

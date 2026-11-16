@@ -13,9 +13,10 @@
  * 工具侧只负责取数，措辞与排版集中在这里，避免同一阶段在不同工具里两种口径。
  */
 import type { DamageBlock, OpBlock, RefLine } from '$lib/calc/timeline.types'
+import { isEffectEntry } from '$lib/calc/core-config'
 import type { DamageEntry } from '$lib/calc/calculation.types'
-import { autoConfigureTimings } from '$lib/calc/ref-line-timing'
-import { shortKeyOf } from '$lib/ai/short-key'
+import { autoConfigureTimings } from '$lib/timeline/ref-line-timing'
+import { shortKeyOf } from './short-key'
 
 /** @desc 秒数显示：保留两位（只用于配置或名称推导的参考线时间） */
 export const fmtSeconds = (seconds: number): string => `${seconds.toFixed(2)}s`
@@ -303,9 +304,8 @@ export interface CalculationDigestInput {
 
 /** @desc 条目类型标记（效应 / 处决 / 响应 / 直伤） */
 const entryKind = (e: DamageEntry): string => {
-    if (e.isEffect) return '效应'
-    if (e.isTuneBreak) return '处决'
-    if (e.isTuneResponse) return '响应'
+    if (isEffectEntry(e)) return '效应'
+    if (e.formula === 'tune') return '处决'
     return ''
 }
 

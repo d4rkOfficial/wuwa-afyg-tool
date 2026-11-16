@@ -11,7 +11,7 @@
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import { getModalClosePosition } from '$lib/data/interaction-prefs.svelte'
     import { openHelp } from '$lib/data/help.svelte'
-    import { CARD_SURFACE_STYLE } from '$lib/calc/result.styles'
+    import { CARD_SURFACE_STYLE } from '$lib/result/styles'
     import type { CharSlot } from '$lib/types/project'
     import type { RefLine } from '$lib/calc/timeline.types'
     import { joinStyle, mergeClass } from '$lib/utils/component-style'

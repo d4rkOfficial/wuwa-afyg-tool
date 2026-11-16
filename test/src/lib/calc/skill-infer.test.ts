@@ -1,5 +1,5 @@
 // 伤害类型自动推导回归测试：文案取自 nanoka 上游（嘉贝莉娜 / 景燃），覆盖「一份 desc 多段/多技能混排」的分段锚定。
-// 运行：node --import ./test/preload.mjs --test "test/src/lib/calc/skill-infer.test.ts"
+// 运行：node --import ./test/preload.mjs --test "test/src/coconut-core/engine/skill-infer.test.ts"
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { inferDamageTypes } from '$lib/calc/utils'
@@ -31,9 +31,7 @@ const buildEntry = (skillType: string, hitName: string): DamageEntry =>
         skillType,
         hitName,
         displayName: hitName,
-        isEffect: false,
-        isTuneBreak: false,
-        isTuneResponse: false,
+        formula: 'direct',
         ratioValue: 100,
         ratioUnit: '%',
         damageBaseType: '攻击',

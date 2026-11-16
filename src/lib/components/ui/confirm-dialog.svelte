@@ -12,7 +12,7 @@
     import type { Snippet } from 'svelte'
     import type { ComponentsProps } from '$lib/types'
     import Modal from '$lib/components/layout/modal.svelte'
-    import Button from '$lib/components/ui/button.svelte'
+    import Button from './button.svelte'
     import Icon from '@iconify/svelte'
     import { mergeClass } from '$lib/utils/component-style'
 

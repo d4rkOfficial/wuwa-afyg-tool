@@ -9,10 +9,10 @@
      */
     import { onMount } from 'svelte'
     import Icon from '@iconify/svelte'
-    import { getCharElementMap, getCharIconMap } from '$lib/calc/timeline.store.svelte'
+    import { getCharElementMap, getCharIconMap } from '$lib/project/timeline.store.svelte'
     import type { CharBuffAnalysis, CharSubstatAnalysis } from '$lib/calc/result.types'
     import type { CharSlot } from '$lib/types/project'
-    import type { AlgorithmId, AlgorithmInfo } from '$lib/calc/substat-algorithms/types'
+    import type { AlgorithmId, AlgorithmInfo } from '$lib/substat/types'
     import { fallbackIcon } from '$lib/utils/icons'
     import { mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'

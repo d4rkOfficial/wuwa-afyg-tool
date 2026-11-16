@@ -4,7 +4,7 @@
      *  - `?import_project=<工程 JSON 地址>`（浏览器 / 普通 iframe）；
      *  - 宿主在 `fast-calc:ready` 后发送 `{ type: 'fast-calc:load', project }`
      *    （wuwacalc-conv 报告页的本地重算走这条路径）。
-     *  页面上半部是角色 / 敌怪编辑，下半部是计算结果表格；计算全部走 `$lib/calc` 引擎，
+     *  页面上半部是角色 / 敌怪编辑，下半部是计算结果表格；计算全部走 `$coconut` 引擎，
      *  乘区列由 `ResultEntry.multiplierZones` 动态得出（引擎新增乘区会自动出现，页面不写死乘区清单）。
      *  计算完成后按旧协议回传 `fast-calc:result`，供 conv 报告页对齐逐技能差异。
      *
@@ -30,14 +30,15 @@
         type DamageTraceCtx,
         type TracePart
     } from '$lib/calc/damage-trace'
-    import { getAllDamageEntries, getCalcState, init as initCalculation } from '$lib/calc/calculation.store.svelte'
+    import { getAllDamageEntries, getCalcState, init as initCalculation } from '$lib/project/calculation.store.svelte'
     import type { CalcState } from '$lib/calc/calculation.types'
-    import { enemyDefenseForLevel } from '$lib/calc/config.consts'
+    import { enemyDefenseForLevel } from '$lib/project/config.consts'
     import type { ConfigState, EchoSlotConfig } from '$lib/calc/config.types'
     import type { ResultEntry } from '$lib/calc/result.types'
+    import { formatMultiplierDisplay } from '$lib/result/styles'
     import type { TimelineData } from '$lib/calc/timeline.types'
-    import { ensureSkillCache } from '$lib/calc/timeline.store.svelte'
-    import { ensureEchoSkillText } from '$lib/data/char-info.svelte'
+    import { ensureSkillCache } from '$lib/project/timeline.store.svelte'
+    import { ensureEchoSkillText, getEchoSkillText } from '$lib/data/char-info.svelte'
     import { ensureCharElements } from '$lib/data/char-elements.svelte'
     import type { CharSlot } from '$lib/types/project'
     import { ELEMENTS, ENEMY_TYPES, CHAIN_MAX, REFINE_MAX, type EnemyType } from '$lib/consts/game-terms'
@@ -339,7 +340,8 @@
                 project.team,
                 charInfoMap,
                 weaponInfoMap,
-                { chains: [...chains], refinements: [...refinements] }
+                { chains: [...chains], refinements: [...refinements] },
+                getEchoSkillText()
             )
             const computeMs = performance.now() - computeStarted
             baseResults = computed
@@ -401,7 +403,7 @@
             zones: entry.multiplierZones.map((zone) => ({
                 label: zone.label,
                 value: zone.value,
-                detail: zone.detail
+                detail: formatMultiplierDisplay(zone.value, zone.display)
             })),
             trace: traceOf(entry)
         })

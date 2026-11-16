@@ -3,6 +3,8 @@
 // 口径（见 docs/buff-engine.md「系数基类条目（处决 / 响应 / 效应）的双暴」）：
 // - 基准 0% / 100%（等价「额外暴击伤害 +0%」）：面板双暴（基础 5%/150%、声骸/武器副词条、转模引用）都不计入；
 // - 只有**绑定到该条目**的双暴 buff 参与暴击区 = 1 + 暴击率 × (暴击伤害 - 1)；
+//   这类条目的双暴是它自己临时的一份（`critBase: coefficient`），**追加 / 覆盖都直接生效**，
+//   只有引用写入被 `formulaAcceptsRef` 剔除；
 // - 暴击率为 0 ⇒ canCrit=false：结果页「暴击 / 不暴击」两列显示占位符、溯源不出「暴击区」段，期望 = 不暴击；
 // - 直伤（面板基类）口径不变，仍以 5%/150% + 装备双暴为基准。
 //
@@ -60,9 +62,7 @@ const effectEntry: DamageEntry = {
     id: 'eff',
     hitName: '光噪效应',
     displayName: '光噪效应3层',
-    isEffect: true,
-    isTuneBreak: false,
-    isTuneResponse: false,
+    formula: 'effect',
     ratioValue: 3,
     ratioUnit: '%',
     damageBaseType: '效应系数',
@@ -76,9 +76,7 @@ const tuneEntry: DamageEntry = {
     character: CHAR,
     hitName: '谐度破坏',
     displayName: '谐度破坏',
-    isEffect: false,
-    isTuneBreak: true,
-    isTuneResponse: false,
+    formula: 'tune',
     ratioValue: 1600,
     ratioUnit: '%',
     damageBaseType: '偏谐系数',
@@ -92,9 +90,7 @@ const directEntry: DamageEntry = {
     character: CHAR,
     hitName: '测试伤害',
     displayName: '测试伤害',
-    isEffect: false,
-    isTuneBreak: false,
-    isTuneResponse: false,
+    formula: 'direct',
     ratioValue: 100,
     ratioUnit: '%',
     damageBaseType: '攻击',
@@ -169,13 +165,13 @@ describe('系数基类（效应）：无 buff 时暴击率为 0，结果页两�
         assert.equal(critSegment, undefined, 'canCrit=false 时溯源不应出现暴击区段')
     })
 
-    it('追加型双暴 buff 不生效：暴击率仍为 0，期望 = 不暴击，溯源也不列它', () => {
+    it('追加型双暴 buff 直接生效：系数条目的双暴是它自己临时的一份', () => {
         const { result, critSegment } = run(effectEntry, [critBuff('all', 50, 50)])
-        assert.equal(result.canCrit, false, '追加不是「覆盖」⇒ 不生效，仍走占位符')
-        assert.equal(result.critRate, 0)
-        assert.equal(result.critDmg, 1, '追加的暴伤也不得进入')
-        assert.equal(result.nonCritPerHit, result.expectedPerHit)
-        assert.equal(critSegment, undefined, '既然不生效，溯源不得把这条 buff 列成暴击区来源')
+        assert.equal(result.canCrit, true, '追加写入生效 ⇒ 暴击率 > 0，可以暴击')
+        assert.equal(result.critRate, 0.5, '0% 基准 + 追加 50%')
+        assert.equal(result.critDmg, 1.5, '100% 基准 + 追加 50%')
+        near(result.expectedPerHit, result.nonCritPerHit * (1 + 0.5 * 0.5))
+        assert.equal(critSegment?.label, '暴击区', '溯源的暴击区要列出它')
     })
 
     it('只有「覆盖」型双暴才生效：暴击率 100% / 暴伤 200% → 每段 = 不暴击 ×2', () => {
@@ -219,12 +215,12 @@ describe('系数基类（处决/响应）：装备双暴不计入，双暴只有
         assert.equal(result.canCrit, false)
     })
 
-    it('追加型（同角色作用域）双暴 buff 同样不生效', () => {
+    it('追加型（同角色作用域）双暴 buff 同样直接生效', () => {
         const { result, critSegment } = run(tuneEntry, [critBuff([0], 30, 60)])
-        assert.equal(result.canCrit, false)
-        assert.equal(result.critRate, 0)
-        assert.equal(result.critDmg, 1)
-        assert.equal(critSegment, undefined)
+        assert.equal(result.canCrit, true)
+        assert.equal(result.critRate, 0.3)
+        assert.equal(result.critDmg, 1.6)
+        assert.equal(critSegment?.label, '暴击区')
     })
 
     it('覆盖型双暴生效', () => {

@@ -3,7 +3,7 @@
  *  登录态/暂存查询、有效性校验、Token 登录、Token 导出、声骸数据强制刷新、打开同步预览弹窗、退出登录。
  *  取数走本地暂存优先的策略（有缓存不打上游、刷新 5 分钟限流），工具保持同一口径。
  */
-import { defineTool } from '$lib/ai/tools/registry'
+import { defineTool } from './registry'
 import {
     getKuroActiveRole,
     getKuroReason,

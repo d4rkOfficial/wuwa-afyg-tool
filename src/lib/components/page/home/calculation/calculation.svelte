@@ -14,7 +14,7 @@
         getDamageTypesForEntry,
         init,
         getConditionProfile
-    } from '$lib/calc/calculation.store.svelte'
+    } from '$lib/project/calculation.store.svelte'
     import type { CharSlot } from '$lib/types/project'
     import type { TimelineData } from '$lib/calc/timeline.types'
     import type { CalcState } from '$lib/calc/calculation.types'

@@ -14,7 +14,7 @@
         redo as redoTimeline,
         canUndo as canUndoTimeline,
         canRedo as canRedoTimeline
-    } from '$lib/calc/timeline.store.svelte'
+    } from '$lib/project/timeline.store.svelte'
     import {
         setShowBuffModal,
         setShowDamageTypeModal,
@@ -23,7 +23,7 @@
         redoTable,
         canUndoTable,
         canRedoTable
-    } from '$lib/calc/calculation.store.svelte'
+    } from '$lib/project/calculation.store.svelte'
     import {
         getHeaderCompact,
         getScrollAxisDefault,

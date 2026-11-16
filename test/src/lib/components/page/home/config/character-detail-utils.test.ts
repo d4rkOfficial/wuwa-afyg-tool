@@ -9,7 +9,7 @@ import { beforeEach, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { computeCharStats } from '$lib/components/page/home/config/character-detail-utils'
-import { setConditionProfile } from '$lib/calc/calculation.store.svelte'
+import { setConditionProfile } from '$lib/project/calculation.store.svelte'
 import type { BuffInstance, BuffRule, CalcState } from '$lib/calc/calculation.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'

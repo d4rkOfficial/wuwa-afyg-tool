@@ -12,10 +12,10 @@
     import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
     import type { WeaponInfo } from '$lib/api/types'
     import { getWeaponInfo } from '$lib/api/data-cache'
-    import { buffLeafName } from '$lib/calc/buff-name'
+    import { buffLeafName } from '$lib/buff/name'
     import type { CharSlot } from '$lib/types/project'
     import type { ConditionProfile, RuleEvalDeps } from '$lib/calc/compute'
-    import type { PaneEffectSource } from '$lib/calc/pane-effects'
+    import type { PaneEffectSource } from '$lib/buff/pane-effects'
     import { createEntryRuleMatcher } from '$lib/calc/compute'
     import {
         applyIdsSelection,
@@ -52,11 +52,11 @@
         type RowData,
         type SourceEntryGroup
     } from './spread-table.utils'
-    import { getCalcElementMap, getPaneEffectSources, getBuffTree } from '$lib/calc/calculation.store.svelte'
-    import { getConfig } from '$lib/calc/config.store.svelte'
-    import { getRefLines, getOpBlocks } from '$lib/calc/timeline.store.svelte'
-    import { storedColumnLayout } from '$lib/calc/buff-tree-state'
-    import { elementColor, getCharIconMap } from '$lib/calc/timeline.store.svelte'
+    import { getCalcElementMap, getPaneEffectSources, getBuffTree } from '$lib/project/calculation.store.svelte'
+    import { getConfig } from '$lib/project/config.store.svelte'
+    import { getRefLines, getOpBlocks } from '$lib/project/timeline.store.svelte'
+    import { storedColumnLayout } from '$lib/buff/tree-state'
+    import { elementColor, getCharIconMap } from '$lib/project/timeline.store.svelte'
     import {
         getHeaderCompact,
         getScrollAxisDefault,

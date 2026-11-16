@@ -9,7 +9,7 @@ import {
     SUBSTAT_DECIMAL_TO_PCT
 } from '$lib/consts/game-terms'
 import { SECOND_MAIN_STAT } from '$lib/consts/stat-data'
-import { getConditionProfile } from '$lib/calc/calculation.store.svelte'
+import { getConditionProfile } from '$lib/project/calculation.store.svelte'
 import { buffRulesMet } from '$lib/calc/compute'
 
 export interface CharStats {

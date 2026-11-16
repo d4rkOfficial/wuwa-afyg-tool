@@ -28,7 +28,7 @@
         isActiveRefOwner,
         sanitizeRefOwner,
         type LibraryRefOwner
-    } from '$lib/calc/buff-library-condition'
+    } from '$lib/buff/library-condition'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import { mergeClass } from '$lib/utils/component-style'
     import { simplifyPct } from './buff-entity-utils'

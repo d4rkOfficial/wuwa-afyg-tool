@@ -5,7 +5,7 @@
 //    唯一的刹车是用户按停止（`options.signal`）——需要中止时一律抛 AiClientError('aborted')。
 // 2. **实时上报生成情况**：每一轮请求、每一次工具调用、每一段流式正文/思考都经 `onEvent` 抛出，
 //    界面据此把「正在做什么」画在生成任务那一行上（不是等结束才一次性给结果）。
-import { AiClientError, chatCompletionStream, type ChatMessage } from '../client'
+import { AiClientError, chatCompletionStream, type ChatMessage } from '$lib/ai/client'
 import {
     executeGenerateTool,
     ENTITY_TYPES,

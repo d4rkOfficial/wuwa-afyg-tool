@@ -44,11 +44,11 @@
         setBlockKey,
         getBlockKeyPickerId,
         setBlockKeyPickerId
-    } from '$lib/calc/timeline.store.svelte'
+    } from '$lib/project/timeline.store.svelte'
     import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
     import { getSimplifyContextMenu } from '$lib/data/context-menu-prefs.svelte'
-    import { remapDuplicatedDamageBuffs } from '$lib/calc/calculation.store.svelte'
-    import { ORIGINAL_BUTTON_KEYS, BUTTON_KEY_LABELS, GAMEPAD_BUTTONS } from '$lib/calc/timeline.consts'
+    import { remapDuplicatedDamageBuffs } from '$lib/project/calculation.store.svelte'
+    import { ORIGINAL_BUTTON_KEYS, BUTTON_KEY_LABELS, GAMEPAD_BUTTONS } from '$lib/timeline/consts'
     import { getKeyMapEntries, getDefaultBlockKey } from '$lib/data/keymap.svelte'
 
     let confirmMultiAction = $state<'delete' | 'reset' | null>(null)

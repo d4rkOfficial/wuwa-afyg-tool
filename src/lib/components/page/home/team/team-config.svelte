@@ -16,9 +16,9 @@
         getWeaponTypeIcons
     } from '$lib/api/data-cache'
     import { fetchApiJson } from '$lib/api/local-api'
-    import CharacterPicker from './pickers/character-picker.svelte'
-    import WeaponPicker from './pickers/weapon-picker.svelte'
-    import EchoPicker from './pickers/echo-picker.svelte'
+    import CharacterPicker from '$lib/components/page/home/team/pickers/character-picker.svelte'
+    import WeaponPicker from '$lib/components/page/home/team/pickers/weapon-picker.svelte'
+    import EchoPicker from '$lib/components/page/home/team/pickers/echo-picker.svelte'
     import SetPicker from '$lib/components/page/home/team/pickers/set-picker.svelte'
     import { fallbackIcon } from '$lib/utils/icons'
     import { HECATE_ECHO } from '$lib/consts/game-terms'

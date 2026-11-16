@@ -4,7 +4,7 @@
  */
 
 import type { BuffInstance, BuffTreeNode, BuffTreeState, CalcState } from '$lib/calc/calculation.types'
-import { BUFF_PATH_SEP, joinBuffPath, splitBuffPath } from '$lib/calc/buff-name'
+import { BUFF_PATH_SEP, joinBuffPath, splitBuffPath } from '$lib/buff/name'
 import {
     characterBodyFolderName,
     characterChainFolderName,
@@ -12,7 +12,7 @@ import {
     characterSetFolderName,
     characterWeaponFolderName,
     normalizeBuffTree
-} from '$lib/calc/buff-tree-state'
+} from '$lib/buff/tree-state'
 import type { CharSlot } from '$lib/types/project'
 
 // ── Buff 文件夹命名迁移：旧「角色名本体 / 角色名2链 / 角色名的武器」→ 新「角色名-本体 / 角色名-2链 / 角色名-武器名」──

@@ -5,7 +5,7 @@
  * 非 Buff 来源（角色 / 武器 / 声骸 / 敌方）没有文件夹，直接作为顶层行。
  */
 
-import { BUFF_PATH_SEP, splitBuffPath } from '$lib/calc/buff-name'
+import { BUFF_PATH_SEP, splitBuffPath } from '$lib/buff/name'
 import type { TracePart } from '$lib/calc/damage-trace'
 
 interface TraceRowBase {

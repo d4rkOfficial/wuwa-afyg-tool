@@ -1,5 +1,5 @@
 import { browser } from '$app/environment'
-import type { KuroCharacterEchoes } from '$lib/kuro-app/kuro.svelte'
+import type { KuroCharacterEchoes } from './kuro.svelte'
 
 /**
  * @desc 角色声骸数据的本地暂存（避免反复打上游被风控）：

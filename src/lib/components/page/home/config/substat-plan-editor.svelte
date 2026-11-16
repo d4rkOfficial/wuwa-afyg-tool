@@ -9,9 +9,9 @@
     import Button from '$lib/components/ui/button.svelte'
     import SubstatPickerModal from './substat-picker-modal.svelte'
     import MainStatPickerModal from './main-stat-picker-modal.svelte'
-    import RandomEnhanceModal from '$lib/components/page/home/config/random-enhance-modal.svelte'
+    import RandomEnhanceModal from './random-enhance-modal.svelte'
     import { SECOND_MAIN_STAT, SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
-    import { cloneSlots, planSubstatTotal, STANDARD_SUBSTAT_TOTAL } from '$lib/calc/standard-substats'
+    import { cloneSlots, planSubstatTotal, STANDARD_SUBSTAT_TOTAL } from '$lib/substat/standard'
 
     interface Props extends ComponentsProps {
         initialSlots: EchoSlotConfig[]

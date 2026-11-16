@@ -12,7 +12,7 @@ import {
     type BuffLibraryScope as BuffSetScope
 } from '$lib/data/buff-library.svelte'
 import { ZONE_NO_REF_IDS } from '$lib/calc/calculation.consts'
-import { buffFolderPath, buffLeafName, joinBuffPath, sanitizeLeafName } from '$lib/calc/buff-name'
+import { buffFolderPath, buffLeafName, joinBuffPath, sanitizeLeafName } from '$lib/buff/name'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 const SCOPES: BuffSetScope[] = ['self', 'self_except', 'team', 'team_only', 'effect_only']

@@ -161,9 +161,9 @@ describe('v4 → v5：「备注即重击」的普攻块升级为独立重击块'
         assert.equal(viewTimeline.opBlocks[0].desc, '')
     })
 
-    it('版本号提升到当前版本（9）', () => {
+    it('版本号提升到当前版本（10）', () => {
         const project = migrateProject(v4Project([block('b1', 'MouseLeft', '重击')]))
-        assert.equal(PROJECT_VERSION, 9)
+        assert.equal(PROJECT_VERSION, 10)
         assert.equal(project.version, PROJECT_VERSION)
     })
 

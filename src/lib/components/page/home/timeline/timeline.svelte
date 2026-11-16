@@ -88,9 +88,9 @@
         applySkillHits,
         applyNonDirectEntries,
         setQuickCharIndex
-    } from '$lib/calc/timeline.store.svelte'
-    import { remapDuplicatedDamageBuffs } from '$lib/calc/calculation.store.svelte'
-    import { SIDE_PAD, NON_DIRECT_ELEMENT, TRACK_COLORS, GAMEPAD_BUTTONS } from '$lib/calc/timeline.consts'
+    } from '$lib/project/timeline.store.svelte'
+    import { remapDuplicatedDamageBuffs } from '$lib/project/calculation.store.svelte'
+    import { SIDE_PAD, NON_DIRECT_ELEMENT, TRACK_COLORS, GAMEPAD_BUTTONS } from '$lib/timeline/consts'
     import type { OpBlock, DamageBlock } from '$lib/calc/timeline.types'
     import ContextMenu from './timeline-menus.svelte'
     import SkillPicker from './skill-picker.svelte'

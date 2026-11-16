@@ -14,7 +14,7 @@ import { resolveAiConfig, type ResolvedAiConfig } from './session-overrides.svel
 import { toReasoningEffort } from './thinking'
 import { hasImageAttachments, toResponseContentParts } from './image-parts'
 import { ABORTED_TOOL_OUTPUT, raceWithAbort } from './abort'
-import { runInSandbox } from './sandbox/runner'
+import { runInSandbox } from '$lib/ai/sandbox/runner'
 import { getGenPrefs, loadGenPrefs } from '$lib/data/ai-prefs.svelte'
 import { drainChanges, renderChangesForPrompt } from './change-queue.svelte'
 import { getSkills, loadSkills, renderActiveSkillListing, renderPassiveSkillsPrompt } from '$lib/data/ai-skills.svelte'

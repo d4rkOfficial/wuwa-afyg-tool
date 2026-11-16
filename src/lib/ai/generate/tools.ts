@@ -11,7 +11,7 @@ import {
 import { ApiError, fetchApiJson } from '$lib/api/local-api'
 import { providerQuery } from '$lib/api/provider'
 import { getBuffEntities } from '$lib/data/buff-library.svelte'
-import { getAllBuffConfs } from '$lib/calc/calculation.store.svelte'
+import { getAllBuffConfs } from '$lib/project/calculation.store.svelte'
 import { ZONE_DEFS, ZONE_MAP, ZONE_REF_DEFS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
 import { normalizeRules, rulesFromLegacyCondition, type LegacyGateCondition } from '$lib/calc/rules'
 import { EFFECTS_TEXT, SCOPE_RULES_TEXT, EXAMPLES_TEXT, REF_RULES_TEXT } from './prompts.config'

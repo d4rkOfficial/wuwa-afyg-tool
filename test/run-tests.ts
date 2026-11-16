@@ -7,7 +7,7 @@
  *   pnpm test:one calc                      # 等价于上面那条（只跑路径含 "calc" 的测试文件）
  *   pnpm test:list                          # 只列出会被跑到的文件，不执行
  * 单个文件直接跑：
- *   node --import ./test/preload-runes.mjs --import ./test/preload.mjs test/test/src/lib/calc/coeff-crit.test.ts
+ *   node --import ./test/preload-runes.mjs --import ./test/preload.mjs test/test/src/coconut-core/engine/coeff-crit.test.ts
  *
  * 不用 `node --test` 的原因：本环境禁止子进程，`--test` 会按文件 spawn 子进程直接失败；
  * 因此走「同进程内逐个 import」，`describe` / `it` 在 import 时注册、由 `node:test` 汇总。

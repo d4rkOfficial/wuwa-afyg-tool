@@ -1,9 +1,9 @@
 // AI 工具注册表（独立于各领域工具，避免循环依赖）：schema 定义 + 执行器
-import type { ChatToolCall } from '../client'
+import type { ChatToolCall } from '$lib/ai/client'
 import type { AskUserFn } from './ask-user.types'
 import type { WebFetchFn } from './web-fetch.types'
-import type { RunScriptFn } from '../sandbox/protocol'
-import type { GenerateEvent } from '../generate'
+import type { RunScriptFn } from '$lib/ai/sandbox/protocol'
+import type { GenerateEvent } from '$lib/ai/generate'
 import { assertPhaseEditable, type GuardedPhase } from './phase-guard'
 
 export interface ToolDefinition {

@@ -8,7 +8,7 @@ import {
 } from '$lib/calc/calculation.consts'
 import { ELEMENTS, DAMAGE_TYPES } from '$lib/consts/game-terms'
 import { CHAIN_MAX, REFINE_MAX } from '$lib/data/buff-library.svelte'
-import { sanitizeLeafName } from '$lib/calc/buff-name'
+import { sanitizeLeafName } from '$lib/buff/name'
 import type { BuffCondition } from '$lib/calc/calculation.types'
 import { normalizeRules, type LegacyGateCondition } from '$lib/calc/rules'
 

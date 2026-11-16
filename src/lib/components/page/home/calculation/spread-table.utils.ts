@@ -11,7 +11,7 @@
  */
 import { LAYERED_BUFF_PATTERN, LAYERED_BUFF_VAR } from '$lib/calc/calculation.consts'
 import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
-import type { PaneEffectSource } from '$lib/calc/pane-effects'
+import type { PaneEffectSource } from '$lib/buff/pane-effects'
 import type { CharSlot } from '$lib/types/project'
 import { entryCharIdx, isNonDirectDamage, zoneLabelsOf } from './damage-table.utils'
 

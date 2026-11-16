@@ -2,26 +2,26 @@
 import { tick } from 'svelte'
 import { defineTool } from './registry'
 import { summarizeDamageByCharacter } from '$lib/ai/result-summary'
-import { computeAll } from '$lib/calc/compute'
+import { computeAllCore as computeAll } from '$lib/calc/compute-facade'
 import {
     getAllDamageEntries,
     getCalcState,
     getConditionProfile,
     buildDamageEntriesFromTimeline
-} from '$lib/calc/calculation.store.svelte'
-import { getConfig } from '$lib/calc/config.store.svelte'
-import { defaultConfig } from '$lib/calc/config.consts'
+} from '$lib/project/calculation.store.svelte'
+import { getConfig } from '$lib/project/config.store.svelte'
+import { defaultConfig } from '$lib/project/config.consts'
 import { buildDamageSegments, type DamageTraceCtx } from '$lib/calc/damage-trace'
 import { aggregateDirectDamageByType } from '$lib/calc/utils'
-import { ALGORITHMS_INFO } from '$lib/calc/substat-algorithms'
-import type { AlgorithmId } from '$lib/calc/substat-algorithms/types'
-import { runContributionAnalysis, type ContributionAnalysisRequest } from '$lib/calc/substat-algorithms/analysis'
+import { ALGORITHMS_INFO } from '$lib/substat'
+import type { AlgorithmId } from '$lib/substat/types'
+import { runContributionAnalysis, type ContributionAnalysisRequest } from '$lib/substat/analysis'
 import type { ResultEntry, CharSubstatAnalysis } from '$lib/calc/result.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import { getActiveProject, getProjects } from '$lib/data/project.svelte'
 import { getCharacterInfo, getWeaponInfo } from '$lib/api/data-cache'
 import { ensureEchoSkillText, getEchoSkillText } from '$lib/data/char-info.svelte'
-import { getRefLines, getOpBlocks, loadCharSkills } from '$lib/calc/timeline.store.svelte'
+import { getRefLines, getOpBlocks, loadCharSkills } from '$lib/project/timeline.store.svelte'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 
@@ -95,7 +95,8 @@ async function buildComputeContext(projectId?: string): Promise<{
         p.team,
         charInfoMap,
         weaponInfoMap,
-        conditionProfile
+        conditionProfile,
+        getEchoSkillText()
     )
     return {
         entries,

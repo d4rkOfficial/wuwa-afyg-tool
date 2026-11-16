@@ -16,8 +16,9 @@
     import type { ComponentsProps } from '$lib/types'
     import type { CharSlot } from '$lib/types/project'
     import type { BuffCondition, BuffConf, BuffRule, BuffZoneValue } from '$lib/calc/calculation.types'
-    import { buffLeafName } from '$lib/calc/buff-name'
+    import { buffLeafName } from '$lib/buff/name'
     import { ZONE_MAP, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
+    import { actionAllowsCondition } from '$lib/calc/core-config'
     import { describeCondition, describeZoneConditionBadge } from '$lib/calc/condition'
     import { describeRules } from '$lib/calc/rules'
     import { fallbackIcon } from '$lib/utils/icons'
@@ -369,25 +370,27 @@
                                 引用
                             </button>
                         {/if}
-                        <!-- @desc 乘区级生效条件（行内下拉展开）：伤害类型 / 伤害属性 -->
-                        <button
-                            onclick={() => ontogglezonecond(zoneIndex)}
-                            class={[
-                                'shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
-                                zone.condition
-                                    ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
-                                    : 'border-transparent text-(--theme-modal-text)/30 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/60'
-                            ].join(' ')}
-                            title={zone.condition
-                                ? `该乘区条件：${describeCondition(zone.condition)}`
-                                : '为该乘区设置生效条件（伤害类型/属性）'}
-                        >
-                            <Icon
-                                icon={expandedZoneIndex === zoneIndex ? 'mdi:chevron-up' : 'mdi:filter-outline'}
-                                class="size-3"
-                            />
-                            条件
-                        </button>
+                        <!-- @desc 乘区级生效条件（行内下拉展开）：只有能挂条件的作用才给入口 -->
+                        {#if actionAllowsCondition(zone.zoneId)}
+                            <button
+                                onclick={() => ontogglezonecond(zoneIndex)}
+                                class={[
+                                    'shrink-0 rounded-none border px-1.5 py-0.5 text-[10px] transition-colors flex items-center gap-0.5',
+                                    zone.condition
+                                        ? 'border-(--theme-accent-bg) text-(--theme-accent-text)'
+                                        : 'border-transparent text-(--theme-modal-text)/30 hover:border-(--theme-divider-border) hover:text-(--theme-modal-text)/60'
+                                ].join(' ')}
+                                title={zone.condition
+                                    ? `该乘区条件：${describeCondition(zone.condition)}`
+                                    : '为该乘区设置生效条件（伤害类型/属性）'}
+                            >
+                                <Icon
+                                    icon={expandedZoneIndex === zoneIndex ? 'mdi:chevron-up' : 'mdi:filter-outline'}
+                                    class="size-3"
+                                />
+                                条件
+                            </button>
+                        {/if}
                         <button
                             onclick={() => onremovezone(zoneIndex)}
                             class="shrink-0 rounded-none border border-transparent px-1 py-0.5 text-[10px] text-(--theme-modal-text)/30 transition-colors hover:border-red-500/40 hover:text-red-500"
@@ -396,7 +399,7 @@
                             <Icon icon="mdi:close" class="size-3" />
                         </button>
                     </div>
-                    {#if expandedZoneIndex === zoneIndex}
+                    {#if expandedZoneIndex === zoneIndex && actionAllowsCondition(zone.zoneId)}
                         <ZoneConditionPanel
                             condition={zone.condition}
                             onchange={(next) => onzonecondchange(zoneIndex, next)}

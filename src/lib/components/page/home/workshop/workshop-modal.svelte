@@ -13,7 +13,7 @@
         SHARE_SORT_LABELS,
         type ShareProject
     } from '$lib/data/share.svelte'
-    import { getCharIconMap, getCharElementMap } from '$lib/calc/timeline.store.svelte'
+    import { getCharIconMap, getCharElementMap } from '$lib/project/timeline.store.svelte'
     import { fillCharElementsFromList } from '$lib/data/char-elements.svelte'
     import { addToast } from '$lib/data/toast.svelte'
     import { mergeComponentsStyle } from '$lib/utils/component-style'

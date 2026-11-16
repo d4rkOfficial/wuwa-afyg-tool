@@ -32,12 +32,12 @@
         getCalcState,
         restoreCalcSnapshot,
         setShowBuffModal
-    } from '$lib/calc/calculation.store.svelte'
+    } from '$lib/project/calculation.store.svelte'
     import { ZONE_REF_DEFS } from '$lib/calc/calculation.consts'
     import type { GroupedBuffConfItem } from '$lib/calc/calculation.consts'
-    import { buildStoredBuffTree } from '$lib/calc/buff-tree'
-    import { findBuffPlacement, findNode } from '$lib/calc/buff-tree-state'
-    import { buffLeafName } from '$lib/calc/buff-name'
+    import { buildStoredBuffTree } from '$lib/buff/tree'
+    import { findBuffPlacement, findNode } from '$lib/buff/tree-state'
+    import { buffLeafName } from '$lib/buff/name'
     import type { CharSlot } from '$lib/types/project'
     import type {
         BuffRule,
@@ -51,7 +51,7 @@
     import { slide } from 'svelte/transition'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import type { BuffEditorTab } from './buff-modal-editor.svelte'
-    import { getCharIconMap, elementColor, getLocked } from '$lib/calc/timeline.store.svelte'
+    import { getCharIconMap, elementColor, getLocked } from '$lib/project/timeline.store.svelte'
     import { getWeaponIcons } from '$lib/api/data-cache'
     import { addToast } from '$lib/data/toast.svelte'
     import Icon from '@iconify/svelte'

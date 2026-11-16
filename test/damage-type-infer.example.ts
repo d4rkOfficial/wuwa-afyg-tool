@@ -5,7 +5,7 @@
 //   node --import ./test/preload.mjs test/damage-type-infer.example.ts
 //   （或复制后改上面这条路径 / 用 pnpm run test:infer）
 //
-// TDD 顺序：先写期望值 → 跑（红）→ 改推导算法（src/lib/calc/skill-infer.ts）→ 再跑（绿）。
+// TDD 顺序：先写期望值 → 跑（红）→ 改推导算法（src/coconut-core/engine/skill-infer.ts）→ 再跑（绿）。
 // 绝不要为了让用例变绿而改期望值；期望值只能来自游戏内伤害类型判定或文案明写。
 // 完整算法与流程见 docs/damage-type-inference.md。
 

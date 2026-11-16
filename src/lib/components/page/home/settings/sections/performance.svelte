@@ -22,7 +22,7 @@
     } from '$lib/data/render-prefs.svelte'
     import { mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'
-    import { ROW_TABS, TAB_ACCENT, pair, segBool, segValue } from '../utils'
+    import { ROW_TABS, TAB_ACCENT, pair, segBool, segValue } from '$lib/components/page/home/settings/utils'
 
     interface Props extends ComponentsProps {}
     let { class: className, style: styleProp }: Props = $props()

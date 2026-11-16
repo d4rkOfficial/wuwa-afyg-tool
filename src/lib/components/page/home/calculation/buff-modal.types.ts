@@ -5,7 +5,7 @@
  * 外壳自身的 props 直接写在其内部的 `interface Props extends ComponentsProps`（闸门 ① 要求），
  * 故此处不重复一份 `BuffModalProps`。
  */
-import type { BuffTreeNode } from '$lib/calc/buff-tree'
+import type { BuffTreeNode } from '$lib/buff/tree'
 
 /** @desc 左栏列表的三级归类树（由 `buildBuffTree` 派生，随 buffSets / 队伍变化） */
 export interface BuffTree {

@@ -9,7 +9,7 @@ import '$lib/ai/tools/panels'
 import '$lib/ai/tools/ask-user'
 import { registerPanel, unregisterPanel } from '$lib/ai/panels.svelte'
 import { createProjectData, __seedProjectsForTest, getActiveProject } from '$lib/data/project.svelte'
-import { init, getAllBuffConfs } from '$lib/calc/calculation.store.svelte'
+import { init, getAllBuffConfs } from '$lib/project/calculation.store.svelte'
 import { updateEntityBuffs, getBuffEntities } from '$lib/data/buff-library.svelte'
 import {
     createBuffSetDataSource,

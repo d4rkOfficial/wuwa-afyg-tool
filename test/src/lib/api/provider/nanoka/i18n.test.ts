@@ -18,7 +18,7 @@ import {
     transformWeaponInfo
 } from '$lib/api/provider/nanoka/utils'
 import type { ZhCharacterDetail, ZhEchoDetail, ZhSonataDetail, ZhWeaponDetail } from '$lib/api/provider/nanoka/types'
-import { characterDetail, echoDetail, sonataDetail, weaponDetail } from './__fixtures__.ts'
+import { characterDetail, echoDetail, sonataDetail, weaponDetail } from './__fixtures__'
 
 const localizedCharacter: ZhCharacterDetail = {
     ...characterDetail,

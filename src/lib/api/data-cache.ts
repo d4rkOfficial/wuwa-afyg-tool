@@ -1,17 +1,8 @@
 import { browser } from '$app/environment'
-import { DATA_CDN_CACHE_NAME } from '$lib/api/consts'
-import { fetchApiJson } from '$lib/api/local-api'
-import { getCurrentProviderId as getProviderId, providerQuery } from '$lib/api/provider'
-import type {
-    Character,
-    Weapon,
-    Echo,
-    EchoSetItem,
-    CharacterInfo,
-    WeaponInfo,
-    EchoInfo,
-    EchoSetInfo
-} from '$lib/api/types'
+import { DATA_CDN_CACHE_NAME } from './consts'
+import { fetchApiJson } from './local-api'
+import { getCurrentProviderId as getProviderId, providerQuery } from './provider'
+import type { Character, Weapon, Echo, EchoSetItem, CharacterInfo, WeaponInfo, EchoInfo, EchoSetInfo } from './types'
 
 const PREFIX = 'wuwa-afyg:v2:'
 const LIST_TTL = 7 * 24 * 60 * 60 * 1000

@@ -19,6 +19,7 @@
     import ZoneConditionPanel from './zone-condition-panel.svelte'
     import BuffModalRules from './buff-modal-rules.svelte'
     import { ZONE_MAP, ZONE_NO_OVERRIDE_IDS, ZONE_NO_REF_IDS, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
+    import { actionAllowsCondition } from '$lib/calc/core-config'
     import type { BuffLibraryBuff, BuffLibraryScope } from '$lib/data/buff-library.svelte'
     import type { BuffRule } from '$lib/calc/calculation.types'
     import {
@@ -26,7 +27,7 @@
         LIBRARY_ZONE_COMPARE_OPTIONS,
         describeLibraryRules,
         isActiveRefOwner
-    } from '$lib/calc/buff-library-condition'
+    } from '$lib/buff/library-condition'
     import BuffPathInput from './buff-path-input.svelte'
     import { describeCondition, describeZoneConditionBadge } from '$lib/calc/condition'
     import { joinStyle, mergeClass } from '$lib/utils/component-style'
@@ -290,16 +291,18 @@
                                     z.ref ? '已引用' : '引用'
                                 )}
                             {/if}
-                            <!-- 乘区级生效条件（行内下拉展开）：伤害类型 / 伤害属性 -->
-                            {@render zoneToggleBtn(
-                                !!z.condition,
-                                () => (expandedZoneIdx = expandedZoneIdx === zoneIndex ? null : zoneIndex),
-                                z.condition
-                                    ? `该乘区条件：${describeCondition(z.condition)}`
-                                    : '为该乘区设置生效条件（伤害类型/属性）',
-                                expandedZoneIdx === zoneIndex ? 'mdi:chevron-up' : 'mdi:filter-outline',
-                                '条件'
-                            )}
+                            <!-- 乘区级生效条件（行内下拉展开）：只有能挂条件的作用才给入口 -->
+                            {#if actionAllowsCondition(z.zoneId)}
+                                {@render zoneToggleBtn(
+                                    !!z.condition,
+                                    () => (expandedZoneIdx = expandedZoneIdx === zoneIndex ? null : zoneIndex),
+                                    z.condition
+                                        ? `该乘区条件：${describeCondition(z.condition)}`
+                                        : '为该乘区设置生效条件（伤害类型/属性）',
+                                    expandedZoneIdx === zoneIndex ? 'mdi:chevron-up' : 'mdi:filter-outline',
+                                    '条件'
+                                )}
+                            {/if}
                             <!-- 移除该乘区条目（同名乘区可添加多个，逐个移除） -->
                             <button
                                 onclick={() => onRemoveZone?.(zoneIndex)}
@@ -309,7 +312,7 @@
                                 <Icon icon="mdi:close" class="size-3" />
                             </button>
                         </div>
-                        {#if expandedZoneIdx === zoneIndex}
+                        {#if expandedZoneIdx === zoneIndex && actionAllowsCondition(z.zoneId)}
                             <ZoneConditionPanel
                                 condition={z.condition}
                                 onchange={(next) => onPatchZone?.(zoneIndex, { condition: next ?? undefined })}

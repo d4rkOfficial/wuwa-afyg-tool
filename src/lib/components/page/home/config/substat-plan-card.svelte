@@ -9,7 +9,7 @@
     import type { Snippet } from 'svelte'
     import type { ComponentsProps } from '$lib/types'
     import type { EchoSlotConfig } from '$lib/calc/config.types'
-    import { planSubstatTotal } from '$lib/calc/standard-substats'
+    import { planSubstatTotal } from '$lib/substat/standard'
     import { abbrevMainStat, abbrevSubstat } from '$lib/utils/substat-abbrev'
 
     interface Props extends ComponentsProps {

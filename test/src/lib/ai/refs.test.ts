@@ -20,9 +20,9 @@ import {
     resolveRefLine
 } from '$lib/ai/refs'
 import { shortKeyOf } from '$lib/ai/short-key'
-import { init as initTimeline, setOpBlockPos } from '$lib/calc/timeline.store.svelte'
+import { init as initTimeline, setOpBlockPos } from '$lib/project/timeline.store.svelte'
 import { createProjectData, __seedProjectsForTest } from '$lib/data/project.svelte'
-import { init as initCalculation, getAllBuffConfs, createBuffSet } from '$lib/calc/calculation.store.svelte'
+import { init as initCalculation, getAllBuffConfs, createBuffSet } from '$lib/project/calculation.store.svelte'
 import type { CharSlot } from '$lib/types/project'
 import type { TimelineData } from '$lib/calc/timeline.types'
 

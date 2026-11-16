@@ -8,7 +8,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { classifyBuffScope } from '$lib/calc/calculation.consts'
-import { pruneEmptyFolders } from '$lib/calc/buff-tree-state'
+import { pruneEmptyFolders } from '$lib/buff/tree-state'
 import type { BuffConf, BuffTreeState } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 import {

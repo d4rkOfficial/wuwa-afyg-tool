@@ -135,9 +135,7 @@ const buildEntry = (
     skillType,
     hitName: ratioName,
     displayName: ratioName,
-    isEffect,
-    isTuneBreak: false,
-    isTuneResponse: false,
+    formula: isEffect ? 'effect' : 'direct',
     ratioValue: 100,
     ratioUnit: '%',
     damageBaseType: '攻击',
@@ -225,7 +223,7 @@ export const assertCorrectDamageTypeInfer = async (
         expectedDamageType,
         `伤害类型推导不符：角色「${characterName}」倍率「${ratioName}」（技能节点：${outcome.skillType}）` +
             `\n期望：${expectedDamageType}\n实际：${outcome.actualDamageType}${note}` +
-            `\n排查：src/lib/calc/skill-infer.ts；用 dumpRatioContext('${characterName}', '${ratioName}') 看文案落在哪个大标题小节`
+            `\n排查：src/coconut-core/engine/skill-infer.ts；用 dumpRatioContext('${characterName}', '${ratioName}') 看文案落在哪个大标题小节`
     )
 }
 
@@ -264,7 +262,7 @@ export const reportDamageTypeInfer = async (cases: readonly InferCase[], title =
     if (failures.length > 0) {
         throw new Error(
             `${title}：${failures.length}/${cases.length} 条失败\n${failures.join('\n')}` +
-                `\n排查：src/lib/calc/skill-infer.ts（规则2 文案定位 / 规则1 名称前缀 / 技能类型兜底）`
+                `\n排查：src/coconut-core/engine/skill-infer.ts（规则2 文案定位 / 规则1 名称前缀 / 技能类型兜底）`
         )
     }
 }

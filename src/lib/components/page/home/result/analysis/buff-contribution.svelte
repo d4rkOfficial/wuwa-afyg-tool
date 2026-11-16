@@ -12,9 +12,9 @@
      */
     import Icon from '@iconify/svelte'
     import { openHelp } from '$lib/data/help.svelte'
-    import { BUFF_ALGORITHM_HELP } from '$lib/calc/result.consts'
-    import { BUFF_PATH_SEP } from '$lib/calc/buff-name'
-    import { CARD_SURFACE_STYLE, SECTION_LABEL, STAT_VALUE_SM } from '$lib/calc/result.styles'
+    import { BUFF_ALGORITHM_HELP } from '$lib/result/consts'
+    import { BUFF_PATH_SEP } from '$lib/buff/name'
+    import { CARD_SURFACE_STYLE, SECTION_LABEL, STAT_VALUE_SM } from '$lib/result/styles'
     import type { CharBuffAnalysis } from '$lib/calc/result.types'
     import { joinStyle, mergeClass } from '$lib/utils/component-style'
     import type { ComponentsProps } from '$lib/types'

@@ -7,8 +7,8 @@
      */
     import { onMount, untrack } from 'svelte'
     import Icon from '@iconify/svelte'
-    import { CARD_SURFACE_STYLE } from '$lib/calc/result.styles'
-    import { COMPARISON_PALETTE } from '$lib/calc/comparison'
+    import { CARD_SURFACE_STYLE } from '$lib/result/styles'
+    import { COMPARISON_PALETTE } from '$lib/result/comparison'
     import { aggregateDirectDamageByType } from '$lib/calc/utils'
     import type { ResultEntry } from '$lib/calc/result.types'
     import { joinStyle, mergeClass } from '$lib/utils/component-style'

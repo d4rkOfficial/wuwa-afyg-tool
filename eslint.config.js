@@ -81,7 +81,7 @@ export default tseslint.config(
     {
         name: 'functional-preference / pure-logic layer',
         files: [
-            'src/lib/calc/**/*.ts',
+            'src/coconut-core/engine/**/*.ts',
             'src/lib/api/**/*.ts',
             'src/lib/utils/**/*.ts',
             'src/lib/consts/**/*.ts',

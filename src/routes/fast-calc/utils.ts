@@ -1,7 +1,8 @@
-import { defaultEnemy } from '$lib/calc/config.consts'
+import { defaultEnemy } from '$lib/project/config.consts'
 import type { CharEchoConfig, ConfigState, EchoSlotConfig } from '$lib/calc/config.types'
-import { autoConfigureTimings } from '$lib/calc/ref-line-timing'
+import { autoConfigureTimings } from '$lib/timeline/ref-line-timing'
 import type { ResultEntry } from '$lib/calc/result.types'
+import { formatMultiplierDisplay } from '$lib/result/styles'
 import { ECHO_SLOT_COUNT } from '$lib/consts/game-terms'
 import { MAIN_STAT_POOL, SECOND_MAIN_STAT, SUBSTAT_MAX, SUBSTAT_OPTIONS } from '$lib/consts/stat-data'
 import type { EchoStat } from '$lib/types/game-data'
@@ -249,5 +250,5 @@ export const zoneColumnsOf = (entries: ResultEntry[]): string[] => {
 
 export const zoneValueOf = (entry: ResultEntry, label: string): { value: number; detail: string } | null => {
     const zone = entry.multiplierZones.find((item) => item.label === label)
-    return zone ? { value: zone.value, detail: zone.detail } : null
+    return zone ? { value: zone.value, detail: formatMultiplierDisplay(zone.value, zone.display) } : null
 }

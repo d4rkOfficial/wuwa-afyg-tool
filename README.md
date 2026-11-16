@@ -26,11 +26,24 @@
 
 **椰果工具箱的功能**：把一名角色的整场战斗拆成「队伍 → 排轴 → 拉表 → 词条/环境配置 → 结果」五步，逐段配置伤害与 Buff，算清楚每一段伤害是怎么来的、DPS 是多少、哪个词条更值，并把整套配置保存为可分享、可对比的工程。
 
+## 计算引擎
+
+椰果工具箱的计算引擎 [CoconutCore](docs/coconut-core.md) 是纯函数，功能稳定，通常不随着工具箱版本更新而更新，所有的面板、乘区、公式可自行注册，理论上适合**所有战斗二游**的伤害计算和 Buff 贡献溯源。
+
+以下是将引擎安装到您的项目的方式：
+
+```sh
+npm i https://github.com/d4rkOfficial/wuwa-afyg-tool/releases/download/core-v0.1.0/d4rkofficial-coconut-core-0.1.0.tgz
+```
+
+我们自愿放弃 `CoconutCore` 的版权，您可随意使用、二次开发、发布并无需标注出处。
+
 ## 文档
 
 | 文档                                                                                     | 内容                                                                     |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | [docs/deployment.md](docs/deployment.md)                                                 | 本地开发、构建预览、Vercel / Cloudflare Pages / GitHub Release、完成检查 |
+| [docs/coconut-core.md](docs/coconut-core.md)                                             | 计算引擎 CoconutCore：安装、注册、输入输出、计算口径与发布               |
 | [docs/buff-engine.md](docs/buff-engine.md)                                               | 计算引擎：一切皆 Buff、乘区算子、条件系统、引用转模                      |
 | [docs/agent-harness.md](docs/agent-harness.md)                                           | AI 助手：回合结构、上下文装配、变化队列、自定义 Skill                    |
 | [docs/upstream-integration.md](docs/upstream-integration.md)                             | 接入新数据上游（`DataProvider` 适配器、数据质量验收）                    |
@@ -91,7 +104,7 @@ pnpm test:watch           # 监视重跑
 pnpm test:infer           # 联网的伤害类型推导 TDD 夹具（默认不在 pnpm test 内）
 ```
 
-单个文件也可以直接跑：`node --import ./test/preload-runes.mjs --import ./test/preload.mjs test/src/lib/calc/coeff-crit.test.ts`。
+单个文件也可以直接跑：`node --import ./test/preload-runes.mjs --import ./test/preload.mjs test/src/coconut-core/engine/coeff-crit.test.ts`。
 
 ## API
 

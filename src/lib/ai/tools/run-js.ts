@@ -2,14 +2,14 @@
 // 两条路径的差别由**上下文能力**决定（`ctx.sandboxRun` / `ctx.windowRun`），而不是工具参数 ——
 // 于是模型无法通过传参把自己提升到「真 window」那条路径上。
 import { availableTools, defineTool, executeTool } from './registry'
-import type { RunScriptFn, RunScriptResult } from '../sandbox/protocol'
+import type { RunScriptFn, RunScriptResult } from '$lib/ai/sandbox/protocol'
 import {
     RUN_JS_MAX_ERROR_CHARS,
     RUN_JS_MAX_OUTPUT_CHARS,
     RUN_JS_MAX_TOOL_CALLS,
     RUN_JS_TIMEOUT_MS
-} from '../sandbox/protocol'
-import { truncateText } from '../sandbox/format'
+} from '$lib/ai/sandbox/protocol'
+import { truncateText } from '$lib/ai/sandbox/format'
 
 const str = (v: unknown): string => String(v ?? '').trim()
 

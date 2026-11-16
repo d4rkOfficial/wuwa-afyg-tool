@@ -26,7 +26,7 @@ import {
     type SegmentMarker
 } from '$lib/components/page/home/calculation/spread-table.utils'
 import type { BuffConf, DamageEntry } from '$lib/calc/calculation.types'
-import type { PaneEffectSource } from '$lib/calc/pane-effects'
+import type { PaneEffectSource } from '$lib/buff/pane-effects'
 import type { CharSlot } from '$lib/types/project'
 
 describe('headTextWidthPx', () => {
@@ -193,9 +193,7 @@ const entry = (id: string, character: string | undefined, extra: Partial<DamageE
         character,
         hitName: id,
         displayName: id,
-        isEffect: false,
-        isTuneBreak: false,
-        isTuneResponse: false,
+        formula: 'direct',
         ratioValue: 100,
         ratioUnit: '%',
         damageBaseType: '攻击',
@@ -214,7 +212,7 @@ describe('buildSourceTabs：角色×(直伤/非直伤) + 其它，空表页签�
     it('有直伤与效应时只出现这两类页签；「其它」只在有无角色伤害时出现', () => {
         const groups = groupsOf([
             entry('e1', '甲'),
-            entry('e2', undefined, { isEffect: true, damageBaseType: '效应系数' })
+            entry('e2', undefined, { formula: 'effect', damageBaseType: '效应系数' })
         ])
         const tabs = buildSourceTabs({ team: TEAM, groups, elementColorOf: () => '#fff' })
         assert.deepEqual(
@@ -227,10 +225,7 @@ describe('buildSourceTabs：角色×(直伤/非直伤) + 其它，空表页签�
     })
 
     it('同角色的直伤/非直伤各占一个页签', () => {
-        const groups = groupsOf([
-            entry('e1', '甲'),
-            entry('e2', '甲', { isTuneBreak: true, damageBaseType: '偏谐系数' })
-        ])
+        const groups = groupsOf([entry('e1', '甲'), entry('e2', '甲', { formula: 'tune', damageBaseType: '偏谐系数' })])
         const tabs = buildSourceTabs({ team: TEAM, groups, elementColorOf: () => '#fff' })
         assert.deepEqual(
             tabs.map((t) => t.key),
@@ -243,7 +238,7 @@ describe('buildSourceTabs：角色×(直伤/非直伤) + 其它，空表页签�
     it('entrySourceKeyOf 与 sourceKeyOf 同口径', () => {
         assert.equal(entrySourceKeyOf(charToIdx, entry('x', '乙')), sourceKeyOf(charToIdx, '乙', 'direct'))
         assert.equal(
-            entrySourceKeyOf(charToIdx, entry('y', undefined, { isEffect: true })),
+            entrySourceKeyOf(charToIdx, entry('y', undefined, { formula: 'effect' })),
             sourceKeyOf(charToIdx, '', 'direct'),
             '无角色伤害归「其它」'
         )
@@ -413,8 +408,8 @@ describe('groupEntriesBySource：按伤害源分组（页签计数与建表共�
     it('直伤/非直伤/其它各自成组，保持条目顺序', () => {
         const groups = groupsOf([
             entry('e1', '甲'),
-            entry('e2', '甲', { isTuneBreak: true, damageBaseType: '偏谐系数' }),
-            entry('e3', undefined, { isEffect: true, damageBaseType: '效应系数' }),
+            entry('e2', '甲', { formula: 'tune', damageBaseType: '偏谐系数' }),
+            entry('e3', undefined, { formula: 'effect', damageBaseType: '效应系数' }),
             entry('e4', '甲')
         ])
         assert.deepEqual(

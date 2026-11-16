@@ -12,7 +12,7 @@ import {
     providerIdFromUrl,
     setProvider,
     resetProvider
-} from '$lib/api/provider/index'
+} from '$lib/api/provider'
 
 beforeEach(() => {
     // 避免测试间相互污染选择状态

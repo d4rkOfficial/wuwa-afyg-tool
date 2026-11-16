@@ -24,9 +24,9 @@
         applySkillHits,
         switchSkillPickerTab,
         getLocked
-    } from '$lib/calc/timeline.store.svelte'
-    import { parseRatioHits, summarizeSelectedHits } from '$lib/calc/skill-segments'
-    import { customHitRatio } from '$lib/calc/custom-hit'
+    } from '$lib/project/timeline.store.svelte'
+    import { parseRatioHits, summarizeSelectedHits } from '$lib/timeline/skill-segments'
+    import { customHitRatio } from '$lib/timeline/custom-hit'
     import { ELEMENTS, PCT_UNITS } from '$lib/consts/game-terms'
     import type { CustomHit } from '$lib/calc/timeline.types'
     import { addToast } from '$lib/data/toast.svelte'

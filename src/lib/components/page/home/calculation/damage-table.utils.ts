@@ -11,12 +11,20 @@
  */
 import { resolveDamageTypes, zoneConditionMet, type ConditionProfile } from '$lib/calc/compute'
 import { inferDamageTypes } from '$lib/calc/utils'
-import { DAMAGE_TYPE_SHORT, ZONE_REF_MAP, zoneAppliesToCoeffEntry } from '$lib/calc/calculation.consts'
+import {
+    isEffectEntry,
+    formulaAcceptsRef,
+    formulaActionClosure,
+    formulaOf,
+    FORMULAS,
+    type CritBase
+} from '$lib/calc/core-config'
+import { DAMAGE_TYPE_SHORT, ZONE_REF_MAP } from '$lib/calc/calculation.consts'
 import type { BuffConf, BuffZoneValue, DamageEntry } from '$lib/calc/calculation.types'
 import type { CharSlot } from '$lib/types/project'
 
 /** @desc 直伤判定的最小入参（两个表的入参都是 `DamageEntry`，此处放宽便于共用） */
-type DamageKind = Pick<DamageEntry, 'isEffect' | 'isTuneBreak' | 'isTuneResponse'>
+type DamageKind = Pick<DamageEntry, 'formula'>
 
 /**
  * @desc 非直伤条目（效应 / 处决 / 响应）的判定。
@@ -25,7 +33,7 @@ type DamageKind = Pick<DamageEntry, 'isEffect' | 'isTuneBreak' | 'isTuneResponse
  * （效应 → `效应伤害`；处决/响应 → 推断类型），拉表的条件过滤也必须照传（见 `buffMatchesEntry`）。
  * 这里只表示「走系数基类公式」这一归属，供分组、可用性与双暴口径使用。
  */
-export const isNonDirectDamage = (e: DamageKind): boolean => e.isEffect || e.isTuneBreak || e.isTuneResponse
+export const isNonDirectDamage = (e: DamageKind): boolean => e.formula === 'effect' || e.formula === 'tune'
 
 /** @desc 是否为直伤条目（非效应/非处决/非响应） */
 export const isDirectDamage = (e: DamageKind): boolean => !isNonDirectDamage(e)
@@ -111,51 +119,23 @@ export const buffScopeOk = (bs: BuffConf, isEffect: boolean | undefined, charIdx
 }
 
 /**
- * @desc 效应/处决/响应伤害实际读取的乘区（`computeEffectEntry` / `computeTuneEntry`）：
- * 效应吃加深不吃谐度增幅；处决/响应吃谐度增幅不吃加深；都不吃攻击/增伤/面板类。
+ * @desc 效应 / 处决条目实际读取的作用：**由公式注册表派生**（`formulaActionClosure`），
+ * 不再手抄白名单 —— 公式链改了这里自动跟上。
  *
- * **双暴是「初始 0」而不是「不吃」**：这类条目的双暴基准为 0% / 100%（`compute.ts` 的 `critBase`），
- * 面板双暴不计入，且**双暴只有「覆盖」写入生效** —— 追加/引用一律不生效
- * （见 `COEFF_OVERRIDE_ONLY_ZONE_IDS`），所以「可吃」还要再过一道 `zoneAppliesToCoeffEntry`。
+ * **双暴是「初始 0」而不是「不吃」**：这类条目的双暴基准为 0% / 100%（注册表的 `initCoeff`），
+ * 面板双暴不计入；双暴的**直接写入**照常生效（那是条目自己临时的一份），
+ * 只有**引用写入**被 `formulaAcceptsRef` 剔除。
  */
-export const EFFECT_RELEVANT_ZONES: ReadonlySet<string> = new Set([
-    'extraRatio',
-    'deepenDmg',
-    'critRate',
-    'critDmg',
-    'resPen',
-    'resDown',
-    'defPen',
-    'defDown',
-    'dmgRedPen',
-    'dmgTakenInc',
-    'finalDmg',
-    'specialFinal1',
-    'specialFinal2',
-    'unisonBoonLayer'
-])
+export const EFFECT_RELEVANT_ZONES: ReadonlySet<string> = formulaActionClosure('effect')
 
-export const TUNE_RELEVANT_ZONES: ReadonlySet<string> = new Set([
-    'extraRatio',
-    'tuneBreakBoost',
-    'critRate',
-    'critDmg',
-    'resPen',
-    'resDown',
-    'defPen',
-    'defDown',
-    'dmgRedPen',
-    'dmgTakenInc',
-    'finalDmg',
-    'specialFinal1',
-    'specialFinal2',
-    'unisonBoonLayer'
-])
+export const TUNE_RELEVANT_ZONES: ReadonlySet<string> = formulaActionClosure('tune')
 
 /** @desc 单条乘区是否被当前非直伤条目真正读取（白名单 + 双暴「只有覆盖生效」） */
 export const zoneUsableByNonDirect = (zone: BuffZoneValue, entry: DamageEntry): boolean => {
-    const zones = entry.isTuneBreak || entry.isTuneResponse ? TUNE_RELEVANT_ZONES : EFFECT_RELEVANT_ZONES
-    return zones.has(zone.zoneId) && zoneAppliesToCoeffEntry(zone)
+    const zones = entry.formula === 'tune' ? TUNE_RELEVANT_ZONES : EFFECT_RELEVANT_ZONES
+    if (!zones.has(zone.zoneId)) return false
+    const critBase: CritBase = FORMULAS[formulaOf(entry)].critBase
+    return !zone.ref || formulaAcceptsRef(critBase, zone.zoneId)
 }
 
 /** @desc 该 buff 是否含当前非直伤条目可用的乘区（避免显示吃不到的全局 buff） */
@@ -211,7 +191,7 @@ export const cellBlockReasonOf = (
     damageTypes: readonly string[] | undefined,
     profile: ConditionProfile
 ): CellBlockReason | null => {
-    if (!buffScopeOk(bs, entry.isEffect, charIdx)) return 'scope'
+    if (!buffScopeOk(bs, isEffectEntry(entry), charIdx)) return 'scope'
     if (!buffUsableByEntry(bs, entry)) return 'zone'
     if (!buffZonesConditionOk(bs, entry, damageTypes, profile)) return 'condition'
     return null

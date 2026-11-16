@@ -15,9 +15,9 @@ import {
     ZONE_SECTION_OF
 } from '$lib/calc/calculation.consts'
 import { computeOneEntry, DEFAULT_CONDITION_PROFILE } from '$lib/calc/compute'
-import { paneEffectSourcesOf } from '$lib/calc/pane-effects'
-import { dedupeImportItems } from '$lib/calc/buff-import-utils'
-import { getAllBuffConfs, importBuffSetsWithDecisions } from '$lib/calc/calculation.store.svelte'
+import { paneEffectSourcesOf } from '$lib/buff/pane-effects'
+import { dedupeImportItems } from '$lib/buff/import-utils'
+import { getAllBuffConfs, importBuffSetsWithDecisions } from '$lib/project/calculation.store.svelte'
 import type { BuffInstance, DamageEntry } from '$lib/calc/calculation.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { CharSlot } from '$lib/types/project'
@@ -55,9 +55,7 @@ const entry: DamageEntry = {
     character: CHAR,
     hitName: '测试伤害',
     displayName: '测试伤害',
-    isEffect: false,
-    isTuneBreak: false,
-    isTuneResponse: false,
+    formula: 'direct',
     ratioValue: 100,
     ratioUnit: '%',
     damageBaseType: '攻击',
@@ -94,10 +92,16 @@ describe('层数类乘区：清单与可引用性', () => {
         assert.equal([...ZONE_SECTION_OF.values()].includes('自定义层数'), false, '「自定义层数」栏目应一并移除')
     })
 
-    it('只有集谐干涉层数被禁止引用；同奏增益层数可以引用', () => {
+    it('目标侧作用都被禁止引用；同奏增益层数可以引用', () => {
         assert.equal(ZONE_NO_REF_IDS.has('unisonBoonLayer'), false, '同奏增益层数应可配引用/转模')
         assert.equal(ZONE_NO_REF_IDS.has('tuneStrainLayer'), true, '集谐干涉层数只允许填固定层数')
-        assert.deepEqual([...ZONE_NO_REF_IDS], ['tuneStrainLayer'], '禁引用名单里只应有集谐干涉层数')
+        assert.equal(ZONE_NO_REF_IDS.has('enemyDmgReduction'), true, '敌人免伤只允许填固定数值')
+        assert.equal(ZONE_NO_REF_IDS.has('enemyCoeff'), true, '偏谐系数是敌人面板属性，只允许填固定数值')
+        assert.deepEqual(
+            [...ZONE_NO_REF_IDS].sort(),
+            ['enemyCoeff', 'enemyDmgReduction', 'tuneStrainLayer'],
+            '禁引用名单 = 目标侧作用'
+        )
     })
 
     it('ZONE_DEFS 里没有重复 id', () => {
@@ -198,9 +202,9 @@ const fixedBuff = (id: string, value: number, slots: number[]): BuffInstance =>
     ({ id, name: `定值-${id}`, scope: slots, zones: [{ zoneId: 'specialFinal1', value }] }) as unknown as BuffInstance
 
 describe('层数作为引用来源：按角色读取、互不串味', () => {
-    it('引用来源清单里有同奏增益层数，没有集谐干涉层数、也没有自定义层数', () => {
+    it('引用来源清单里有同奏增益层数（按角色）与集谐干涉层数（目标侧），没有自定义层数', () => {
         assert.ok(ZONE_REF_MAP.has('unisonBoonLayer'), '同奏增益层数应可作为引用来源')
-        assert.equal(ZONE_REF_MAP.has('tuneStrainLayer'), false, '集谐干涉层数不属于角色，不作为引用来源')
+        assert.equal(ZONE_REF_MAP.has('tuneStrainLayer'), true, '集谐干涉层数挂在目标面板上，可作为引用来源（D23）')
         for (const id of ['customLayer1', 'customLayer2', 'customLayer3']) {
             assert.equal(ZONE_REF_MAP.has(id), false, `${id} 不是引用来源`)
         }
