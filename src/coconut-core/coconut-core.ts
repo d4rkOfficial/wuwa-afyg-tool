@@ -50,14 +50,14 @@ export class CoconutCore {
         return this
     }
 
-    /** @desc 结算整张表 */
-    compute(table: GeneralTable): CoreResult {
+    /** @desc 结算整张表（`trace: true` 时为每段附带逐 buff 贡献，供溯源 / 贡献分析） */
+    compute(table: GeneralTable, options?: { trace?: boolean }): CoreResult {
         const registries: KernelRegistries = {
             characterOf: this.characterOf,
             weaponOf: this.weaponOf,
             enemyCoefficientOf: this.enemyCoefficientOf
         }
-        return computeGeneralTable(table, registries)
+        return computeGeneralTable(table, registries, options)
     }
 }
 

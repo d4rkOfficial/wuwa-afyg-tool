@@ -25,6 +25,17 @@ export interface MultiplierZone {
     display: MultiplierDisplay
 }
 
+/** @desc 一条 buff 对某段伤害的贡献（溯源口径：把这条 buff 摘掉再算一遍的差值） */
+export interface BuffContribution {
+    buffId: string
+    /** @desc 这条 buff 的作用落点（`applyTo`，便于按作用分组） */
+    applyTo: string
+    /** @desc 摘掉它之后期望伤害的变化（正数 = 它贡献了这么多伤害） */
+    deltaExpected: number
+    /** @desc 占这一段期望伤害的比例（可为负 / 大于 1） */
+    share: number
+}
+
 /** @desc 一段伤害的结算结果 */
 export interface DamageResult {
     /** @desc 所属条目下标（`GeneralTable.damage_entries`） */
@@ -51,6 +62,8 @@ export interface DamageResult {
     panel: CharacterPanel
     /** @desc 该段用的目标面板（含目标侧 buff） */
     target: TargetPanel
+    /** @desc 逐 buff 贡献（`compute(table, { trace: true })` 时给出，否则为空数组） */
+    contributions: BuffContribution[]
 }
 
 /** @desc 一次结算的结果 */

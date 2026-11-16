@@ -254,3 +254,48 @@ describe('CoconutCore：倍率串', () => {
         }
     })
 })
+
+describe('CoconutCore：buff 贡献溯源', () => {
+    it('默认不溯源（贡献为空数组）', () => {
+        const buff = { id: 'b1', effect: { applyTo: 'bonusDmg', value: '20' } }
+        const result = coreOf().compute(directDamage('100%', [buff]))
+        assert.deepEqual(result.damages[0]!.contributions, [])
+    })
+
+    it('trace 时逐 buff 给出「摘掉它」的差值，且能对上整段伤害', () => {
+        const buffs = [
+            { id: 'atk', effect: { applyTo: 'atkPct', value: '20' } },
+            { id: 'bonus', effect: { applyTo: 'bonusDmg', value: '30' } }
+        ]
+        const withTrace = coreOf().compute(directDamage('100%', buffs), { trace: true })
+        const damage = withTrace.damages[0]!
+        assert.deepEqual(damage.contributions.map((c) => c.buffId).sort(), ['atk', 'bonus'])
+        // 每条贡献 = 含它 - 不含它；正贡献、比例自洽
+        for (const contribution of damage.contributions) {
+            assert.ok(contribution.deltaExpected > 0, `${contribution.buffId} 应为正贡献`)
+            assert.equal(contribution.share, contribution.deltaExpected / damage.expected)
+        }
+        // 两条 buff 都摘掉的伤害 = 不含任何 buff 的伤害（可比性校验）
+        const none = coreOf().compute(directDamage('100%', []))
+        const atkOnly = damage.contributions.find((c) => c.buffId === 'bonus')!
+        assert.equal(
+            damage.expected - atkOnly.deltaExpected,
+            coreOf().compute(directDamage('100%', [buffs[0]!])).damages[0]!.expected
+        )
+        assert.ok(none.damages[0]!.expected < damage.expected)
+    })
+
+    it('目标侧 buff 同样可溯源（减防 / 免伤）', () => {
+        const buffs = [
+            { id: 'defDown', effect: { applyTo: 'defDown', value: '20' } },
+            { id: 'red', effect: { applyTo: 'enemyDmgReduction', value: '10' } }
+        ]
+        const result = coreOf().compute(directDamage('100%', buffs), { trace: true })
+        const contributions = result.damages[0]!.contributions
+        assert.equal(contributions.length, 2)
+        const red = contributions.find((c) => c.buffId === 'red')!
+        assert.ok(red.deltaExpected < 0, '免伤 buff 抬高敌人免伤 → 贡献为负（摘掉它伤害更高）')
+        const defDown = contributions.find((c) => c.buffId === 'defDown')!
+        assert.ok(defDown.deltaExpected > 0, '减防 → 正贡献')
+    })
+})

@@ -31,7 +31,7 @@ import {
     type GeneralTable,
     type StatRef
 } from '$coconut/general-table'
-import type { CoreResult, DamageResult, MultiplierZone } from '$coconut/result'
+import type { BuffContribution, CoreResult, DamageResult, MultiplierZone } from '$coconut/result'
 
 /** @desc 角色基础属性（由调用方注册；数值为 90 级白值） */
 export interface CharacterBaseStats {
@@ -215,16 +215,20 @@ const baseValueOf = (
     return panel.total[parsed.base] * (parsed.ratio + extraRatio)
 }
 
-/** @desc 单段结算 */
+/** @desc 单段结算（`excludeBuffId` 用于溯源：把这一条 buff 摘掉再算一遍） */
 const computeDamage = (
     table: GeneralTable,
     registries: KernelRegistries,
     entryIndex: number,
     damageIndex: number,
-    charIndex: number
+    charIndex: number,
+    excludeBuffId?: string
 ): DamageResult => {
     const entry = table.damage_entries[entryIndex]!
-    const damage = entry.damages[damageIndex]!
+    const raw = entry.damages[damageIndex]!
+    const damage = excludeBuffId
+        ? { ...raw, activated_buffs: raw.activated_buffs.filter((buff) => buff.id !== excludeBuffId) }
+        : raw
     const def = FORMULAS[formulaOfDamage(damage)]
     const critBase = def.critBase
     const { targetSide } = splitBuffs(damage)
@@ -268,17 +272,53 @@ const computeDamage = (
         expected,
         multipliers,
         panel,
-        target
+        target,
+        contributions: []
     }
 }
 
-/** @desc 结算整张表 */
-export const computeGeneralTable = (table: GeneralTable, registries: KernelRegistries): CoreResult => {
+/** @desc 逐 buff 溯源：把每条 buff 单独摘掉重算，差值即它的贡献 */
+const contributionsOf = (
+    table: GeneralTable,
+    registries: KernelRegistries,
+    entryIndex: number,
+    damageIndex: number,
+    charIndex: number,
+    full: DamageResult
+): BuffContribution[] => {
+    const damage = table.damage_entries[entryIndex]!.damages[damageIndex]!
+    const seen = new Set<string>()
+    const out: BuffContribution[] = []
+    for (const buff of damage.activated_buffs) {
+        if (seen.has(buff.id)) continue
+        seen.add(buff.id)
+        const without = computeDamage(table, registries, entryIndex, damageIndex, charIndex, buff.id)
+        const deltaExpected = full.expected - without.expected
+        out.push({
+            buffId: buff.id,
+            applyTo: buff.effect.applyTo,
+            deltaExpected,
+            share: full.expected === 0 ? 0 : deltaExpected / full.expected
+        })
+    }
+    return out
+}
+
+/** @desc 结算整张表（`trace: true` 时为每段附带逐 buff 贡献） */
+export const computeGeneralTable = (
+    table: GeneralTable,
+    registries: KernelRegistries,
+    options?: { trace?: boolean }
+): CoreResult => {
     const damages: DamageResult[] = []
     for (const [entryIndex, entry] of table.damage_entries.entries()) {
         const charIndex = table.characters.indexOf(entry.source)
         for (const [damageIndex] of entry.damages.entries()) {
-            damages.push(computeDamage(table, registries, entryIndex, damageIndex, charIndex))
+            const damage = computeDamage(table, registries, entryIndex, damageIndex, charIndex)
+            if (options?.trace) {
+                damage.contributions = contributionsOf(table, registries, entryIndex, damageIndex, charIndex, damage)
+            }
+            damages.push(damage)
         }
     }
     return {
