@@ -24,14 +24,23 @@
         updateConditionProfile,
         ProjectParseError
     } from '$lib/data/project.svelte'
-    import { importFromShareUrl, shareAndCopy, shareState, shareCooldownLabel } from '$lib/data/share.svelte'
+    import {
+        importFromShareUrl,
+        shareProject,
+        shareState,
+        shareCooldownLabel,
+        getReopenableShare,
+        openShareDialog,
+        getShareDialog,
+        closeShareDialog
+    } from '$lib/data/share.svelte'
     import { pushProjectSwitch, pushPhaseChange } from '$lib/ai/change-queue.svelte'
     import type { PhaseKey } from '$lib/types/project'
     import type { TimelineData } from '$lib/calc/timeline.types'
     import type { CalcState } from '$lib/calc/calculation.types'
     import type { ConfigState } from '$lib/calc/config.types'
     import { PHASE_LABELS } from '$lib/consts/game-terms'
-    import { addToast } from '$lib/data/toast.svelte'
+    import { addToast, removeToast } from '$lib/data/toast.svelte'
     import { preloadCharElements } from '$lib/data/char-elements.svelte'
     import { loadCustomHits } from '$lib/calc/timeline.store.svelte'
     import {
@@ -53,6 +62,7 @@
     import WorkshopModal from '$lib/components/page/home/workshop/workshop-modal.svelte'
     import SubstatLibraryModal from '$lib/components/page/home/config/substat-library-modal.svelte'
     import DamageTypeModal from '$lib/components/page/home/calculation/damage-type-modal.svelte'
+    import ShareModal from '$lib/components/page/home/share-modal.svelte'
     import {
         getSubstatLibraryOpen,
         openSubstatLibrary,
@@ -447,21 +457,35 @@
     }
 
     let showWorkshop = $state(false)
+    /** @desc 分享弹窗状态（侧栏右键 / 归档区共用同一份快照） */
+    let shareDialogRef = $derived(getShareDialog())
 
     async function handleShare(id: string) {
+        // 冷却期内右键刚分享过的工程：直接重开弹窗，不重新上传
+        const reopened = getReopenableShare(id)
+        if (reopened) {
+            openShareDialog(reopened)
+            return
+        }
         if (shareState.cooldownRemaining > 0) {
             addToast(`分享冷却中，请在 ${shareCooldownLabel()} 后重试`, 'info')
             return
         }
         const p = projects.find((pr) => pr.id === id)
         if (!p) return
-        addToast('正在生成分享链接...', 'info')
-        const res = await shareAndCopy(p)
+        // 进度提示不自动消失：成功时让位给弹窗，失败时换成错误提示，避免两条叠在一起
+        const loadingToast = addToast('正在生成分享链接...', 'info', 0)
+        const res = await shareProject(p)
+        removeToast(loadingToast)
         if (!res.ok) {
             addToast(res.error ?? '分享失败', 'error')
             return
         }
-        addToast('已分享(10分钟)，链接已复制到剪贴板', 'success')
+        if (!res.snapshot) {
+            addToast('工坊没有返回可用的分享链接', 'error')
+            return
+        }
+        openShareDialog(res.snapshot)
     }
 
     async function handleArchive(id: string) {
@@ -838,6 +862,9 @@
 />
 
 <BuffLibraryModal open={showBuffLibrary} onclose={() => (showBuffLibrary = false)} />
+
+<!-- @desc 工程临时分享弹窗：两条链接 + 双二维码 + 过期倒计时，侧栏右键与归档区共用 -->
+<ShareModal open={shareDialogRef.open} snapshot={shareDialogRef.snapshot} onclose={closeShareDialog} />
 
 <SubstatLibraryModal />
 

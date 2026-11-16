@@ -16,7 +16,7 @@
     import Button from '$lib/components/ui/button.svelte'
     import EmptyState from '$lib/components/ui/empty-state.svelte'
     import { getCharIconMap } from '$lib/calc/timeline.store.svelte'
-    import { addToast } from '$lib/data/toast.svelte'
+    import { addToast, removeToast } from '$lib/data/toast.svelte'
     import {
         buildExportFile,
         deleteProject,
@@ -24,7 +24,7 @@
         getPhaseOrder,
         unarchiveProject
     } from '$lib/data/project.svelte'
-    import { getShareLink } from '$lib/data/share.svelte'
+    import { openShareDialog, shareProject } from '$lib/data/share.svelte'
     import { getConfirmDeletes } from '$lib/data/interaction-prefs.svelte'
     import {
         doArchiveDelete,
@@ -80,18 +80,18 @@
     async function handleArchiveShare(id: string) {
         const p = archivedProjects.find((pr) => pr.id === id)
         if (!p) return
-        addToast('正在生成分享链接...', 'info')
-        const link = await getShareLink(p)
-        if (!link) {
-            addToast('分享失败', 'error')
+        const loadingToast = addToast('正在生成分享链接...', 'info', 0)
+        const res = await shareProject(p)
+        removeToast(loadingToast)
+        if (!res.ok) {
+            addToast(res.error ?? '分享失败', 'error')
             return
         }
-        try {
-            await navigator.clipboard.writeText(link)
-            addToast('已分享(10分钟)，链接已复制到剪贴板', 'success')
-        } catch {
-            addToast('已分享(10分钟)，请在地址栏查看导入链接', 'success')
+        if (!res.snapshot) {
+            addToast('工坊没有返回可用的分享链接', 'error')
+            return
         }
+        openShareDialog(res.snapshot)
     }
 
     async function handleArchiveDelete(id: string) {

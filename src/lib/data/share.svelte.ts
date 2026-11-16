@@ -7,6 +7,8 @@ import {
     parseProjectFile,
     ProjectParseError
 } from '$lib/data/project.svelte'
+import { buildShareSnapshot, isShareSnapshotExpired, parseShareSnapshot, SHARE_TTL_MS } from '$lib/data/share.utils'
+import type { ShareSnapshot } from '$lib/data/share.utils'
 import type { Project } from '$lib/types/project'
 
 export interface ShareTeamPreview {
@@ -38,6 +40,8 @@ export interface ShareResult {
     ok: boolean
     code?: string
     url?: string
+    /** @desc 成功时的分享快照（链接、二维码数据、过期时间），失败为 undefined */
+    snapshot?: ShareSnapshot
     error?: string
 }
 
@@ -62,9 +66,51 @@ export function getShareState() {
 
 // ── 分享频率限制：10 分钟内只能分享一次（本地持久化，刷新页面仍然生效）──
 
-/** @desc 分享冷却时长：10 分钟 */
-export const SHARE_COOLDOWN_MS = 10 * 60 * 1000
+/** @desc 分享冷却时长：10 分钟（与分享有效期同一时长） */
+export const SHARE_COOLDOWN_MS = SHARE_TTL_MS
 const SHARE_LAST_AT_KEY = 'wuwa-afyg:share-last-at'
+/** @desc 最近一次分享的快照：冷却期内右键同一个工程可直接重开分享弹窗 */
+const SHARE_LAST_SNAPSHOT_KEY = 'wuwa-afyg:share-last'
+
+/**
+ * @desc 分享弹窗状态（单例）：快照由 store 持有，页面顶层只负责挂载组件。
+ * 归档区与工程侧栏共用这一份状态，避免两处各写一套弹窗。
+ */
+export const shareDialog = $state({
+    open: false,
+    snapshot: null as ShareSnapshot | null
+})
+
+export function getShareDialog() {
+    return shareDialog
+}
+
+export const openShareDialog = (snapshot: ShareSnapshot): void => {
+    shareDialog.snapshot = snapshot
+    shareDialog.open = true
+}
+
+export const closeShareDialog = (): void => {
+    shareDialog.open = false
+}
+
+const readPersistedSnapshot = (): ShareSnapshot | null => {
+    if (!browser) return null
+    return parseShareSnapshot(localStorage.getItem(SHARE_LAST_SNAPSHOT_KEY))
+}
+
+/** @desc 最近一次成功分享的快照（右键时现取，过期判定依赖当前时间，不做缓存） */
+let _lastSnapshot: ShareSnapshot | null = readPersistedSnapshot()
+
+/**
+ * @desc 冷却期内可重开的分享快照：工程一致且未过期才返回。
+ * 过期不清理存储（下次分享会覆盖），仅让调用点按「没有快照」处理。
+ */
+export function getReopenableShare(projectId: string): ShareSnapshot | null {
+    const snapshot = _lastSnapshot
+    if (!snapshot || snapshot.projectId !== projectId) return null
+    return isShareSnapshotExpired(snapshot) ? null : snapshot
+}
 
 let _cooldownTimer: ReturnType<typeof setInterval> | null = null
 
@@ -86,9 +132,9 @@ export function isShareCoolingDown(): boolean {
     return shareState.cooldownRemaining > 0
 }
 
-/** @desc 剩余冷却的可读文案（mm:ss） */
+/** @desc 剩余冷却的可读文案（mm:ss；`cooldownRemaining` 本身以秒计） */
 export function shareCooldownLabel(): string {
-    const total = Math.ceil(shareState.cooldownRemaining / 1000)
+    const total = Math.max(0, Math.ceil(shareState.cooldownRemaining))
     const m = Math.floor(total / 60)
     const s = total % 60
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
@@ -110,10 +156,18 @@ export function refreshShareCooldown(): void {
     }
 }
 
-/** @desc 记录一次成功分享并开始冷却 */
-const markShared = (): void => {
-    if (browser) localStorage.setItem(SHARE_LAST_AT_KEY, String(Date.now()))
+/** @desc 记录一次成功分享并开始冷却；返回分享创建时间（快照的 `createdAt` 与冷却起点同一时刻） */
+const markShared = (): number => {
+    const now = Date.now()
+    if (browser) localStorage.setItem(SHARE_LAST_AT_KEY, String(now))
     refreshShareCooldown()
+    return now
+}
+
+/** @desc 保存分享快照：冷却期内重开弹窗、刷新页面后仍可查看链接都靠它 */
+const persistSnapshot = (snapshot: ShareSnapshot): void => {
+    _lastSnapshot = snapshot
+    if (browser) localStorage.setItem(SHARE_LAST_SNAPSHOT_KEY, JSON.stringify(snapshot))
 }
 
 let _seq = 0
@@ -262,7 +316,7 @@ export function setPage(page: number) {
     return checkShare(true)
 }
 
-/** @desc 分享工程（10 分钟频率限制）：冷却中直接拒绝；成功后记录时间戳并开始倒计时 */
+/** @desc 分享工程（10 分钟频率限制）：冷却中直接拒绝；成功后记录时间戳、快照并开始倒计时 */
 export async function shareProject(project: Project): Promise<ShareResult> {
     refreshShareCooldown()
     if (isShareCoolingDown()) {
@@ -277,8 +331,17 @@ export async function shareProject(project: Project): Promise<ShareResult> {
         })
         const json = (await res.json().catch(() => ({}))) as { code?: string; url?: string; error?: string }
         if (!res.ok) return { ok: false, error: json.error ?? `HTTP ${res.status}` }
-        markShared()
-        return { ok: true, code: json.code, url: json.url }
+        const createdAt = markShared()
+        const downloadUrl = json.url ?? (json.code ? `${getShareBase()}/share/${json.code}/download` : null)
+        if (!downloadUrl) return { ok: true, code: json.code, url: json.url }
+        const snapshot = buildShareSnapshot({
+            projectId: project.id,
+            downloadUrl,
+            origin: location.origin,
+            createdAt
+        })
+        persistSnapshot(snapshot)
+        return { ok: true, code: json.code, url: json.url, snapshot }
     } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : '网络错误' }
     }
@@ -287,31 +350,6 @@ export async function shareProject(project: Project): Promise<ShareResult> {
 /** 根据分享 code 构建导入链接（与 10 分钟临时分享同一格式） */
 export function buildImportLink(code: string): string {
     return `${location.origin}#import_project=${encodeURIComponent(`${getShareBase()}/share/${code}/download`)}`
-}
-
-/** 分享工程并生成 10 分钟有效的导入链接；失败返回 null */
-export async function getShareLink(project: Project): Promise<string | null> {
-    const res = await shareProject(project)
-    if (!res.ok || !res.code) return null
-    return buildImportLink(res.code)
-}
-
-/** @desc 分享并把链接写入剪贴板：返回可读结果，供侧栏/归档区共用 */
-export async function shareAndCopy(project: Project): Promise<ShareResult> {
-    const res = await shareProject(project)
-    if (!res.ok) return res
-    if (res.url || res.code) {
-        const link = res.url
-            ? `${location.origin}#import_project=${encodeURIComponent(res.url)}`
-            : buildImportLink(res.code!)
-        try {
-            await navigator.clipboard.writeText(link)
-        } catch {
-            // 剪贴板不可用：链接仍可通过返回结果展示
-        }
-        return { ...res, url: link }
-    }
-    return res
 }
 
 export interface DownloadResult {

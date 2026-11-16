@@ -13,7 +13,8 @@
     import { slide } from 'svelte/transition'
     import { MOTION_MS, slideParams } from '$lib/utils/motion'
     import favicon from '$lib/assets/favicon.svg'
-    import { getShareState, shareCooldownLabel, refreshShareCooldown } from '$lib/data/share.svelte'
+    import { getShareState, shareCooldownLabel, refreshShareCooldown, getReopenableShare } from '$lib/data/share.svelte'
+    import type { ShareSnapshot } from '$lib/data/share.utils'
     import type { ComponentsProps } from '$lib/types'
 
     interface Props extends ComponentsProps {
@@ -72,6 +73,8 @@
     let ctxX = $state(0)
     let ctxY = $state(0)
     let ctxTargetId = $state<string | null>(null)
+    /** @desc 右键目标就是刚分享过的工程时，冷却期内仍可点开分享弹窗（链接与二维码已就绪） */
+    let ctxShareSnapshot = $state<ShareSnapshot | null>(null)
     let expandedKeys = $state<Set<string>>(new Set())
     let hoveredHeaderKey = $state<string | null>(null)
     let actionsCollapsed = $state(false)
@@ -88,12 +91,15 @@
         ctxTargetId = id
         ctxX = e.clientX
         ctxY = e.clientY
+        // 每次右键重新取：过期判定依赖当前时间，不能靠 derived 缓存
+        ctxShareSnapshot = getReopenableShare(id)
         ctxMenuOpen = true
     }
 
     let shareStateRef = $derived(getShareState())
     /** @desc 分享频率限制：冷却中禁用分享菜单项并显示剩余时间 */
     let shareCoolingDown = $derived(shareStateRef.cooldownRemaining > 0)
+    let shareDisabled = $derived(shareCoolingDown && !ctxShareSnapshot)
 
     let ctxMenuItems = $derived([
         {
@@ -120,12 +126,12 @@
         ...(shareStateRef.available
             ? [
                   {
-                      label: shareCoolingDown ? `分享（${shareCooldownLabel()}）` : '分享',
+                      label: shareDisabled ? `分享（${shareCooldownLabel()}）` : '分享',
                       icon: 'mdi:share-variant',
-                      disabled: shareCoolingDown,
+                      disabled: shareDisabled,
                       action: () => {
-                          if (shareCoolingDown) return
-                          if (ctxTargetId) onshare(ctxTargetId)
+                          if (!ctxTargetId || shareDisabled) return
+                          onshare(ctxTargetId)
                       }
                   }
               ]
