@@ -104,13 +104,15 @@ export const compileGeneralTable = (request: ComputeRequest): GeneralTable => {
         })
     )
 
-    const mainStats: Stat[][] = statsPerChar.map((stats) => [...stats.mainStats])
+    const mainStats: Stat[][] = []
     const subStats: Stat[][] = []
     const typeBonusStats: Stat[][] = []
     for (const stats of statsPerChar) {
-        const { plain, typeBonus } = splitStats([...stats.mainStats, ...stats.subStats])
-        subStats.push(plain)
-        typeBonusStats.push(typeBonus)
+        const mains = splitStats([...stats.mainStats])
+        const subs = splitStats([...stats.subStats])
+        mainStats.push(mains.plain)
+        subStats.push(subs.plain)
+        typeBonusStats.push([...mains.typeBonus, ...subs.typeBonus])
     }
 
     const refContext = {

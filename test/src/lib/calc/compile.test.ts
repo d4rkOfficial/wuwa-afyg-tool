@@ -232,9 +232,14 @@ describe('编译 → 内核 与引擎数值对账', () => {
         assert.ok(Number(ref!.effect.value) > 0, '转模折算结果应是正数')
     })
 
-    it('数值：逐条目与引擎完全一致', () => {
-        // 对齐口径：内核各段之和 == 引擎 `totalDamage`（引擎的 `expectedPerHit` 已含段数口径）。
-        // 当前两侧仍有差异（引擎侧基值/额外倍率口径待对齐），先只断言两侧都产出了条目。
+    it('数值：基值逐条目与引擎一致（乘子链差异待收）', () => {
+        // 已对齐：词条/声骸/转模折算后的**基值**两侧逐条目相同。
+        // 待收：乘子链乘积仍有约 13% 差异（引擎侧增伤/防御口径），故这里只钉基值。
+        for (const [index, expected] of engineResult.entries()) {
+            const segment = coreResult.damages.find((damage) => damage.entryIndex === index)
+            assert.ok(segment, `条目 ${index} 未产出结果`)
+            assert.equal(segment!.baseValue, expected.baseValue, `${expected.displayName} 基值不一致`)
+        }
         assert.ok(engineResult.length > 0 && coreResult.damages.length > 0)
     })
 })
