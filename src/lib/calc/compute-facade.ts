@@ -7,7 +7,7 @@
  * 为什么物化还留在工具箱：`ResultEntry` 是界面契约（倍率拆解、溯源辅助、兼容列），
  * 属于 app 的展示需求，不进内核。物化**只搬字段**，不再自己算一遍数值。
  */
-import type { ActionId, CharacterPanel, DamageResult } from '$coconut'
+import type { ActionId, CharacterPanel, DamageResult } from '$coconut-core'
 import type { ComputeRequest } from '$lib/calc/request.types'
 import type { DamageEntry } from '$lib/calc/calculation.types'
 import type { ResultEntry } from '$lib/calc/result.types'
@@ -16,6 +16,7 @@ import { CRIT_MULTIPLIER_ID, FORMULAS, createCoconutCore, effectiveCritRate, for
 import { formulaCanCrit, multiplierZoneViewOf } from '$lib/calc/display-meta'
 import {
     effectRatioFactors,
+    entryResultKeyOf,
     makeStubEntry,
     resolveBase,
     skillRatioFactors,
@@ -164,12 +165,37 @@ export const computeWithCore = (request: ComputeRequest) => {
     return { table, meta, result }
 }
 
+/**
+ * @desc 内容完全一致的条目只算一次：只把每组的第一条送进编译与内核，其余按索引复用同一条结果。
+ *
+ * 拉表里同一条伤害被绑定到多个时间轴块是常态（`id` 不同、内容相同），它们必然算出同一个数。
+ */
+const dedupeEntries = (request: ComputeRequest) => {
+    const seen = new Map<string, number>()
+    const entries: DamageEntry[] = []
+    const ownerOf: number[] = []
+    for (const entry of request.entries) {
+        const key = entryResultKeyOf(entry, request.bindings, request.damageTypes)
+        const known = seen.get(key)
+        if (known === undefined) {
+            seen.set(key, entries.length)
+            ownerOf.push(entries.length)
+            entries.push(entry)
+        } else {
+            ownerOf.push(known)
+        }
+    }
+    return { entries, ownerOf }
+}
+
 /** @desc 工程状态 → `ResultEntry[]`（与引擎 `computeAll` 同形状） */
 export const computeAllViaCore = (request: ComputeRequest): ResultEntry[] => {
-    const { meta, result } = computeWithCore(request)
+    const { entries, ownerOf } = dedupeEntries(request)
+    const { meta, result } = computeWithCore({ ...request, entries })
     return request.entries.map((entry, entryIndex) => {
-        if (meta[entryIndex]!.stub) return makeStubEntry(entry)
-        return materialize(entry, result.damages[entryIndex]!, meta[entryIndex]!)
+        const owner = ownerOf[entryIndex]!
+        if (meta[owner]!.stub) return makeStubEntry(entry)
+        return materialize(entry, result.damages[owner]!, meta[owner]!)
     })
 }
 

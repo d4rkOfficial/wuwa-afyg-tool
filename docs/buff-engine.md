@@ -137,7 +137,7 @@ BuffInstance ─┘
 ### 暴击区的等效暴击率
 
 暴击区 = `1 + 等效暴击率 × (暴击伤害 - 1)`，**等效暴击率**把面板暴击率钳在 0–100
-（`effectiveCritRate`，见 `core-config.ts`）：低于 0 按必不暴（乘子 1），高于 100 按必暴（乘子 = 暴伤比值）。
+（`effectiveCritRate`，见 `src/coconut-config/multipliers.ts`）：低于 0 按必不暴（乘子 1），高于 100 按必暴（乘子 = 暴伤比值）。
 
 面板 `zones.critRate` 本身**不裁剪**：负值与 >100 都照原样保留，因为引用读的就是原值 ——
 「暴击超过 100 的部分转成暴击伤害」这类 buff 靠 `StatRef` 读 `critRate` 再减 `baseLine: 100` 实现。

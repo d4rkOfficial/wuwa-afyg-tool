@@ -6,8 +6,25 @@
 乘子、公式全部由调用方注册，所以它不止能算《鸣潮》。
 
 - 源码：[`src/coconut-core/`](../src/coconut-core)
-- 注册表范例：[`src/lib/calc/core-config.ts`](../src/lib/calc/core-config.ts)（35 条作用 / 19 个引用来源 /
+- 注册配置：[`src/coconut-config/`](../src/coconut-config)（当前版本 35 条作用 / 19 个引用来源 /
   12 个乘子 / 4 条公式，可直接当模板改）
+
+## 注册配置的版本链
+
+`src/coconut-config/` 与内核平级，按游戏版本组织：
+
+| 文件                                                     | 内容                                                       |
+| -------------------------------------------------------- | ---------------------------------------------------------- |
+| [`data.ts`](../src/coconut-config/data.ts)               | 作用表 / 引用来源 / 面板维度 / 目标侧字段 / 常量 / 倍率点  |
+| [`multipliers.ts`](../src/coconut-config/multipliers.ts) | 乘子（防御区 / 抗性区 / 双暴 / 集谐区 / 谐度区 / 同奏区）  |
+| [`formulas.ts`](../src/coconut-config/formulas.ts)       | 每版乘子序 + 公式（基值配方 + 链 + 暴击口径）              |
+| [`versions.ts`](../src/coconut-config/versions.ts)       | 版本链：`v1_0 → v2_0 → v3_0 → v3_7`，`config` 指向最后一版 |
+
+每一版就是「上一版 + 本版新增」的一个对象（`satisfies CoconutCoreConfig`）：`v2_0` 加处决（谐度区、偏谐系数），
+`v3_0` 加效应与集谐区，`v3_7` 加同奏区。应用只用 `config`；前面的版本是口径历史，仍受类型校验。
+
+`src/lib/calc/core-config.ts` 是唯一入口：它把 `config` 装成内核注册表，再补上工具箱自己的口径
+（中文基值类型、展示元数据转发、公式 id 判定），其余代码一律从它取用。
 
 ## 安装
 

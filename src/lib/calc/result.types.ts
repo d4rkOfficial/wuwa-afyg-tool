@@ -1,4 +1,4 @@
-import type { PanelDim } from '$coconut'
+import type { PanelDim } from '$coconut-core'
 import type { CalculationFormulaId } from './calculation.types'
 import type { MultiplierDisplay } from './display-meta'
 

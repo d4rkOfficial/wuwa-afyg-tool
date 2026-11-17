@@ -41,10 +41,13 @@
         panel: 'var(--theme-modal-text)'
     }
 
+    /** @desc 系数是游戏给定的常数（如 BOSS 10027.001），展示到 3 位小数才不丢精度 */
+    const fmtCoeff = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 3 })
+
     function partValue(p: TracePart): string {
         if (p.unit === '%') return fmt(p.value) + '%'
         if (p.unit === 'mult') return '× ' + p.value.toFixed(3)
-        return fmt(p.value)
+        return fmtCoeff(p.value)
     }
 
     /** @desc 计算链上的一个单项式：数值 + 来源（hover 浮窗展示） */
@@ -64,9 +67,9 @@
             list.push({
                 id: 'coeff',
                 label: '系数',
-                value: fmt(seg.totalStat),
+                value: fmtCoeff(seg.totalStat),
                 parts: seg.baseParts,
-                detail: `${seg.baseLabel} ${fmt(seg.totalStat)}`
+                detail: `${seg.baseLabel} ${fmtCoeff(seg.totalStat)}`
             })
         } else {
             list.push({

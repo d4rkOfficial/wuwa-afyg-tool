@@ -7,7 +7,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { createCoconutCore, effectiveCritRate } from '$lib/calc/core-config'
-import type { BuffEffect, GeneralTable } from '$coconut'
+import type { BuffEffect, GeneralTable } from '$coconut-core'
 
 const core = createCoconutCore()
 

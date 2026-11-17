@@ -4,7 +4,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { CoconutCore, type GeneralTable } from '$coconut'
+import { CoconutCore, type GeneralTable } from '$coconut-core'
 import { buildCoconutCoreConfig } from '$lib/calc/core-config'
 
 /** @desc 注册层：内核零内置，结算前必须 init 一份配置 */

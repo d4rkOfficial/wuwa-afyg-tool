@@ -4,7 +4,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { CoconutCore } from '$coconut'
+import { CoconutCore } from '$coconut-core'
 import { buildCoconutCoreConfig } from '$lib/calc/core-config'
 import { computeAll } from '$lib/calc/compute'
 import type { BuffInstance, DamageEntry } from '$lib/calc/calculation.types'
@@ -160,7 +160,7 @@ const entries: DamageEntry[] = [
         sourceTimelineBlockId: 'op1'
     } as unknown as DamageEntry,
     {
-        // 处决：基值读**敌人面板**的偏谐系数（BOSS 10027）
+        // 处决：基值读**敌人面板**的偏谐系数（BOSS 10027.001）
         id: 'e3',
         character: CHAR,
         displayName: '谐度破坏',
@@ -266,7 +266,10 @@ describe('编译 → 内核 与引擎数值对账', () => {
             const segments = coreResult.damages.filter((damage) => damage.entryIndex === index)
             assert.equal(segments.length, 1, `${expected.displayName} 应产出一段结果`)
             const segment = segments[0]!
-            assert.equal(segment.baseValue, expected.baseValue, `${expected.displayName} 基值不一致`)
+            // 内核的 `baseValue` 不取整（偏谐系数是小数，如 10027.001 × 16 = 160432.016），
+            // 引擎的 `ResultEntry.baseValue` 是取整后的展示值；两层的对齐在门面（`compute-facade`）完成，
+            // 见下面「门面：ResultEntry 与引擎 computeAll 逐字段相等」。
+            assert.equal(Math.round(segment.baseValue), expected.baseValue, `${expected.displayName} 基值不一致`)
             // 「暴击 / 不暴击」两列是门面派生（内核只给期望），在门面层对账
             assert.equal(segment.expected, expected.expectedPerHit, `${expected.displayName} 期望不一致`)
             const engineZones = new Map((expected.multiplierZones ?? []).map((zone) => [zone.id, zone.value] as const))

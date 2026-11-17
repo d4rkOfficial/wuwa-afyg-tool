@@ -7,7 +7,7 @@
  * 三张表都用「完整键」声明（`Record<CalcActionId, …>` 等），少一个 id 或多一个 id 都是类型错误，
  * 因此与注册层 `core-config.ts` 天然同步。
  */
-import type { CharacterPanel, FormulaCtx, FormulaId } from '$coconut'
+import type { CharacterPanel, FormulaCtx, FormulaId } from '$coconut-core'
 import type { CalcActionId, FormulaKey, MultiplierId } from './core-config'
 
 // ─────────────────────────── 乘区展示形态 ───────────────────────────

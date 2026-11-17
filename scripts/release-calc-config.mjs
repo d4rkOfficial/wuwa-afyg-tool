@@ -1,12 +1,12 @@
 /**
- * @desc 把注册层 `core-config.ts` 编译成**可发布的 config 包**：`dist/calc-config/` → `dist/d4rkofficial-coconut-config-<version>.tgz`。
+ * @desc 把 `src/coconut-config` 编译成**可发布的 config 包**：`dist/calc-config/` → `dist/d4rkofficial-coconut-config-<version>.tgz`。
  *
  * 为什么要单独发包：内核零语料，使用方要么自己写 35 条作用 / 19 个引用来源 / 12 个乘子 / 4 条公式，
- * 要么直接拿工具箱已经调好的这一份。这份 config 只依赖内核的**类型**，运行时自带所需的注册辅助函数，
+ * 要么直接拿工具箱已经调好的这一份。这份 config 只依赖内核的**类型**与 `defineFormula`，
  * 所以装它 + 内核就能算《鸣潮》口径。
  *
  * 版本号默认取根 `package.json`（与工具箱一起发，脚本用 `--version` 覆盖）。
- * 产物：`index.js`（单文件 ESM，默认导出 config）、`index.d.ts`、`package.json`、`README.md`。
+ * 产物：`index.js`（单文件 ESM，默认导出当前版本的 config）、`index.d.ts`、`package.json`、`README.md`。
  *
  * 用法：node scripts/release-calc-config.mjs [--version 0.0.1]
  */
@@ -52,7 +52,8 @@ const isFile = (path) => {
 
 /** @desc 前缀别名（esbuild 的 alias 只做精确匹配，这里手写 onResolve） */
 const prefixAlias = {
-    $coconut: resolve(root, 'src/coconut-core'),
+    '$coconut-core': resolve(root, 'src/coconut-core'),
+    '$coconut-config': resolve(root, 'src/coconut-config'),
     $lib: resolve(root, 'src/lib'),
     $src: resolve(root, 'src')
 }
@@ -75,13 +76,12 @@ const resolveFile = (base) => {
 rmSync(outDir, { recursive: true, force: true })
 mkdirSync(outDir, { recursive: true })
 
-/** 2) 生成入口：默认导出注册层那一份 config */
+/** 2) 生成入口：默认导出当前版本的 config */
 const entryPath = resolve(outDir, 'entry.ts')
 writeFileSync(
     entryPath,
-    `import { buildCoconutCoreConfig } from '$lib/calc/core-config'
+    `import { config } from '$coconut-config'
 
-const config = buildCoconutCoreConfig()
 export { config }
 export default config
 `,
@@ -115,7 +115,7 @@ await build({
             name: 'coconut-alias',
             setup(builder) {
                 builder.onResolve({ filter: /^\$app\/environment$/ }, () => ({ path: resolve(outDir, 'env.js') }))
-                builder.onResolve({ filter: /^\$(coconut|lib|src)(\/|$)/ }, (args) => {
+                builder.onResolve({ filter: /^\$(coconut-core|coconut-config|lib|src)(\/|$)/ }, (args) => {
                     const [head, ...rest] = args.path.split('/')
                     return { path: resolveFile(resolve(prefixAlias[head], rest.join('/'))) }
                 })
@@ -180,7 +180,7 @@ writeFileSync(
             sideEffects: false,
             engines: { node: '>=20' },
             peerDependencies: { '@d4rkofficial/coconut-core': '>=0.1.0' },
-            repository: { type: 'git', url: `git+${repo}.git`, directory: 'src/lib/calc' },
+            repository: { type: 'git', url: `git+${repo}.git`, directory: 'src/coconut-config' },
             homepage: `${repo}/blob/main/docs/coconut-core.md`,
             keywords: ['wuwa', 'wuthering-waves', 'damage', 'calculator', 'coconut-core'],
             license: 'MIT',

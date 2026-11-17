@@ -7,7 +7,7 @@
 // 生成 d.ts 会把 `$lib/*` 别名写进产物，反而对消费方不可用。
 //
 // 用 vite 的 JS API 而不是新引一个打包器：`vite` 已是本仓依赖，且它自带 `resolve.alias`，
-// 不用为 `$lib` / `$src` 写第二套解析。
+// 不用为 `$lib` / `$src` / `$coconut-core` 写第二套解析。
 import { build } from 'vite'
 import { resolve } from 'node:path'
 
@@ -20,7 +20,7 @@ await build({
         alias: {
             $lib: resolve(root, 'src/lib'),
             $src: resolve(root, 'src'),
-            $coconut: resolve(root, 'src/coconut-core')
+            '$coconut-core': resolve(root, 'src/coconut-core')
         }
     },
     build: {

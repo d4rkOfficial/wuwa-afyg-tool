@@ -11,11 +11,13 @@
 // import 的文件，也必须是纯的（否则接线的第一步就踩坑，且闸门看不见）。
 //
 // 四条硬规则：
-//   ① 纯计算：每个文件的 import 闭包都不得触达 `$app/*` / `$lib/*` / `*.svelte.ts` / 界面层；
+//   ① 纯计算：每个文件的 import 闭包都不得触达 `$app/*` / `$lib/*` / `*.svelte.ts` / 界面层，
+//      也不得触达注册配置 `$coconut-config`（配置依赖内核，方向不能反过来）；
 //   ② 零语料：不出现中文字符（标识符 / 字符串 / 注释一律不允许 —— 内核注释是故意全删的）；
 //   ③ 零内置表：不出现 `id: 'xxx'` 这类表项形状，作用表 / 乘子 / 公式只能来自 `init`；
-//   ④ 单一出口：只允许 `src/lib/calc/core-config.ts` 走 `$coconut/*` 子路径，其余上层代码只能从
-//      `$coconut` 公共入口（即 `CoconutCore` 与类型）取用 —— 「对外只暴露一个纯计算核」的落地形态。
+//   ④ 单一出口：`$coconut-core/*` 子路径只允许注册配置（`src/coconut-config/**`）与门面
+//      （`src/lib/calc/core-config.ts`）使用；`$coconut-config` 只允许门面使用 ——
+//      「对外只暴露一个纯计算核、一份注册配置」的落地形态。
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, normalize } from 'node:path'
 
@@ -35,7 +37,11 @@ const FORBIDDEN = [
     },
     { test: (p) => p.endsWith('.svelte.ts'), reason: '依赖 Runes store（*.svelte.ts）' },
     { test: (p) => p.startsWith('$lib/substat'), reason: '副词条分析属于 app 功能，不在计算核内' },
-    { test: (p) => p.startsWith('$lib/components/') || p.startsWith('$lib/theme/'), reason: '依赖界面层' }
+    { test: (p) => p.startsWith('$lib/components/') || p.startsWith('$lib/theme/'), reason: '依赖界面层' },
+    {
+        test: (p) => p.startsWith('src/coconut-config') || p.startsWith('$coconut-config'),
+        reason: '内核不得依赖注册配置（$coconut-config），方向是配置依赖内核'
+    }
 ]
 
 /** @desc 中文字符 / 全角标点的字符范围（内核零语料） */
@@ -63,8 +69,10 @@ const resolveSpecifier = (spec, fromFile) => {
     }
     if (spec.startsWith('$lib/')) return `src/lib/${spec.slice('$lib/'.length)}`
     if (spec.startsWith('$src/')) return `src/${spec.slice('$src/'.length)}`
-    if (spec.startsWith('$coconut/')) return `src/coconut-core/${spec.slice('$coconut/'.length)}`
-    if (spec === '$coconut') return `src/coconut-core/index.ts`
+    if (spec.startsWith('$coconut-core/')) return `src/coconut-core/${spec.slice('$coconut-core/'.length)}`
+    if (spec === '$coconut-core') return 'src/coconut-core/index.ts'
+    if (spec === '$coconut-config') return 'src/coconut-config/index.ts'
+    if (spec.startsWith('$coconut-config/')) return `src/coconut-config/${spec.slice('$coconut-config/'.length)}`
     return null
 }
 
@@ -150,10 +158,13 @@ if (builtInTables.length > 0) {
     console.log('── ③ 零内置表：通过')
 }
 
-// ── ④ 单一出口：只有注册层可以走 $coconut 子路径 ──
-const SUBPATH_RE = /from '\$coconut\/(?!index)/
+// ── ④ 单一出口：内核子路径只给注册配置与门面，`$coconut-config` 只给门面 ──
+const CORE_SUBPATH_RE = /from '\$coconut-core\/(?!index)/
+const CONFIG_RE = /from '\$coconut-config(\/|')/
 const REGISTRATION_LAYER = 'src/lib/calc/core-config.ts'
-const subpathImports = []
+const CONFIG_DIR = 'src/coconut-config/'
+const coreSubpathImports = []
+const configImports = []
 const scanUpper = (dir) => {
     for (const name of readdirSync(dir)) {
         const p = join(dir, name)
@@ -162,21 +173,34 @@ const scanUpper = (dir) => {
             scanUpper(p)
         } else if (/\.(ts|svelte)$/.test(name)) {
             const file = norm(p)
-            if (file === REGISTRATION_LAYER) continue
             const source = readFileSync(file, 'utf8')
-            if (SUBPATH_RE.test(source)) subpathImports.push(file)
+            if (file !== REGISTRATION_LAYER && !file.startsWith(CONFIG_DIR) && CORE_SUBPATH_RE.test(source))
+                coreSubpathImports.push(file)
+            if (file !== REGISTRATION_LAYER && CONFIG_RE.test(source)) configImports.push(file)
         }
     }
 }
 scanUpper('src')
-if (subpathImports.length > 0) {
-    console.log('\n── 内核出口越界（只有注册层可以 import $coconut 子路径）')
-    for (const file of subpathImports) console.log(`   ✗ ${file}`)
+if (coreSubpathImports.length > 0) {
+    console.log('\n── 内核出口越界（只有注册配置与门面可以 import $coconut-core 子路径）')
+    for (const file of coreSubpathImports) console.log(`   ✗ ${file}`)
 } else {
-    console.log(`── ④ 单一出口：通过（仅 ${REGISTRATION_LAYER} 可走子路径）`)
+    console.log(`── ④ 单一出口：内核子路径仅 ${CONFIG_DIR}** 与 ${REGISTRATION_LAYER}`)
+}
+if (configImports.length > 0) {
+    console.log('\n── 注册配置出口越界（只有门面可以 import $coconut-config）')
+    for (const file of configImports) console.log(`   ✗ ${file}`)
+} else {
+    console.log(`── ④ 单一出口：$coconut-config 仅 ${REGISTRATION_LAYER}`)
 }
 
-const failed = violations.length + externalAliases.size + corpus.length + builtInTables.length + subpathImports.length
+const failed =
+    violations.length +
+    externalAliases.size +
+    corpus.length +
+    builtInTables.length +
+    coreSubpathImports.length +
+    configImports.length
 if (failed > 0) {
     if (violations.length > 0) {
         console.log('\n── 违规')

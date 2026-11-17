@@ -44,6 +44,7 @@ npm i https://github.com/d4rkOfficial/wuwa-afyg-tool/releases/download/core-v0.1
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | [docs/deployment.md](docs/deployment.md)                                                 | 本地开发、构建预览、Vercel / Cloudflare Pages / GitHub Release、完成检查 |
 | [docs/coconut-core.md](docs/coconut-core.md)                                             | 计算引擎 CoconutCore：安装、注册、输入输出与计算口径                     |
+| [docs/adding-calculation-feature.md](docs/adding-calculation-feature.md)                 | 新增游戏计算特性（作用 / 乘子 / 公式 / 系数）的机械步骤、测试与闸门清单  |
 | [docs/buff-engine.md](docs/buff-engine.md)                                               | 计算引擎：一切皆 Buff、乘区算子、条件系统、引用转模                      |
 | [docs/agent-harness.md](docs/agent-harness.md)                                           | AI 助手：回合结构、上下文装配、变化队列、自定义 Skill                    |
 | [docs/upstream-integration.md](docs/upstream-integration.md)                             | 接入新数据上游（`DataProvider` 适配器、数据质量验收）                    |
@@ -65,8 +66,8 @@ npm i https://github.com/d4rkOfficial/wuwa-afyg-tool/releases/download/core-v0.1
 
 ### 计算引擎（一切皆 Buff）
 
-- 所有影响伤害计算的东西都是 **Buff 类实例**：角色面板 / 武器 / 声骸 / 敌人配置 / 公式固有乘区全部通过
-  **统一贡献聚合**（单一 `ZONE_OPS` 乘区算子表）进入公式；乘区算子只在 `ZONE_OPS` 一处维护
+- 所有影响伤害计算的东西都是 **Buff 类实例**：角色面板 / 武器 / 声骸 / 敌人配置 / 公式固有乘区全部编译成
+  作用落值进入公式；作用表与乘子链都在 [`src/coconut-config/`](src/coconut-config) 里按游戏版本登记
 - 完整伤害公式：攻击 × 增伤 × 加深 × 同奏 × 暴击 × 防御 × 抗性 × 免伤 等乘区
 - 支持直伤、**效应伤害**、**谐度破坏 / 偏谐响应**三类输出
 - **条件系统**：乘区级伤害类型与伤害属性条件；Buff 实例级链条件 / 阶条件（硬性，且二选一）

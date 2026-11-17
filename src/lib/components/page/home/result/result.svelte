@@ -10,6 +10,15 @@
     import { getMultiEntryExpand } from '$lib/data/interaction-prefs.svelte'
     import { nextExpandedIds } from '$lib/utils/expand-state'
     import { computeAllCore as computeAllDamage } from '$lib/calc/compute-facade'
+    import { entryResultKeyOf } from '$lib/calc/compute'
+    import {
+        assembleEntryResults,
+        computeInputsSignatureOf,
+        computePlanOf,
+        emptyEntryResultCache,
+        nextEntryResultCache,
+        type EntryResultCache
+    } from '$lib/components/page/home/result/compute-cache.utils'
     import {
         getAllDamageEntries,
         getCalcState,
@@ -189,27 +198,70 @@
         if (showDataAnalysis) void runAnalysis(['substat', 'buff'])
     }
 
+    /**
+     * @desc 条目结果缓存（跨轮复用）。
+     *
+     * 结果页里「内容完全相同的条目」是常态，而多数刷新只动了条目集合（排轴加删伤害块 / 改名），
+     * 没动 Buff、配置与队伍。所以按条目内容缓存结果、用输入签名整体作废：签名不变时同内容条目
+     * 直接同步，连重复条目都只算一次；签名一变（Buff / 配置 / 队伍 / 链阶动过）就整份重算。
+     *
+     * 非响应式 `let`：缓存读写不得触发界面重算。
+     */
+    let entryResultCache: EntryResultCache = emptyEntryResultCache()
+
     function computeAll() {
         const calc = getCalcState()
         const config = getConfig()
         const dmgEntries = getAllDamageEntries()
         if (dmgEntries.length === 0) {
+            entryResultCache = emptyEntryResultCache()
             cleanEntries = []
             entries = []
             return
         }
-        cleanEntries = computeAllDamage(
-            dmgEntries,
-            calc.buffSets,
-            calc.damageEntryBuffSetIds,
-            calc.damageEntryDamageTypes,
-            config,
-            team,
-            charInfoMap,
-            weaponInfoMap,
-            getConditionProfile(),
-            getEchoSkillText()
+        const profile = getConditionProfile()
+        const echoSkillText = getEchoSkillText()
+        const keys = dmgEntries.map((entry) =>
+            entryResultKeyOf(entry, calc.damageEntryBuffSetIds, calc.damageEntryDamageTypes)
         )
+        const signature = computeInputsSignatureOf({
+            table: getTableVersion(),
+            refresh: refreshKey,
+            profile: `${profile.chains.join(',')}|${profile.refinements.join(',')}`,
+            team,
+            config,
+            charInfo: charInfoMap,
+            weaponInfo: weaponInfoMap,
+            echoSkillText
+        })
+        const plan = computePlanOf({ previous: entryResultCache, signature, entries: dmgEntries, keys })
+        const computed =
+            plan.missing.length > 0
+                ? computeAllDamage(
+                      plan.missing.map((slot) => slot.entry),
+                      calc.buffSets,
+                      calc.damageEntryBuffSetIds,
+                      calc.damageEntryDamageTypes,
+                      config,
+                      team,
+                      charInfoMap,
+                      weaponInfoMap,
+                      profile,
+                      echoSkillText
+                  )
+                : []
+        cleanEntries = assembleEntryResults({
+            entries: dmgEntries,
+            keys,
+            reusable: plan.reusable,
+            missing: plan.missing,
+            computed
+        })
+        entryResultCache = nextEntryResultCache({
+            previous: entryResultCache,
+            signature,
+            computed: new Map(plan.missing.map((slot, index) => [keys[slot.index]!, computed[index]!]))
+        })
         applyModes(cleanEntries)
     }
 

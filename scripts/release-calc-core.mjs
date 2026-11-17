@@ -6,7 +6,7 @@
  * 不需要 npm 账号、也不需要把内核混进 app 的 release 语义里（脚本最后会打印现成的 `gh release` 命令）。
  *
  * 产物内容：
- * - `index.js`：单文件 ESM（零 import、零 `$coconut` 别名残留），由 `build-calc-lib.mjs` 打包；
+ * - `index.js`：单文件 ESM（零 import、零 `$coconut-core` 别名残留），由 `build-calc-lib.mjs` 打包；
  * - `*.d.ts`：由 `tsconfig.core.json` 直出（内核源码内部已改为相对路径，类型说明符天然干净），
  *   并把相对说明符补成 `.js`，让 `moduleResolution: node16/nodenext` 的消费方也能解析；
  * - `package.json` / `README.md` / `LICENSE`：包元数据与许可。`README.md` 取自

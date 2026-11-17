@@ -5,8 +5,8 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { CoconutCore, type CharacterPanel, type GeneralTable } from '$coconut'
-import { defineFormula } from '$coconut/formulas'
+import { CoconutCore, type CharacterPanel, type GeneralTable } from '$coconut-core'
+import { defineFormula } from '$coconut-core/formulas'
 
 const ATK = Symbol('atk')
 const ATK_FLAT = Symbol('atkFlat')

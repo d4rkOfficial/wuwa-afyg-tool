@@ -11,7 +11,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { computeOneEntry, DEFAULT_CONDITION_PROFILE } from '$lib/calc/compute'
+import { computeOneEntry, DEFAULT_CONDITION_PROFILE, TUNE_COEFF_MAP } from '$lib/calc/compute'
 import { buildDamageSegments, type DamageTraceCtx, type DamageSegment } from '$lib/calc/damage-trace'
 import type { BuffInstance, BuffZoneValue, DamageEntry } from '$lib/calc/calculation.types'
 import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
@@ -113,6 +113,20 @@ const run = (entry: DamageEntry, buffs: BuffInstance[], damageTypes: string[]) =
     }
     return { result, segs, segmentOf }
 }
+
+describe('系数基类：溯源「系数」取敌人偏谐系数，不取角色白值', () => {
+    it('处决条目的系数 = 敌人类型的偏谐系数', () => {
+        const { segs } = run(tuneEntry, [], [])
+        assert.equal(segs.isCoeff, true)
+        assert.equal(segs.totalStat, TUNE_COEFF_MAP['BOSS'], 'BOSS 的偏谐系数原值')
+        assert.equal(segs.baseWhite, TUNE_COEFF_MAP['BOSS'])
+        assert.deepEqual(
+            segs.baseParts.map((p) => [p.label, p.value]),
+            [['偏谐系数', TUNE_COEFF_MAP['BOSS']]]
+        )
+        assert.notEqual(segs.totalStat, charInfo.lv90BaseStats.atk, '不能拿角色面板白值当系数')
+    })
+})
 
 describe('处决/响应：谐度破坏增幅进「谐度区」，不写进「集谐区」', () => {
     const boost = buff('b1', '增幅之赐', [zone('tuneBreakBoost', 50)])

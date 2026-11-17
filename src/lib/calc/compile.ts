@@ -13,13 +13,20 @@
  */
 import type { DamageEntry as EngineDamageEntry } from '$lib/calc/calculation.types'
 import type { ComputeRequest } from '$lib/calc/request.types'
-import { DEFAULT_CONDITION_PROFILE, TUNE_COEFF_MAP, entryStatsOf, resolveEntry, weaponStatsOf } from '$lib/calc/compute'
+import {
+    createResolveMemo,
+    DEFAULT_CONDITION_PROFILE,
+    TUNE_COEFF_FALLBACK,
+    TUNE_COEFF_MAP,
+    entryStatsOf,
+    weaponStatsOf
+} from '$lib/calc/compute'
 import { ELEMENT_BONUS_MAP, ELEMENTS, NON_DIRECT_ELEMENT, TYPE_BONUS_MAP } from '$lib/consts/game-terms'
 import { EFFECT_BASE_VALUE, getEffectBurstMultiplier, getEffectMultiplier } from '$lib/consts/effect-data'
 import { BONUS_DMG_ACTION, DEFAULT_PANEL_DIM, statActionOf } from '$lib/calc/stat-writes'
 import type { PanelDim } from '$lib/calc/core-config'
 import { CHAR_LEVEL_ACTION, CRIT_ACTION_IDS, PANEL_BASE_TYPES, TUNE_BREAK_BOOST_ACTION } from '$lib/calc/core-config'
-import type { ActionId, Buff, BuffEffect, Damage, DamageEntry, GeneralTable, Stat } from '$coconut'
+import type { ActionId, Buff, BuffEffect, Damage, DamageEntry, GeneralTable, Stat } from '$coconut-core'
 
 /** @desc 只读列表 Record → 可变列表 Record（引擎入参是可变形态） */
 const toMutableList = (record: Readonly<Record<string, readonly string[]>> | undefined): Record<string, string[]> =>
@@ -196,7 +203,7 @@ const enemyEffectsOf = (request: ComputeRequest): BuffEffect[] => {
         { applyTo: 'enemyType', value: enemy.type },
         { applyTo: 'enemyDefense', value: String(enemy.defense) },
         { applyTo: 'enemyDmgReduction', value: String(enemy.dmgReduction) },
-        { applyTo: 'enemyCoeff', value: String(TUNE_COEFF_MAP[enemy.type] ?? 716.2) }
+        { applyTo: 'enemyCoeff', value: String(TUNE_COEFF_MAP[enemy.type] ?? TUNE_COEFF_FALLBACK) }
     ]
     for (const element of ELEMENTS) {
         effects.push({ applyTo: 'resistance', element, value: String(enemy.resistances[element] ?? 0) })
@@ -268,8 +275,9 @@ export const compileProject = (request: ComputeRequest): { table: GeneralTable; 
     )
 
     const meta: CompiledEntryMeta[] = []
+    const resolver = createResolveMemo(ctx)
     const damageEntries: DamageEntry[] = request.entries.map((entry) => {
-        const resolved = resolveEntry(entry, ctx)
+        const resolved = resolver.resolve(entry)
         const charIndex = request.team.findIndex((slot) => (slot.character ?? '') === (entry.character ?? ''))
         const element = elementOf(entry)
         const isEffect = entry.formula === 'effect'

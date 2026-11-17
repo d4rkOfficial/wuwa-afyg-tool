@@ -137,6 +137,7 @@ const ENTITY_IDS = [
 
 /** @desc ① 自检的搜索范围：这些文件里必须能找到 ENTITY_IDS 的每一项 */
 const REGISTRY_SOURCES = [
+    'src/coconut-config/data.ts',
     'src/lib/calc/stat-writes.ts',
     'src/lib/calc/core-config.ts',
     'src/lib/calc/display-meta.ts',

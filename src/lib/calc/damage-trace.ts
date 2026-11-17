@@ -858,7 +858,8 @@ export function buildDamageSegments(
     let baseGreen = 0
     let baseParts: TracePart[] = []
     if (isCoeff) {
-        const coeff = entry.panel.base.atk
+        // 系数条目里 `panel.base.atk` 仍是**角色白值**，系数在 `baseAtk` 上（`resolveEntry` 的 `baseAtkField`）
+        const coeff = entry.baseAtk
         baseWhite = coeff
         totalStat = coeff
         baseParts = collectCoeffParts(baseUnit, coeff, ctx)

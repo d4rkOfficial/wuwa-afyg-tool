@@ -12,7 +12,7 @@ import type { CharacterInfo, WeaponInfo } from '$lib/api/types'
 import type { ResultEntry, MultiplierZone, RatioFactor } from './result.types'
 import type { CharSlot } from '$lib/types/project'
 import { TARGET_SIDE_ZONE_IDS, ZONE_NO_REF_IDS } from './calculation.consts'
-import type { ActionId, CharacterPanel, TargetPanel } from '$coconut'
+import type { ActionId, CharacterPanel, TargetPanel } from '$coconut-core'
 import type { AppPanel } from '$lib/calc/panel-ops'
 import {
     ACTION_MAP,
@@ -52,6 +52,7 @@ import { evaluateRules, resolveActiveBuffIds, ruleMet, type RuleContext, type Ru
 import { getEffectMultiplier, getEffectBurstMultiplier, EFFECT_BASE_VALUE } from '$lib/consts/effect-data'
 import {
     NON_DIRECT_ELEMENT,
+    SKILL_TYPE_ECHO,
     TYPE_BONUS_MAP,
     ELEMENT_BONUS_MAP,
     WEAPON_SUBSTAT_NAME_MAP,
@@ -453,7 +454,9 @@ const entryCandidateBuffs = (
 ): BuffInstance[] => {
     const boundIds = damageEntryBuffSetIds[entry.id] ?? []
     if (boundIds.length === 0) return []
-    return buffSets.filter((b) => boundIds.includes(b.id))
+    // 成员判定走 Set：这条在「条目 × Buff」的重算里是最内层循环，`includes` 是线性扫描
+    const bound = new Set(boundIds)
+    return buffSets.filter((b) => bound.has(b.id))
 }
 
 /**
@@ -751,7 +754,7 @@ export const buildTargetPanel = (
         scalars: {
             defense: enemy.defense,
             dmgReduction: enemy.dmgReduction,
-            coefficient: TUNE_COEFF_MAP[enemy.type] ?? 716.2
+            coefficient: TUNE_COEFF_MAP[enemy.type] ?? TUNE_COEFF_FALLBACK
         },
         maps: { resistance: { ...enemy.resistances } },
         text: { type: enemy.type },
@@ -931,12 +934,21 @@ export const withExtraRatioFactor = (factors: RatioFactor[], extraRatio: number,
 
 // ────────────────────────────── 公式求值（直伤 / 处决 / 效应 / 固定值 共用） ──────────────────────────────
 
-/** @desc 偏谐系数（处决 / 偏谐系数直伤）的基值系数：按敌人类型取表 */
+/**
+ * @desc 偏谐系数（处决 / 偏谐系数直伤）的基值系数：按敌人类型取表（游戏内原值，不做取整）。
+ *
+ * 三档都是小数，直接写全精度：处决倍率动辄十几倍，先取整再乘会把误差放大到个位数。
+ */
+/** @desc 小怪档偏谐系数（也是「不认识敌人类型」时的兜底） */
+const SMALL_ENEMY_COEFF = 716.186
+
 export const TUNE_COEFF_MAP: Record<string, number> = {
-    BOSS: 10027,
-    精英怪: 2149,
-    小怪: 716.2
+    BOSS: 10027.001,
+    精英怪: 2148.675,
+    小怪: SMALL_ENEMY_COEFF
 }
+
+export const TUNE_COEFF_FALLBACK = SMALL_ENEMY_COEFF
 
 /** @desc 是否「系数来自面板属性」的效应条目（内核 `panelStat / effectCoeff` 配方） */
 export const isEffectBase = (def: FormulaDef): boolean =>
@@ -1037,7 +1049,7 @@ export const resolveBase = (
     const effectiveRatio = ratio + (extraRatio / 100) * hits
 
     if (def.base.kind === 'targetStat') {
-        const coeff = TUNE_COEFF_MAP[ctx.target.text.type ?? ''] ?? 716.2
+        const coeff = TUNE_COEFF_MAP[ctx.target.text.type ?? ''] ?? TUNE_COEFF_FALLBACK
         return {
             baseUnit: '偏谐系数',
             baseAtkField: coeff,
@@ -1419,6 +1431,105 @@ export interface EntryResolution {
     stub: boolean
 }
 
+/**
+ * @desc **结果级去重键**：条目内容 + 它勾选的 Buff + 显式伤害类型。
+ *
+ * 拉表里同一条伤害被绑定多次是常态（`id` / 时间轴块不同、内容完全相同），而内容相同就必然
+ * 算出同一个数，所以 `id` 与 `sourceTimelineBlockId` 不进键（它们只是身份，复用结果时换掉即可）。
+ * 其余字段**全部**进键：`displayName` 会被「伤害名」规则读到，`hitName` 决定效应条目的属性。
+ */
+export const entryResultKeyOf = (
+    entry: DamageEntry,
+    damageEntryBuffSetIds: Record<string, readonly string[]> = {},
+    damageEntryDamageTypes: Record<string, readonly string[]> = {}
+): string =>
+    [
+        entry.character ?? '',
+        entry.skillType ?? '',
+        entry.hitName,
+        entry.displayName,
+        entry.formula,
+        entry.ratioUnit,
+        String(entry.ratioValue),
+        String(entry.hits),
+        String(entry.burstLayers ?? ''),
+        entry.damageBaseType,
+        entry.damageElement,
+        JSON.stringify(entry.ratioParts ?? []),
+        (damageEntryBuffSetIds[entry.id] ?? []).join(','),
+        (damageEntryDamageTypes[entry.id] ?? []).join(',')
+    ].join('\u0000')
+
+/** @desc 复用已算好的结果：只换身份字段（其余字段由内容键保证一致） */
+export const withEntryIdentity = (source: ResultEntry, entry: DamageEntry): ResultEntry => ({
+    ...source,
+    id: entry.id,
+    displayName: entry.displayName,
+    sourceTimelineBlockId: entry.sourceTimelineBlockId
+})
+
+/**
+ * @desc 单次重算内的 `resolveEntry` 记忆化：同一份「解析输入」只解析一次。
+ *
+ * 键只取**真正影响解析结果**的输入（实测：30 条条目通常只有 7 种解析结果）：
+ * 角色 / 公式（含暴击口径）/ 属性 / 推导出的伤害类型 / 勾选的 Buff 集合。
+ * 伤害名不无条件进键 —— 六类 Buff 规则里只有 `damageNameRegex` 读它，其余五类都不读。
+ *
+ * 缓存只活一次调用（不跨请求），故不需要失效逻辑；命中时克隆 `panel`，因为公式求值会把
+ * 元素/类型加成折进面板（`formulaCtxOf`），共享同一个面板会被反复累加。
+ * `target` / `writes` / `targetWrites` 只被读取，可以共享。
+ */
+export const createResolveMemo = (ctx: RefResolveContext) => {
+    const cache = new Map<string, EntryResolution>()
+    /** @desc 声骸技能文案（`buildEchoDescByEntry` 只按角色取首位声骸，故按角色缓存一次） */
+    const echoDescByChar = new Map<string, string>()
+    const echoDescOf = (entry: DamageEntry): Record<string, string> => {
+        if (entry.skillType !== SKILL_TYPE_ECHO || !entry.character) return {}
+        let desc = echoDescByChar.get(entry.character)
+        if (desc === undefined) {
+            desc = buildEchoDescByEntry([entry], ctx.team, ctx.echoSkillText ?? {})[entry.id] ?? ''
+            echoDescByChar.set(entry.character, desc)
+        }
+        return desc ? { [entry.id]: desc } : {}
+    }
+    /** @desc 候选 Buff 与「是否读伤害名」只取决于勾选集合，按勾选集合缓存一次 */
+    const preparedCache = new Map<string, { candidates: BuffInstance[]; idKey: string; nameSensitive: boolean }>()
+    const preparedOf = (entry: DamageEntry) => {
+        const boundKey = (ctx.damageEntryBuffSetIds[entry.id] ?? []).join(',')
+        const known = preparedCache.get(boundKey)
+        if (known) return known
+        const candidates = entryCandidateBuffs(entry, ctx.buffSets, ctx.damageEntryBuffSetIds)
+        const prepared = {
+            candidates,
+            idKey: candidates.map((buff) => buff.id).join(','),
+            nameSensitive: candidates.some((buff) => (buff.rules ?? []).some((rule) => rule.kind === 'damageNameRegex'))
+        }
+        preparedCache.set(boundKey, prepared)
+        return prepared
+    }
+    const resolve = (entry: DamageEntry): EntryResolution => {
+        const { idKey, nameSensitive } = preparedOf(entry)
+        const damageTypes = resolveDamageTypes(entry, ctx.damageEntryDamageTypes, ctx.charInfoMap, echoDescOf(entry))
+        const key = [
+            entry.character ?? '',
+            formulaOf(entry),
+            entry.damageElement,
+            damageTypes.join('|'),
+            nameSensitive ? entry.displayName : '',
+            idKey
+        ].join('\u0000')
+
+        const cached = cache.get(key)
+        if (cached) return { ...cached, panel: clonePanel(cached.panel) }
+        const resolved = resolveEntry(entry, ctx)
+        // 缓存里存**克隆**：返回出去的面板会被 `computeFormulaEntry` 折进元素/类型加成，
+        // 直接把同一个对象存进缓存，第二次命中就会带着上一条目累加过的 `bonusDmg`。
+        cache.set(key, { ...resolved, panel: clonePanel(resolved.panel) })
+        return resolved
+    }
+    return { resolve }
+}
+
 /** @desc 解析一条伤害条目（引擎与编译器共用的唯一来源） */
 export function resolveEntry(entry: DamageEntry, ctx: RefResolveContext): EntryResolution {
     const charName = entry.character
@@ -1552,10 +1663,19 @@ export function computeAll(
         conditionProfile,
         echoSkillText
     }
+    const resolver = createResolveMemo(ctx)
+    const done = new Map<string, ResultEntry>()
     return damageEntries.map((entry) => {
-        const resolution = resolveEntry(entry, ctx)
-        if (resolution.stub) return makeStubEntry(entry)
-        return computeFormulaEntry(entry, resolution.panel, resolution.target, resolution.damageTypes)
+        // 内容完全一致（含勾选的 Buff）的条目直接复用：拉表里同一条伤害绑定多次是常态
+        const key = entryResultKeyOf(entry, damageEntryBuffSetIds, damageEntryDamageTypes)
+        const cached = done.get(key)
+        if (cached) return withEntryIdentity(cached, entry)
+        const resolution = resolver.resolve(entry)
+        const result = resolution.stub
+            ? makeStubEntry(entry)
+            : computeFormulaEntry(entry, resolution.panel, resolution.target, resolution.damageTypes)
+        done.set(key, result)
+        return result
     })
 }
 

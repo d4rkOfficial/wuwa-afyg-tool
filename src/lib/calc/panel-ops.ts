@@ -5,7 +5,7 @@
  * 「元素加成 / 伤害类型加成」是工具箱自己的口径（内核只认 `bonusDmg` 一个作用），
  * 所以它们挂在 app 的 `AppPanel` 上，不进内核的面板类型。
  */
-import type { CharacterPanel } from '$coconut'
+import type { CharacterPanel } from '$coconut-core'
 
 /** @desc 单次写入的形态 */
 export type ZoneWrite = 'add' | 'override'
