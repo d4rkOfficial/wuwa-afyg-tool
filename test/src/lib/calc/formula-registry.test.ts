@@ -158,57 +158,21 @@ const FORMULA_MANIFEST = {
         baseAttr: 'auto',
         critBase: 'panel',
         reportsDamageTypes: true,
-        chain: [
-            'deepen',
-            'bonus',
-            'vuln',
-            'resist',
-            'defense',
-            'dmgRed',
-            'tuneStrain',
-            'unison',
-            'final',
-            'special',
-            'crit'
-        ]
+        chain: ['deepen', 'bonus', 'vuln', 'resist', 'defense', 'tuneStrain', 'unison', 'final', 'special', 'crit']
     },
     tune: {
         base: 'targetStat',
         baseAttr: 'coefficient',
         critBase: 'coefficient',
         reportsDamageTypes: true,
-        chain: [
-            'deepen',
-            'vuln',
-            'resist',
-            'defense',
-            'dmgRed',
-            'tuneStrain',
-            'tuneBreak',
-            'unison',
-            'final',
-            'special',
-            'crit'
-        ]
+        chain: ['deepen', 'vuln', 'resist', 'defense', 'tuneStrain', 'tuneBreak', 'unison', 'final', 'special', 'crit']
     },
     effect: {
         base: 'zone',
         baseAttr: 'effectCoeff',
         critBase: 'coefficient',
         reportsDamageTypes: true,
-        chain: [
-            'deepen',
-            'vuln',
-            'resist',
-            'defense',
-            'dmgRed',
-            'tuneStrain',
-            'tuneBreak',
-            'unison',
-            'final',
-            'special',
-            'crit'
-        ]
+        chain: ['deepen', 'vuln', 'resist', 'defense', 'tuneStrain', 'tuneBreak', 'unison', 'final', 'special', 'crit']
     },
     fixed: {
         base: 'fixed',

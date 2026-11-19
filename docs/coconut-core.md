@@ -157,7 +157,8 @@ interface DamageResult {
 - **暴击区**：`1 + 等效暴击率 × (暴伤 - 1)`；等效暴击率钳在 0–100（低于 0 按必不暴、高于 100 按必暴），
   但面板里的 `critRate` 原值不裁剪，「超过 100 转暴伤」这类引用读的就是原值
 - **乘子链**：顺序即注册顺序；工具箱注册的是
-  `deepen → bonus → vuln → resist → defense → dmgRed → tuneStrain → tuneBreak → unison → final → special → crit`
+  `deepen → bonus → vuln → resist → defense → tuneStrain → tuneBreak → unison → final → special → crit`
+  （`vuln` 是易伤·免伤区：对敌易伤、免伤无视、敌人免伤同一乘区加算，封底 0）
 - **系数基类**（处决 / 偏谐响应 / 效应）：双暴基准改成 0% / 100%，装备双暴不参与，Buff 追加写入照常
 
 ## 许可

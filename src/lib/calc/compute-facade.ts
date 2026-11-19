@@ -131,7 +131,6 @@ const materialize = (entry: DamageEntry, damage: DamageResult, meta: CompiledEnt
         critDmg: critDmgDecimal,
         defMulti: values.get('defense') ?? 0,
         resMulti: values.get('resist') ?? 0,
-        dmgRedMulti: values.get('dmgRed') ?? 0,
         finalDmg: z('finalDmg') / 100,
         finalTuneStrainMulti:
             tuneStrainZone !== undefined && (damage.target.zones.tuneStrainLayer ?? 0) > 0 ? tuneStrainZone - 1 : 0,
@@ -139,7 +138,8 @@ const materialize = (entry: DamageEntry, damage: DamageResult, meta: CompiledEnt
         finalUnisonMulti: unisonZone !== undefined && z('unisonBoonLayer') > 0 ? unisonZone - 1 : 0,
         customMult,
         extraRatio: z('extraRatio'),
-        vulnerability: values.has('vuln') ? z('dmgTakenInc') / 100 : 0,
+        // 易伤/免伤区的净值就是乘子 − 1（乘子里已封底 0）
+        vulnerability: values.has('vuln') ? (values.get('vuln') ?? 1) - 1 : 0,
         rawPerHit,
         expectedPerHit: damage.expected,
         totalDamage: damage.expected,

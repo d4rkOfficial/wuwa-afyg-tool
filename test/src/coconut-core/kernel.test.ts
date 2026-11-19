@@ -262,19 +262,7 @@ describe('CoconutCore：公式与暴击三列', () => {
         assert.equal(damage.baseValue, 20000)
         assert.deepEqual(
             damage.multipliers.map((m) => m.id),
-            [
-                'deepen',
-                'bonus',
-                'vuln',
-                'resist',
-                'defense',
-                'dmgRed',
-                'tuneStrain',
-                'unison',
-                'final',
-                'special',
-                'crit'
-            ]
+            ['deepen', 'bonus', 'vuln', 'resist', 'defense', 'tuneStrain', 'unison', 'final', 'special', 'crit']
         )
         const product = damage.multipliers.reduce((acc, m) => acc * m.value, 1)
         assert.equal(damage.expected, Math.round(20000 * product))

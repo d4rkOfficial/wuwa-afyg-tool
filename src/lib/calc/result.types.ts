@@ -6,8 +6,8 @@ import type { MultiplierDisplay } from './display-meta'
  * @desc 乘区的展示参数（结构化）：内核只给**原始量纲**，格式化留给界面层
  * （`result.styles.ts` 的 `formatMultiplierDisplay`）。
  *
- * - `delta`：显示成「1 + x%」形态（加深 / 增伤 / 易伤 / 终伤 / 谐度）；
- * - `factor`：显示成乘数（抗性 / 防御 / 免伤 / 特殊）；
+ * - `delta`：显示成「1 + x%」形态（加深 / 增伤 / 易伤·免伤 / 终伤 / 谐度）；
+ * - `factor`：显示成乘数（抗性 / 防御 / 特殊）；
  * - `deltaWhenActive`：生效时显示 delta、未生效时显示乘数（集谐 / 同奏 / 暴击这类值可能恰为 1 的乘区）。
  */
 export type { MultiplierDisplay } from './display-meta'
@@ -71,7 +71,6 @@ export interface ResultEntry {
     critDmg: number
     defMulti: number
     resMulti: number
-    dmgRedMulti: number
     finalDmg: number
     finalTuneStrainMulti: number
     finalTuneBreakZone: number
@@ -79,6 +78,7 @@ export interface ResultEntry {
     finalUnisonMulti: number
     customMult: number
     extraRatio: number
+    /** @desc 易伤/免伤区净值（含负号）：乘子 = 1 + 净值，封底 0；来源是 易伤 − 穿免 − 敌人免伤 */
     vulnerability: number
 
     // per hit and total

@@ -128,10 +128,9 @@ const factorDisplay: MultiplierDisplayFn = () => ({ mode: 'factor', digits: 4 })
 export const MULTIPLIER_META: Record<MultiplierId, MultiplierMeta> = {
     deepen: { label: '加深区', display: deltaDisplay },
     bonus: { label: '增伤区', display: deltaDisplay },
-    vuln: { label: '易伤区', display: deltaDisplay },
+    vuln: { label: '易伤/免伤区', display: deltaDisplay },
     resist: { label: '抗性区', display: factorDisplay },
     defense: { label: '防御区', display: factorDisplay },
-    dmgRed: { label: '免伤区', display: factorDisplay },
     tuneStrain: {
         label: '集谐区',
         display: (value, ctx) => ({

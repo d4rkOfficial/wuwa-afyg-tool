@@ -300,7 +300,6 @@ describe('编译 → 内核 与引擎数值对账', () => {
             'dmgBonus',
             'defMulti',
             'resMulti',
-            'dmgRedMulti',
             'finalDmg',
             'extraRatio',
             'vulnerability'

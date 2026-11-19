@@ -55,13 +55,16 @@ const bonusMultiplier = defineFormula(
     ({ bonusDmg }) => 1 + bonusDmg / 100
 )
 
+/**
+ * @desc 易伤/免伤区：对敌易伤、免伤无视（穿免）、敌人免伤同一乘区、加算。
+ */
 const vulnMultiplier = defineFormula(
     {
         id: 'vuln',
-        inputs: ['dmgTakenInc'] as const,
-        uses: [pctPlusOne] as const
+        inputs: ['dmgTakenInc', 'dmgRedPen', 'target.enemyDmgReduction'] as const
     },
-    (r) => r.pctPlusOne(r.dmgTakenInc)
+    ({ dmgTakenInc, dmgRedPen, 'target.enemyDmgReduction': enemyDmgReduction }) =>
+        Math.max(0, 1 + (dmgTakenInc - dmgRedPen - enemyDmgReduction) / 100)
 )
 
 const resistMultiplier = defineFormula(
@@ -79,14 +82,6 @@ const defenseMultiplier = defineFormula(
         inputs: ['defPen', 'defDown', 'target.defense'] as const
     },
     (r, ctx) => computeDefMulti(r['target.defense'], r.defPen, r.defDown, ctx.consts.charLevel ?? DEFAULT_CHAR_LEVEL)
-)
-
-const dmgRedMultiplier = defineFormula(
-    {
-        id: 'dmgRed',
-        inputs: ['dmgRedPen', 'target.enemyDmgReduction'] as const
-    },
-    (r) => 1 - r['target.enemyDmgReduction'] / 100 - r.dmgRedPen / 100
 )
 
 /** @desc 集谐区（鸣潮 3.0）：谐度破坏增幅 × 集谐干涉层数 */
@@ -148,7 +143,6 @@ export const MULTIPLIERS = {
     vuln: vulnMultiplier,
     resist: resistMultiplier,
     defense: defenseMultiplier,
-    dmgRed: dmgRedMultiplier,
     tuneStrain: tuneStrainMultiplier,
     tuneBreak: tuneBreakMultiplier,
     unison: unisonMultiplier,

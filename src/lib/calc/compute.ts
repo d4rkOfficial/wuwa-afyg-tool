@@ -1210,7 +1210,6 @@ export const computeFormulaEntry = (
         critDmg: critDmgDecimal,
         defMulti: values.get(MULTIPLIERS.defense.id) ?? 0,
         resMulti: values.get(MULTIPLIERS.resist.id) ?? 0,
-        dmgRedMulti: values.get(MULTIPLIERS.dmgRed.id) ?? 0,
         finalDmg: z('finalDmg') / 100,
         finalTuneStrainMulti:
             tuneStrainZone !== undefined && (target.zones.tuneStrainLayer ?? 0) > 0 ? tuneStrainZone - 1 : 0,
@@ -1218,7 +1217,8 @@ export const computeFormulaEntry = (
         finalUnisonMulti: unisonZone !== undefined && z('unisonBoonLayer') > 0 ? unisonZone - 1 : 0,
         customMult,
         extraRatio: z('extraRatio'),
-        vulnerability: values.has(MULTIPLIERS.vuln.id) ? z('dmgTakenInc') / 100 : 0,
+        // 易伤/免伤区的净值就是乘子 − 1（乘子里已封底 0），这样 `1 + vulnerability` 恒等于该区乘子
+        vulnerability: values.has(MULTIPLIERS.vuln.id) ? values.get(MULTIPLIERS.vuln.id)! - 1 : 0,
         rawPerHit: nonCritPerHit,
         expectedPerHit,
         totalDamage: expectedPerHit,
@@ -1269,7 +1269,6 @@ export function makeStubEntry(entry: DamageEntry): ResultEntry {
         critDmg: 0,
         defMulti: 0,
         resMulti: 0,
-        dmgRedMulti: 0,
         finalDmg: 0,
         finalTuneStrainMulti: 0,
         finalTuneBreakZone: 0,

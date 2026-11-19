@@ -744,14 +744,16 @@ const SEGMENT_BUILDERS: Record<MultiplierId, (c: SegmentCtx) => DamageSegment | 
             `(1 + ${fmtPercent(entry.dmgBonus * 100)})`,
             collectBonusParts(entry, ctx, buffs, zoneTrace)
         ),
-    vuln: ({ entry, buffs, zoneTrace, valueOf }) =>
-        seg(
-            'vuln',
-            '易伤区',
-            valueOf('vuln'),
-            `(1 + ${fmtPercent(entry.vulnerability * 100)})`,
-            buffZoneParts(buffs, 'dmgTakenInc', '易伤', '%', zoneTrace)
-        ),
+    // 易伤 / 穿免 / 敌人免伤是**同一个乘区、加算**：净值可能为负（免伤高于易伤 ⇒ 乘子 < 1），
+    // 净值 ≤ -100% 时乘子封底为 0（负伤害没有意义）。来源条把三类输入一起列出。
+    vuln: ({ entry, ctx, buffs, zoneTrace, valueOf }) => {
+        const delta = entry.vulnerability
+        const detail = delta >= 0 ? `(1 + ${fmtPercent(delta * 100)})` : `(1 − ${fmtPercent(-delta * 100)})`
+        return seg('vuln', '易伤/免伤区', valueOf('vuln'), detail, [
+            ...buffZoneParts(buffs, 'dmgTakenInc', '易伤', '%', zoneTrace),
+            ...collectEnemyParts(entry, ctx, buffs, 'dmgRed', zoneTrace)
+        ])
+    },
     resist: ({ entry, ctx, buffs, zoneTrace, valueOf }) =>
         seg(
             'resist',
@@ -767,14 +769,6 @@ const SEGMENT_BUILDERS: Record<MultiplierId, (c: SegmentCtx) => DamageSegment | 
             valueOf('defense'),
             entry.defMulti.toFixed(4),
             collectEnemyParts(entry, ctx, buffs, 'def', zoneTrace)
-        ),
-    dmgRed: ({ entry, ctx, buffs, zoneTrace, valueOf }) =>
-        seg(
-            'dmgRed',
-            '免伤区',
-            valueOf('dmgRed'),
-            entry.dmgRedMulti.toFixed(4),
-            collectEnemyParts(entry, ctx, buffs, 'dmgRed', zoneTrace)
         ),
     // 集谐·干涉层数挂在目标身上、全队一份：来源可能指向别的角色，按目标侧口径取（不做作用域过滤）。
     // 该区不生效（值恒为 1）时不列来源，否则溯源/AI 会读到「区值 1 却有一堆来源」的幻影贡献。
