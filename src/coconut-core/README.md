@@ -25,7 +25,7 @@ const result = core.compute(table)
 公式 / 面板维度 / 目标侧字段 / 常量，随工具箱发版更新），默认导出就是配置对象：
 
 ```sh
-npm i https://github.com/d4rkOfficial/wuwa-afyg-tool/releases/latest/download/d4rkofficial-coconut-config-0.0.1.tgz
+npm i https://github.com/d4rkOfficial/wuwa-afyg-tool/releases/latest/download/coconut-config.tgz
 ```
 
 ```ts

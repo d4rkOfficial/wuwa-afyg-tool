@@ -40,7 +40,7 @@ npm i https://github.com/d4rkOfficial/wuwa-afyg-tool/releases/download/core-v0.1
 目标侧字段 / 常量）。它随工具箱发版更新，默认导出即配置对象：
 
 ```sh
-npm i https://github.com/d4rkOfficial/wuwa-afyg-tool/releases/latest/download/d4rkofficial-coconut-config-0.0.1.tgz
+npm i https://github.com/d4rkOfficial/wuwa-afyg-tool/releases/latest/download/coconut-config.tgz
 ```
 
 ```ts

@@ -1,9 +1,12 @@
 /**
- * @desc 把 `src/coconut-config` 编译成**可发布的 config 包**：`dist/calc-config/` → `dist/d4rkofficial-coconut-config-<version>.tgz`。
+ * @desc 把 `src/coconut-config` 编译成**可发布的 config 包**：`dist/calc-config/` → `dist/coconut-config.tgz`。
  *
  * 为什么要单独发包：内核零语料，使用方要么自己写 35 条作用 / 19 个引用来源 / 12 个乘子 / 4 条公式，
  * 要么直接拿工具箱已经调好的这一份。这份 config 只依赖内核的**类型**与 `defineFormula`，
  * 所以装它 + 内核就能算《鸣潮》口径。
+ *
+ * 资产名固定为 `coconut-config.tgz`（不带版本号）：下载地址不随版本变化，
+ * 版本号仍写在包内 `package.json` 里，需要锁版本就按 release 标签取（`/releases/download/toolbox-<sha>/…`）。
  *
  * 版本号默认取根 `package.json`（与工具箱一起发，脚本用 `--version` 覆盖）。
  * 产物：`index.js`（单文件 ESM，默认导出当前版本的 config）、`index.d.ts`、`package.json`、`README.md`。
@@ -11,7 +14,7 @@
  * 用法：node scripts/release-calc-config.mjs [--version 0.0.1]
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 
@@ -202,9 +205,13 @@ const [shellBin, shellArgs] =
         : ['/bin/sh', ['-c', packCmd]]
 const packOutput = execFileSync(shellBin, shellArgs, { cwd: outDir, encoding: 'utf8' })
 const [packed] = JSON.parse(packOutput)
-const tarball = resolve(outDir, '..', packed.filename)
+const packedPath = resolve(outDir, '..', packed.filename)
 
-/** 8) 自检：`files` 写错时不能「打包成功」 */
+/** 8) 资产名固定：`npm pack` 产出带版本号的文件名，这里改成稳定的 `coconut-config.tgz` */
+const tarball = resolve(outDir, '..', 'coconut-config.tgz')
+renameSync(packedPath, tarball)
+
+/** 9) 自检：`files` 写错时不能「打包成功」 */
 const paths = new Set(packed.files.map((file) => file.path))
 const required = ['package.json', 'index.js', 'index.d.ts', 'README.md']
 const missing = required.filter((file) => !paths.has(file))
@@ -219,4 +226,5 @@ console.log(`     ${packed.files.map((file) => file.path).join('\n     ')}`)
 console.log(`   tarball  ${tarball}（${sizeKb} KB，解包后 ${(packed.unpackedSize / 1024).toFixed(1)} KB）`)
 console.log(`\n── 消费方安装（core 与本包都从工具箱 Release 取）`)
 console.log(`npm i ${repo}/releases/download/core-v0.1.0/d4rkofficial-coconut-core-0.1.0.tgz`)
-console.log(`npm i ${repo}/releases/latest/download/${packed.filename}`)
+console.log(`npm i ${repo}/releases/latest/download/coconut-config.tgz`)
+console.log(`（锁版本：把 latest 换成对应的 toolbox-<sha> 标签，包内 package.json 的 version 即该次发布版本）`)
