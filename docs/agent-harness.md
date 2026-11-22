@@ -2,27 +2,27 @@
 
 AI 助手的回合结构、会话覆盖层（模型/提供商/思考/权限的临时覆盖，不落盘）、上下文组成、变化队列、自定义 Skill、token / 缓存命中统计与实时运行情况。
 
-| 文件                                                            | 职责                                                       |
-| --------------------------------------------------------------- | ---------------------------------------------------------- |
-| `src/lib/ai/session.ts`                                         | 回合循环、事件分发（双协议：Responses / Chat Completions） |
-| `src/lib/ai/turn-context.ts`                                    | 上下文分段结构与消息装配顺序（纯逻辑，装配与面板共用真源） |
-| `src/lib/ai/token-usage.ts`                                     | usage 解析 + 本地 token 估算 + 格式化                      |
-| `src/lib/ai/turn-state.svelte.ts`                               | 会话级临时状态：分段快照/禁用、实时运行、用量累计          |
-| `src/lib/ai/persona.ts`                                         | 默认人设提示词                                             |
-| `src/lib/ai/change-queue.svelte.ts`                             | 工程变化队列（静默；面板可看待上报条数并清空）             |
-| `src/lib/ai/skills.ts`                                          | 技能卡纯逻辑（类型/归一化/内置合并/注入渲染）              |
-| `src/lib/data/ai-skills.svelte.ts`                              | 自定义 Skill 存储（IndexedDB）                             |
-| `src/lib/ai/tools/skills.ts`                                    | 技能卡 CRUD + `use_skill` 工具                             |
-| `src/lib/ai/thinking.ts`                                        | 思考强度档位与协议映射                                     |
-| `src/lib/ai/session-overrides.svelte.ts`                        | **会话覆盖层**：模型/提供商/思考/权限临时覆盖（内存态）    |
-| `src/lib/ai/compaction.ts`                                      | 上下文压缩（切分点/摘要消息/摘要请求/token 统计）          |
-| `src/lib/ai/image-parts.ts`                                     | 图片附件 → 两协议 content parts（形状差异唯一真源）        |
-| `src/lib/ai/attachments.ts`                                     | 图片附件准入校验与读取                                     |
-| `src/lib/components/page/home/settings/ai-assistant.svelte`     | 助手界面                                                   |
-| `src/lib/components/page/home/settings/ai-composer.svelte`      | 输入区 composer                                            |
-| `src/lib/components/page/home/settings/ai-usage-ring.svelte`    | 上下文用量圈                                               |
-| `src/lib/components/page/home/settings/ai-context-panel.svelte` | 上下文面板                                                 |
-| `src/lib/components/page/home/settings/skill-section.svelte`    | 技能管理                                                   |
+| 文件                                                                                                                                | 职责                                                       |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| [`src/lib/ai/session.ts`](../src/lib/ai/session.ts)                                                                                 | 回合循环、事件分发（双协议：Responses / Chat Completions） |
+| [`src/lib/ai/turn-context.ts`](../src/lib/ai/turn-context.ts)                                                                       | 上下文分段结构与消息装配顺序（纯逻辑，装配与面板共用真源） |
+| [`src/lib/ai/token-usage.ts`](../src/lib/ai/token-usage.ts)                                                                         | usage 解析 + 本地 token 估算 + 格式化                      |
+| [`src/lib/ai/turn-state.svelte.ts`](../src/lib/ai/turn-state.svelte.ts)                                                             | 会话级临时状态：分段快照/禁用、实时运行、用量累计          |
+| [`src/lib/ai/persona.ts`](../src/lib/ai/persona.ts)                                                                                 | 默认人设提示词                                             |
+| [`src/lib/ai/change-queue.svelte.ts`](../src/lib/ai/change-queue.svelte.ts)                                                         | 工程变化队列（静默；面板可看待上报条数并清空）             |
+| [`src/lib/ai/skills.ts`](../src/lib/ai/skills.ts)                                                                                   | 技能卡纯逻辑（类型/归一化/内置合并/注入渲染）              |
+| [`src/lib/data/ai-skills.svelte.ts`](../src/lib/data/ai-skills.svelte.ts)                                                           | 自定义 Skill 存储（IndexedDB）                             |
+| [`src/lib/ai/tools/skills.ts`](../src/lib/ai/tools/skills.ts)                                                                       | 技能卡 CRUD + `use_skill` 工具                             |
+| [`src/lib/ai/thinking.ts`](../src/lib/ai/thinking.ts)                                                                               | 思考强度档位与协议映射                                     |
+| [`src/lib/ai/session-overrides.svelte.ts`](../src/lib/ai/session-overrides.svelte.ts)                                               | **会话覆盖层**：模型/提供商/思考/权限临时覆盖（内存态）    |
+| [`src/lib/ai/compaction.ts`](../src/lib/ai/compaction.ts)                                                                           | 上下文压缩（切分点/摘要消息/摘要请求/token 统计）          |
+| [`src/lib/ai/image-parts.ts`](../src/lib/ai/image-parts.ts)                                                                         | 图片附件 → 两协议 content parts（形状差异唯一真源）        |
+| [`src/lib/ai/attachments.ts`](../src/lib/ai/attachments.ts)                                                                         | 图片附件准入校验与读取                                     |
+| [`src/lib/components/page/home/settings/ai-assistant.svelte`](../src/lib/components/page/home/settings/ai-assistant.svelte)         | 助手界面                                                   |
+| [`src/lib/components/page/home/settings/ai-composer.svelte`](../src/lib/components/page/home/settings/ai-composer.svelte)           | 输入区 composer                                            |
+| [`src/lib/components/page/home/settings/ai-usage-ring.svelte`](../src/lib/components/page/home/settings/ai-usage-ring.svelte)       | 上下文用量圈                                               |
+| [`src/lib/components/page/home/settings/ai-context-panel.svelte`](../src/lib/components/page/home/settings/ai-context-panel.svelte) | 上下文面板                                                 |
+| [`src/lib/components/page/home/settings/skill-section.svelte`](../src/lib/components/page/home/settings/skill-section.svelte)       | 技能管理                                                   |
 
 ## 回合结构
 

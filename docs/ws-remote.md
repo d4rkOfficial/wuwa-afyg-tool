@@ -129,7 +129,7 @@ exec set_team_character {"slot":1,"character":"散华"}
 
 ## 工具清单
 
-工具与 AI 助手完全一致，按领域分组（运行 `node scripts/ws-demo-server.mjs` 后输入 `tools` 看完整清单，或看 `src/lib/ai/tools/`）。
+工具与 AI 助手完全一致，按领域分组（运行 `node scripts/ws-demo-server.mjs` 后输入 `tools` 看完整清单，或看 [`src/lib/ai/tools/`](../src/lib/ai/tools)）。
 
 | 领域          | 工具（节选）                                                                                                                                                                         |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -145,7 +145,7 @@ exec set_team_character {"slot":1,"character":"散华"}
 
 ## 示例服务端
 
-`scripts/ws-demo-server.mjs`：零依赖，Node 原生 `http` upgrade + 手写最小 WebSocket 帧编解码（仅文本帧、无分片，演示用途）。
+[`scripts/ws-demo-server.mjs`](../scripts/ws-demo-server.mjs)：零依赖，Node 原生 `http` upgrade + 手写最小 WebSocket 帧编解码（仅文本帧、无分片，演示用途）。
 
 ```bash
 node scripts/ws-demo-server.mjs [port]   # 默认 8765
@@ -163,11 +163,11 @@ node scripts/ws-demo-server.mjs [port]   # 默认 8765
 
 ## 实现说明
 
-| 部件         | 文件 / 说明                                                                                                                                                             |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 客户端       | `src/lib/ws-remote/ws-remote.svelte.ts`（连接/重连/协议/串行队列/状态推送），挂于 `+layout.svelte`（hash 解析 + 自动连接）与 `+page.svelte`（宿主桥）                   |
-| 连接偏好     | `src/lib/data/ws-prefs.svelte.ts`（localStorage 持久）；设置输入草稿在 `settings-ui.svelte.ts`，UI 在 `settings/sections/connection.svelte`，统一走 `setWsConnection()` |
-| 状态胶囊     | `components/page/home/ws-status-chip.svelte`，与顶栏弹窗共用                                                                                                            |
-| 执行入口     | `executeTool(ctx, name, args)`（`src/lib/ai/tools/registry.ts`），与 AI 会话共用注册表，能力天然同步                                                                    |
-| 状态推送     | 顶栏 `phase-tabs.svelte` 内 `$effect` 观察工程/视图/锁定/弹窗变化后调 `pushState()`                                                                                     |
-| 危险操作放行 | `ToolContext.onConfirm` 恒为 `true`；收紧改 `buildCtx()`                                                                                                                |
+| 部件         | 文件 / 说明                                                                                                                                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 客户端       | [`src/lib/ws-remote/ws-remote.svelte.ts`](../src/lib/ws-remote/ws-remote.svelte.ts)（连接/重连/协议/串行队列/状态推送），挂于 `+layout.svelte`（hash 解析 + 自动连接）与 `+page.svelte`（宿主桥）             |
+| 连接偏好     | [`src/lib/data/ws-prefs.svelte.ts`](../src/lib/data/ws-prefs.svelte.ts)（localStorage 持久）；设置输入草稿在 `settings-ui.svelte.ts`，UI 在 `settings/sections/connection.svelte`，统一走 `setWsConnection()` |
+| 状态胶囊     | `components/page/home/ws-status-chip.svelte`，与顶栏弹窗共用                                                                                                                                                  |
+| 执行入口     | `executeTool(ctx, name, args)`（[`src/lib/ai/tools/registry.ts`](../src/lib/ai/tools/registry.ts)），与 AI 会话共用注册表，能力天然同步                                                                       |
+| 状态推送     | 顶栏 `phase-tabs.svelte` 内 `$effect` 观察工程/视图/锁定/弹窗变化后调 `pushState()`                                                                                                                           |
+| 危险操作放行 | `ToolContext.onConfirm` 恒为 `true`；收紧改 `buildCtx()`                                                                                                                                                      |

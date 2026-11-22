@@ -1,8 +1,8 @@
 # 上游数据源接入
 
-应用对上游的唯一抽象是 `DataProvider`（`src/lib/api/provider/types.ts`）。新增上游实现该接口并注册，路由 / 组件 / AI 工具只依赖接口，不感知具体上游。
+应用对上游的唯一抽象是 `DataProvider`（[`src/lib/api/provider/types.ts`](../src/lib/api/provider/types.ts)）。新增上游实现该接口并注册，路由 / 组件 / AI 工具只依赖接口，不感知具体上游。
 
-当前生产上游：**nanoka**（`src/lib/api/provider/nanoka/`）。
+当前生产上游：**nanoka**（[`src/lib/api/provider/nanoka/`](../src/lib/api/provider/nanoka)）。
 
 ## 接口方法
 
@@ -16,12 +16,12 @@
 
 ## 接入步骤
 
-| 步  | 落点                                          | 内容                                               |
-| --- | --------------------------------------------- | -------------------------------------------------- |
-| 1   | `src/lib/api/provider/{id}/`                  | 建适配器目录，文件分工见下表                       |
-| 2   | `src/lib/api/provider/index.ts` 的 `REGISTRY` | 追加 `{ id, label, create }`                       |
-| 3   | `test/src/lib/api/provider/{id}/`             | 编写测试，见「测试」                               |
-| 4   | 命令行                                        | `pnpm test` → `pnpm run format` → `pnpm run check` |
+| 步  | 落点                                                                              | 内容                                               |
+| --- | --------------------------------------------------------------------------------- | -------------------------------------------------- |
+| 1   | `src/lib/api/provider/{id}/`                                                      | 建适配器目录，文件分工见下表                       |
+| 2   | [`src/lib/api/provider/index.ts`](../src/lib/api/provider/index.ts) 的 `REGISTRY` | 追加 `{ id, label, create }`                       |
+| 3   | `test/src/lib/api/provider/{id}/`                                                 | 编写测试，见「测试」                               |
+| 4   | 命令行                                                                            | `pnpm test` → `pnpm run format` → `pnpm run check` |
 
 适配器目录文件分工：
 
@@ -35,14 +35,14 @@
 
 ## 测试
 
-测试镜像源码路径放仓库根 `test/`（见 AGENTS §4 / §5.2），无需登记：`test/run-tests.ts` 自动发现 `test/**/*.test.ts`。
+测试镜像源码路径放仓库根 `test/`（见 AGENTS §4 / §5.2），无需登记：[`test/run-tests.ts`](../test/run-tests.ts) 自动发现 `test/**/*.test.ts`。
 
 | 文件                                              | 覆盖                                                     |
 | ------------------------------------------------- | -------------------------------------------------------- |
 | `test/src/lib/api/provider/{id}/utils.test.ts`    | 纯转换函数                                               |
 | `test/src/lib/api/provider/{id}.provider.test.ts` | mock fetch 驱动适配器方法 + `runContractTests(provider)` |
 
-共享契约夹具：`test/src/lib/api/provider/contract-test.ts`。目标路径用 `test/paths.ts` 的 `testPathOf()` 推导。
+共享契约夹具：[`test/src/lib/api/provider/contract-test.ts`](../test/src/lib/api/provider/contract-test.ts)。目标路径用 [`test/paths.ts`](../test/paths.ts) 的 `testPathOf()` 推导。
 
 ## 数据质量验收
 

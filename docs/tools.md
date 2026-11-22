@@ -1,6 +1,6 @@
 # 工具文档（AI 助手 / WS 远程接管共用）
 
-> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **172** 个工具。
+> 本文档由 [`scripts/generate-tools-doc.mjs`](../scripts/generate-tools-doc.mjs) 从工具源码自动生成，共 **172** 个工具。
 > 新增/修改工具后请重跑：`node scripts/generate-tools-doc.mjs`
 
 AI 助手与 WS 远程接管（`#websocket=`）共用同一套工具注册表与执行引擎。

@@ -2,9 +2,9 @@
 
 <img src="src/lib/assets/favicon.svg" alt="椰果工具箱" width="110" />
 
-<h1>椰果工具箱 · WUWA-AFYG-TOOL</h1>
+<h1>椰果工具箱</h1>
 
-<p><i>适合所有人的《鸣潮》拉表、排轴、配装对比计算工具</i></p>
+<p><i>基于“一切皆 Buff”架构的《鸣潮》拉表工具</i></p>
 
 <p>
 <img src="https://img.shields.io/badge/SvelteKit-FF3E00?logo=svelte&logoColor=white" alt="SvelteKit" />
@@ -14,14 +14,8 @@
 <img src="https://img.shields.io/badge/Iconify-3E7BFA?logo=iconify&logoColor=white" alt="Iconify" />
 <img src="https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white" alt="Vercel" />
 <img src="https://img.shields.io/badge/Cloudflare%20Pages-F38020?logo=cloudflare&logoColor=white" alt="Cloudflare Pages" />
-<img src="https://img.shields.io/badge/IndexedDB-7BA0C1" alt="IndexedDB" />
 <img src="https://img.shields.io/badge/GitHub-181717?logo=github&logoColor=white" alt="GitHub Release" />
-</p>
-
-<p>
-<a href="https://wuwa-afyg-tool.200503.xyz/"><b>凹分椰果 · 主站</b></a> ·
-<a href="https://wuwa-hpyg-tool.200503.xyz/"><b>滑坡椰果 · 副站</b></a> ·
-<a href="https://wuwa-afyg-share.200503.xyz/launcher"><b>启动器下载</b></a>
+<a href="https://www.bilibili.com/toy/coconut-toolbox/index.html"><img src="https://img.shields.io/badge/Bilibili%20Toy-FB7299?logo=bilibili&logoColor=white" alt="Bilibili Toy" /></a>
 </p>
 
 </div>
@@ -30,9 +24,22 @@
 
 <table>
 <tr>
-<td align="center" width="33%"><a href="https://github.com/d4rkOfficial/coconut-app"><b>启动器</b></a><br />桌面端 / 插件宿主</td>
-<td align="center" width="33%"><a href="https://github.com/d4rkOfficial/wuwa-afyg-share"><b>工坊</b></a><br />方案分享</td>
-<td align="center" width="34%"><a href="https://github.com/d4rkOfficial/coconut-app-plugin-sdk"><b>插件 SDK</b></a><br />启动器插件开发</td>
+<td width="25%" valign="top" style="border:1px solid #8b949e;border-top:3px solid #cf222e;border-radius:8px;padding:12px">
+<b style="color:#cf222e">网页版</b><br />拉表 / 排轴 / 配装对比<br /><br />
+<div align="right"><a href="https://wuwa-afyg-tool.200503.xyz/" style="color:#cf222e">前往主站</a> · <a href="https://wuwa-hpyg-tool.200503.xyz/" style="color:#cf222e">前往副站</a></div>
+</td>
+<td width="25%" valign="top" style="border:1px solid #8b949e;border-top:3px solid #bf8700;border-radius:8px;padding:12px">
+<b style="color:#bf8700">启动器</b><br />桌面端 / 插件宿主<br /><br />
+<div align="right"><a href="https://github.com/d4rkOfficial/coconut-app" style="color:#bf8700">启动器仓库</a> · <a href="https://github.com/d4rkOfficial/coconut-app-plugin-sdk" style="color:#bf8700">插件 SDK</a></div>
+</td>
+<td width="25%" valign="top" style="border:1px solid #8b949e;border-top:3px solid #4493f8;border-radius:8px;padding:12px">
+<b style="color:#4493f8">椰果工坊</b><br />方案分享与数据同步<br /><br />
+<div align="right"><a href="https://github.com/d4rkOfficial/wuwa-afyg-share" style="color:#4493f8">前往椰果工坊</a></div>
+</td>
+<td width="25%" valign="top" style="border:1px solid #8b949e;border-top:3px solid #3fb950;border-radius:8px;padding:12px">
+<b style="color:#3fb950">椰果引擎</b><br />纯函数伤害计算核心<br /><br />
+<div align="right"><a href="src/coconut-core/README.md" style="color:#3fb950">CoconutCore README</a></div>
+</td>
 </tr>
 </table>
 
@@ -99,7 +106,7 @@ pnpm test:infer   # 联网 TDD 夹具（默认不在 pnpm test 内）
 
 ## API
 
-**只读数据接口**，供 AI 助手、外部脚本与自建站点使用，随游戏版本自动更新；上游以 `DataProvider` 适配器接入（`src/lib/api/provider/`），见 [docs/upstream-integration.md](docs/upstream-integration.md)。
+**只读数据接口**，供 AI 助手、外部脚本与自建站点使用，随游戏版本自动更新；上游以 `DataProvider` 适配器接入（[`src/lib/api/provider/`](src/lib/api/provider)），见 [docs/upstream-integration.md](docs/upstream-integration.md)。
 
 ## 声明
 

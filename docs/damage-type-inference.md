@@ -1,16 +1,16 @@
 # 伤害类型推导与 TDD 流程
 
-说明「伤害条目 → 伤害类型」的自动推导链（`src/coconut-core/engine/skill-infer.ts` + `engine/utils.ts`），以及用 `assertCorrectDamageTypeInfer` 以 TDD 补用例、定位与修护栏。
+说明「伤害条目 → 伤害类型」的自动推导链（[`src/lib/calc/skill-infer.ts`](../src/lib/calc/skill-infer.ts) + [`src/lib/calc/utils.ts`](../src/lib/calc/utils.ts)），以及用 `assertCorrectDamageTypeInfer` 以 TDD 补用例、定位与修护栏。
 
 ## 输入与输出
 
-| 项           | 内容                                                                                            |
-| ------------ | ----------------------------------------------------------------------------------------------- |
-| 输入         | `DamageEntry`：`skillType`（技能类型）、`hitName`（倍率行名）、`isEffect`（是否效应）           |
-| 附加输入     | 声骸技能条目首位声骸文案（应用层 `buildEchoDescByEntry` 传入）；用户手动设置的伤害类型          |
-| 输出         | `DAMAGE_TYPES` 的一个或多个（`string[]`；「同时视为」产出双类型，如 `['重击伤害','效应伤害']`） |
-| 入口         | `inferDamageTypes(entry, charInfo, echoDesc?)`（`engine/utils.ts`）                             |
-| 应用层优先级 | 用户手动设置的类型不被自动推导覆盖                                                              |
+| 项           | 内容                                                                                                  |
+| ------------ | ----------------------------------------------------------------------------------------------------- |
+| 输入         | `DamageEntry`：`skillType`（技能类型）、`hitName`（倍率行名）、`isEffect`（是否效应）                 |
+| 附加输入     | 声骸技能条目首位声骸文案（应用层 `buildEchoDescByEntry` 传入）；用户手动设置的伤害类型                |
+| 输出         | `DAMAGE_TYPES` 的一个或多个（`string[]`；「同时视为」产出双类型，如 `['重击伤害','效应伤害']`）       |
+| 入口         | `inferDamageTypes(entry, charInfo, echoDesc?)`（[`src/lib/calc/utils.ts`](../src/lib/calc/utils.ts)） |
+| 应用层优先级 | 用户手动设置的类型不被自动推导覆盖                                                                    |
 
 `DAMAGE_TYPES`：普攻 / 重击 / 共鸣技能 / 共鸣解放 / 声骸技能 / 变奏技能 / 延奏技能 / 协同攻击 / 效应 / 其它类型伤害。
 
@@ -113,16 +113,16 @@
 
 ## TDD 流程
 
-| 步  | 操作                                                                                                                                                                            |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | 查行名：`await listRatios('长离', '重击')`（或看游戏面板）                                                                                                                      |
-| 2   | 写期望（先红）：复制 `test/damage-type-infer.example.ts` 为用例脚本，填「角色 + 行名 + 期望类型」进 `CASES`；期望只能来自游戏内判定或文案明写                                   |
-| 3   | 跑：`node --import ./test/preload.mjs test/damage-type-infer.example.ts`；失败打印「期望 X，实际 Y（命中节点：…）」并非 0 退出                                                  |
-| 4   | 定位：先确认期望没错；`await dumpRatioContext('长离', '重击')` 打印该倍率相关文案，判断结论落在哪节                                                                             |
-| 5   | 改算法：只改 `skill-infer.ts`（规则2）或 `engine/utils.ts`（兜底），不为让用例变绿改期望                                                                                        |
-| 6   | 跑绿：重跑第 3 步                                                                                                                                                               |
-| 7   | 固化：网络/上游用例留 `test/` 下用 `.ts`（不叫 `*.test.ts`，不进 `pnpm test`）；结构性行为补进离线夹具 `test/src/coconut-core/engine/skill-infer.test.ts`（自动跑到，无需登记） |
-| 8   | 收尾：`pnpm run format && pnpm run lint:eslint && pnpm run check`                                                                                                               |
+| 步  | 操作                                                                                                                                                                                                             |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 查行名：`await listRatios('长离', '重击')`（或看游戏面板）                                                                                                                                                       |
+| 2   | 写期望（先红）：复制 [`test/damage-type-infer.example.ts`](../test/damage-type-infer.example.ts) 为用例脚本，填「角色 + 行名 + 期望类型」进 `CASES`；期望只能来自游戏内判定或文案明写                            |
+| 3   | 跑：`node --import ./test/preload.mjs test/damage-type-infer.example.ts`；失败打印「期望 X，实际 Y（命中节点：…）」并非 0 退出                                                                                   |
+| 4   | 定位：先确认期望没错；`await dumpRatioContext('长离', '重击')` 打印该倍率相关文案，判断结论落在哪节                                                                                                              |
+| 5   | 改算法：只改 `skill-infer.ts`（规则2）或 [`src/lib/calc/utils.ts`](../src/lib/calc/utils.ts)（兜底），不为让用例变绿改期望                                                                                       |
+| 6   | 跑绿：重跑第 3 步                                                                                                                                                                                                |
+| 7   | 固化：网络/上游用例留 `test/` 下用 `.ts`（不叫 `*.test.ts`，不进 `pnpm test`）；结构性行为补进离线夹具 [`test/src/lib/calc/skill-infer.test.ts`](../test/src/lib/calc/skill-infer.test.ts)（自动跑到，无需登记） |
+| 8   | 收尾：`pnpm run format && pnpm run lint:eslint && pnpm run check`                                                                                                                                                |
 
 离线夹具示例：
 
@@ -199,21 +199,21 @@ await sweepDamageTypeInfer(names) // 也可只跑 ['长离', '安可', '嘉贝�
 
 ## 相关文件与命令
 
-| 文件                                               | 作用                                                           |
-| -------------------------------------------------- | -------------------------------------------------------------- |
-| `src/coconut-core/engine/skill-infer.ts`           | 规则2 全部实现（节点/小节定位、两轮匹配、归属兜底）            |
-| `src/coconut-core/engine/utils.ts`                 | 判定链入口 `inferDamageTypes`、规则1 与技能类型兜底            |
-| `test/src/coconut-core/engine/skill-infer.test.ts` | 离线夹具回归（不联网）                                         |
-| `test/damage-type-infer.ts`                        | 在线 TDD 夹具：`assertCorrectDamageTypeInfer` / 排查工具       |
-| `test/damage-type-infer.example.ts`                | 空白用例模板                                                   |
-| `test/preload.mjs`                                 | `$lib` 别名 + 无扩展名导入钩子（跑脚本必须带）                 |
-| `src/lib/consts/game-terms.ts`                     | `DAMAGE_TYPES` 权威清单                                        |
-| `src/lib/api/provider/nanoka/utils.ts`             | 上游转换与行名规范化（`makeSkillValues` / `preprocessSkills`） |
+| 文件                                                                                | 作用                                                           |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| [`src/lib/calc/skill-infer.ts`](../src/lib/calc/skill-infer.ts)                     | 规则2 全部实现（节点/小节定位、两轮匹配、归属兜底）            |
+| `src/coconut-core/src/lib/calc/utils.ts`                                            | 判定链入口 `inferDamageTypes`、规则1 与技能类型兜底            |
+| [`test/src/lib/calc/skill-infer.test.ts`](../test/src/lib/calc/skill-infer.test.ts) | 离线夹具回归（不联网）                                         |
+| [`test/damage-type-infer.ts`](../test/damage-type-infer.ts)                         | 在线 TDD 夹具：`assertCorrectDamageTypeInfer` / 排查工具       |
+| [`test/damage-type-infer.example.ts`](../test/damage-type-infer.example.ts)         | 空白用例模板                                                   |
+| [`test/preload.mjs`](../test/preload.mjs)                                           | `$lib` 别名 + 无扩展名导入钩子（跑脚本必须带）                 |
+| [`src/lib/consts/game-terms.ts`](../src/lib/consts/game-terms.ts)                   | `DAMAGE_TYPES` 权威清单                                        |
+| [`src/lib/api/provider/nanoka/utils.ts`](../src/lib/api/provider/nanoka/utils.ts)   | 上游转换与行名规范化（`makeSkillValues` / `preprocessSkills`） |
 
 ```bash
 pnpm run test:infer                                              # 在线用例
 node --import ./test/preload.mjs test/<你的用例文件>.ts
-node --import ./test/preload.mjs test/src/coconut-core/engine/skill-infer.test.ts   # 离线夹具
+node --import ./test/preload.mjs test/src/lib/calc/skill-infer.test.ts   # 离线夹具
 pnpm run format && pnpm run lint:eslint && pnpm run check          # 收尾
 ```
 

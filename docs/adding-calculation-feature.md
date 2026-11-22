@@ -18,7 +18,7 @@
 
 ## 版本块
 
-`src/coconut-config/versions.ts`：复制最后一版，改 `actions` / `multipliers` / `formulas`。只有最后一版进 `config`，历史版本继续受 `satisfies CoconutCoreConfig` 校验。
+[`src/coconut-config/versions.ts`](../src/coconut-config/versions.ts)：复制最后一版，改 `actions` / `multipliers` / `formulas`。只有最后一版进 `config`，历史版本继续受 `satisfies CoconutCoreConfig` 校验。
 
 内核 `createFormulaRegistry` 在 `init` 时校验两条硬约束：
 
@@ -29,27 +29,27 @@
 
 ## 新作用
 
-| 步  | 文件 / 位置                    | 内容                                                                                           |
-| --- | ------------------------------ | ---------------------------------------------------------------------------------------------- |
-| 1   | `coconut-config/data.ts`       | 新增 `as const satisfies BuffActionDef` 导出；id 加进 `CalcActionId` 联合                      |
-| 2   | 同上 `REF_ACTIONS`             | 可作引用来源则加入（展示名在 `display-meta.ts` 的 `refName`）                                  |
-| 3   | `versions.ts`                  | 对应版本块的 `actions` 末尾追加                                                                |
-| 4   | `src/lib/calc/display-meta.ts` | `ACTION_META` 补 `label` / `unit` / `group`（按需 `internal` / `damageMatchable` / `refName`） |
-| 5   | AI 工具手写说明串              | `ai/tools/calculation.ts` 的 `zoneId 可选：…` 手工补一项（唯一例外）                           |
+| 步  | 文件 / 位置                                                       | 内容                                                                                           |
+| --- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| 1   | `coconut-config/data.ts`                                          | 新增 `as const satisfies BuffActionDef` 导出；id 加进 `CalcActionId` 联合                      |
+| 2   | 同上 `REF_ACTIONS`                                                | 可作引用来源则加入（展示名在 `display-meta.ts` 的 `refName`）                                  |
+| 3   | `versions.ts`                                                     | 对应版本块的 `actions` 末尾追加                                                                |
+| 4   | [`src/lib/calc/display-meta.ts`](../src/lib/calc/display-meta.ts) | `ACTION_META` 补 `label` / `unit` / `group`（按需 `internal` / `damageMatchable` / `refName`） |
+| 5   | AI 工具手写说明串                                                 | `ai/tools/calculation.ts` 的 `zoneId 可选：…` 手工补一项（唯一例外）                           |
 
 界面与 AI 清单不用手改：`calc/calculation.consts.ts` 的 `ZONE_DEFS` / `ZONE_SECTIONS` 由作用表 + `ACTION_META` 派生，`ai/generate/prompts.ts` 乘区文本同源。
 
 ## 新乘子
 
-| 步  | 文件 / 位置                     | 内容                                                                                      |
-| --- | ------------------------------- | ----------------------------------------------------------------------------------------- |
-| 1   | `coconut-config/multipliers.ts` | `defineFormula({ id, inputs, uses? }, compute)`                                           |
-| 2   | `coconut-config/formulas.ts`    | 在 `ORDER_x` 排位（注册序 = 链序），必要时新增 `ORDER`                                    |
-| 3   | `src/lib/calc/display-meta.ts`  | `MULTIPLIER_META` 补 `label` 与 `display`                                                 |
-| 4   | `src/lib/calc/damage-trace.ts`  | `SEGMENT_BUILDERS` 补一段（`Record<MultiplierId, …>`，决定结果页展示与来源）              |
-| 5   | `calc/result.types.ts` 等       | 需新 `ResultEntry` 字段：加字段 → `compute.ts` 赋值 → `compute-facade.ts` 同步 → 界面组件 |
-| 6   | 结果页独立列                    | `result.types.ts` → `compute.ts` → `compute-facade.ts` 列映射 → 表格组件                  |
-| 7   | 仅调数值                        | 直接改 `multipliers.ts` 系数，无需新版本块                                                |
+| 步  | 文件 / 位置                                                       | 内容                                                                                      |
+| --- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 1   | `coconut-config/multipliers.ts`                                   | `defineFormula({ id, inputs, uses? }, compute)`                                           |
+| 2   | `coconut-config/formulas.ts`                                      | 在 `ORDER_x` 排位（注册序 = 链序），必要时新增 `ORDER`                                    |
+| 3   | [`src/lib/calc/display-meta.ts`](../src/lib/calc/display-meta.ts) | `MULTIPLIER_META` 补 `label` 与 `display`                                                 |
+| 4   | [`src/lib/calc/damage-trace.ts`](../src/lib/calc/damage-trace.ts) | `SEGMENT_BUILDERS` 补一段（`Record<MultiplierId, …>`，决定结果页展示与来源）              |
+| 5   | `calc/result.types.ts` 等                                         | 需新 `ResultEntry` 字段：加字段 → `compute.ts` 赋值 → `compute-facade.ts` 同步 → 界面组件 |
+| 6   | 结果页独立列                                                      | `result.types.ts` → `compute.ts` → `compute-facade.ts` 列映射 → 表格组件                  |
+| 7   | 仅调数值                                                          | 直接改 `multipliers.ts` 系数，无需新版本块                                                |
 
 ## 新公式
 
@@ -63,28 +63,28 @@
 
 ## 系数与效应表
 
-| 内容                   | 文件 / 位置                                                             | 要求                                                                               |
-| ---------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| 偏谐系数（按敌人类型） | `src/lib/calc/compute.ts` 的 `TUNE_COEFF_MAP`                           | 写游戏原值**不取整**（先取整会把放大后的误差带进结果）；兜底 `TUNE_COEFF_FALLBACK` |
-| 效应层数倍率与基础值   | `src/lib/consts/effect-data.ts` 的 `EFFECT_BASE_VALUE` / `EFFECT_TABLE` | —                                                                                  |
+| 内容                   | 文件 / 位置                                                                                                 | 要求                                                                               |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 偏谐系数（按敌人类型） | [`src/lib/calc/compute.ts`](../src/lib/calc/compute.ts) 的 `TUNE_COEFF_MAP`                                 | 写游戏原值**不取整**（先取整会把放大后的误差带进结果）；兜底 `TUNE_COEFF_FALLBACK` |
+| 效应层数倍率与基础值   | [`src/lib/consts/effect-data.ts`](../src/lib/consts/effect-data.ts) 的 `EFFECT_BASE_VALUE` / `EFFECT_TABLE` | —                                                                                  |
 
 ## 词条 / 元素 / 伤害类型
 
-| 内容                             | 文件                                                              |
-| -------------------------------- | ----------------------------------------------------------------- |
-| 元素、伤害类型、技能类型、抗性键 | `src/lib/consts/game-terms.ts`                                    |
-| 副词条 label 与档位              | `src/lib/consts/stat-data.ts`                                     |
-| 词条 label → 面板落点            | `src/lib/calc/stat-writes.ts`（`ACTION_STATS` / `BASE_SUFFIXES`） |
+| 内容                             | 文件                                                                                                |
+| -------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 元素、伤害类型、技能类型、抗性键 | [`src/lib/consts/game-terms.ts`](../src/lib/consts/game-terms.ts)                                   |
+| 副词条 label 与档位              | [`src/lib/consts/stat-data.ts`](../src/lib/consts/stat-data.ts)                                     |
+| 词条 label → 面板落点            | [`src/lib/calc/stat-writes.ts`](../src/lib/calc/stat-writes.ts)（`ACTION_STATS` / `BASE_SUFFIXES`） |
 
 ## 动内核
 
 判据：「纯计算 + 零语料 + 零内置表」。改 `src/coconut-core/**` 必须同时做到：
 
-| 步  | 要求                                                                                                                        |
-| --- | --------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `node scripts/check-calc-core.mjs` 通过：每个文件作入口做 import 闭包检查，不得触达 `$app/*` / `$lib/*` / `$coconut-config` |
-| 2   | `pnpm run build:core` / `release:core` 重新生成内核包与 `.d.ts`；版本号在 `src/coconut-core/package.json`                   |
-| 3   | 上层只从 `$lib/calc/core-config.ts` 取用；`src/coconut-config` 只用 `$coconut-core` 公开入口与 `defineFormula`              |
+| 步  | 要求                                                                                                                                          |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `node scripts/check-calc-core.mjs` 通过：每个文件作入口做 import 闭包检查，不得触达 `$app/*` / `$lib/*` / `$coconut-config`                   |
+| 2   | `pnpm run build:core` / `release:core` 重新生成内核包与 `.d.ts`；版本号在 [`src/coconut-core/package.json`](../src/coconut-core/package.json) |
+| 3   | 上层只从 `$lib/calc/core-config.ts` 取用；[`src/coconut-config`](../src/coconut-config) 只用 `$coconut-core` 公开入口与 `defineFormula`       |
 
 ## 测试与闸门
 
@@ -112,23 +112,23 @@ $env:UPDATE_GOLDEN=1; pnpm test compute-golden
 
 主要测试文件（改哪块先跑哪块）：
 
-| 文件                                                                               | 钉住什么                                  |
-| ---------------------------------------------------------------------------------- | ----------------------------------------- |
-| `test/src/coconut-core/kernel.test.ts`                                             | 内核契约：配置校验、trace、系数基准       |
-| `test/src/lib/calc/compile.test.ts`                                                | 编译器压表 vs 引擎逐条目数值对账          |
-| `test/src/lib/calc/compute-golden.test.ts`                                         | 数值基线（全部数值字段 + 乘区段 id 序列） |
-| `test/src/lib/calc/{core-config,formula-registry,coeff-crit,resolve-memo}.test.ts` | 注册表 / 公式链 / 系数基准 / 解析去重     |
+| 文件                                                                                      | 钉住什么                                  |
+| ----------------------------------------------------------------------------------------- | ----------------------------------------- |
+| [`test/src/coconut-core/kernel.test.ts`](../test/src/coconut-core/kernel.test.ts)         | 内核契约：配置校验、trace、系数基准       |
+| [`test/src/lib/calc/compile.test.ts`](../test/src/lib/calc/compile.test.ts)               | 编译器压表 vs 引擎逐条目数值对账          |
+| [`test/src/lib/calc/compute-golden.test.ts`](../test/src/lib/calc/compute-golden.test.ts) | 数值基线（全部数值字段 + 乘区段 id 序列） |
+| `test/src/lib/calc/{core-config,formula-registry,coeff-crit,resolve-memo}.test.ts`        | 注册表 / 公式链 / 系数基准 / 解析去重     |
 
 新增特性至少覆盖三件事：一段真实倍率的数值、乘区明细里出现该段、溯源段出现该段与来源。
 
 ## 文档同步
 
-| 文件                   | 改什么                                                    |
-| ---------------------- | --------------------------------------------------------- |
-| `docs/coconut-core.md` | 版本链小节（顶部计数已移除）                              |
-| `docs/buff-engine.md`  | 乘区 / 公式说明与展示名                                   |
-| `docs/tools.md`        | AI 工具清单变了跑 `pnpm run generate-tools-doc`（生成物） |
-| `README.md`            | 「计算引擎」小节（仅对外能力变化时）                      |
+| 文件                                              | 改什么                                                    |
+| ------------------------------------------------- | --------------------------------------------------------- |
+| [`docs/coconut-core.md`](../docs/coconut-core.md) | 版本链小节（顶部计数已移除）                              |
+| [`docs/buff-engine.md`](../docs/buff-engine.md)   | 乘区 / 公式说明与展示名                                   |
+| [`docs/tools.md`](../docs/tools.md)               | AI 工具清单变了跑 `pnpm run generate-tools-doc`（生成物） |
+| `README.md`                                       | 「计算引擎」小节（仅对外能力变化时）                      |
 
 ## 收尾核对
 
@@ -142,7 +142,7 @@ $env:UPDATE_GOLDEN=1; pnpm test compute-golden
 | 6   | `pnpm test` 通过；计算变化时更新 `GOLDEN` 并核对 diff                         |
 | 7   | `pnpm run format` / `lint:eslint` / `check` 全绿                              |
 | 8   | 文档同步；对外发布的配置包已重新生成（`pnpm run release:config`）             |
-| 9   | 未删除或改名既有 id（否则在 `src/migration/` 写迁移）                         |
+| 9   | 未删除或改名既有 id（否则在 [`src/migration/`](../src/migration) 写迁移）     |
 
 ## 常见坑
 

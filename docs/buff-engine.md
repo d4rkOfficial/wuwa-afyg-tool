@@ -2,15 +2,15 @@
 
 「一切皆 Buff」引擎的数据模型、乘区算子与条件系统。
 
-| 文件                                           | 职责                                                                       |
-| ---------------------------------------------- | -------------------------------------------------------------------------- |
-| `src/coconut-core/engine/registry/actions.ts`  | **Buff 作用注册表**（落点 / 合并语义 / 初值 / 可覆盖 / 可挂条件 / 可引用） |
-| `src/coconut-core/engine/calculation.types.ts` | Buff / 乘区 / 条件的类型定义                                               |
-| `src/coconut-core/engine/zone-ops.ts`          | 面板结构与作用写入（`emptyPanel` / `applyZone` / `recomputeTotals`）       |
-| `src/coconut-core/engine/condition.ts`         | 乘区级条件求值与归一化                                                     |
-| `src/coconut-core/engine/rules.ts`             | Buff 级规则（求值 / 依赖 / 级联 / 文案）                                   |
-| `src/coconut-core/engine/compute.ts`           | 贡献聚合与逐条目计算                                                       |
-| `src/migration/`                               | 历史数据迁移（版本链、拉表态、Buff 文件夹命名、v7 规则化 / v8 伤害名正则） |
+| 文件                                                                        | 职责                                                                       |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| [`src/coconut-core/actions.ts`](../src/coconut-core/actions.ts)             | **Buff 作用注册表**（落点 / 合并语义 / 初值 / 可覆盖 / 可挂条件 / 可引用） |
+| [`src/lib/calc/calculation.types.ts`](../src/lib/calc/calculation.types.ts) | Buff / 乘区 / 条件的类型定义                                               |
+| [`src/coconut-core/panel.ts`](../src/coconut-core/panel.ts)                 | 面板结构与作用写入（`emptyPanel` / `applyZone` / `recomputeTotals`）       |
+| [`src/lib/calc/condition.ts`](../src/lib/calc/condition.ts)                 | 乘区级条件求值与归一化                                                     |
+| [`src/lib/calc/rules.ts`](../src/lib/calc/rules.ts)                         | Buff 级规则（求值 / 依赖 / 级联 / 文案）                                   |
+| [`src/coconut-core/compute.ts`](../src/coconut-core/compute.ts)             | 贡献聚合与逐条目计算                                                       |
+| [`src/migration/`](../src/migration)                                        | 历史数据迁移（版本链、拉表态、Buff 文件夹命名、v7 规则化 / v8 伤害名正则） |
 
 ## 统一模型
 
@@ -112,7 +112,7 @@ BuffInstance ─┘
 
 ### 等效暴击率
 
-暴击区 = `1 + 等效暴击率 × (暴击伤害 - 1)`；`effectiveCritRate`（`src/coconut-config/multipliers.ts`）把面板暴击率钳在 0–100：低于 0 必不暴（乘子 1），高于 100 必暴（乘子 = 暴伤比值）。
+暴击区 = `1 + 等效暴击率 × (暴击伤害 - 1)`；`effectiveCritRate`（[`src/coconut-config/multipliers.ts`](../src/coconut-config/multipliers.ts)）把面板暴击率钳在 0–100：低于 0 必不暴（乘子 1），高于 100 必暴（乘子 = 暴伤比值）。
 
 `zones.critRate` 原值**不裁剪**：负值与 >100 都保留，引用读的就是原值——「暴击超过 100 的部分转暴伤」靠 `StatRef` 读 `critRate` 再减 `baseLine: 100`。结果页 `critRate` 字段是等效值（0–1），原值从 `panel.zones.critRate` 取。
 

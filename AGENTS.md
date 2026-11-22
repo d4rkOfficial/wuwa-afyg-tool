@@ -79,10 +79,10 @@
 
 配置 `eslint.config.js`（flat config）。
 
-| 层       | 范围                                                                                                                          | 规则                                                                                                                        |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| 纯逻辑   | `src/lib` 下 `calc/` `api/` `utils/` `consts/` `types/` `ai/generate/` `ai/tools/` 的 `.ts`（排除 `*.svelte.ts`/`*.test.ts`） | `prefer-const` `prefer-arrow-callback` `prefer-template` `object-shorthand` `arrow-body-style` `no-var` `no-param-reassign` |
-| UI/store | `*.svelte`、`*.svelte.ts`                                                                                                     | 基础解析，不加强制函数式                                                                                                    |
+| 层       | 范围                                                                                                                                     | 规则                                                                                                                        |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 纯逻辑   | [`src/lib`](src/lib) 下 `calc/` `api/` `utils/` `consts/` `types/` `ai/generate/` `ai/tools/` 的 `.ts`（排除 `*.svelte.ts`/`*.test.ts`） | `prefer-const` `prefer-arrow-callback` `prefer-template` `object-shorthand` `arrow-body-style` `no-var` `no-param-reassign` |
+| UI/store | `*.svelte`、`*.svelte.ts`                                                                                                                | 基础解析，不加强制函数式                                                                                                    |
 
 Svelte 棘轮：
 
@@ -97,12 +97,12 @@ Svelte 棘轮：
 
 | 项     | 规则                                                                                                                                       |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| 布局   | `test/` 镜像 `src/`，替身 `test/__mocks__/`；`testPathOf()` 定位                                                                           |
-| 入口   | `test/run-tests.ts` 自动发现 `*.test.ts`，逐文件隔离 `import`（禁子进程，不用 `node --test`）                                              |
+| 布局   | `test/` 镜像 `src/`，替身 [`test/__mocks__/`](test/__mocks__)；`testPathOf()` 定位                                                         |
+| 入口   | [`test/run-tests.ts`](test/run-tests.ts) 自动发现 `*.test.ts`，逐文件隔离 `import`（禁子进程，不用 `node --test`）                         |
 | 失败   | 逐文件 `try/catch` → `[test] ✖ 加载失败：<文件>`，退出码 1                                                                                 |
 | 脚手架 | `.tmp/` 单文件覆盖，不建子目录再删；改后对比 `tests` 计数；不用 `mem:` scheme                                                              |
 | 命令   | `pnpm test` / `test calc` / `test:list` / `test:watch`；单文件 `node --import ./test/preload-runes.mjs --import ./test/preload.mjs <file>` |
-| 别名   | `$lib`→`src/lib`、`$src`→`src`；`svelte.config.js` 与 `test/preload.mjs` 同步                                                              |
+| 别名   | `$lib`→[`src/lib`](src/lib)、`$src`→`src`；`svelte.config.js` 与 [`test/preload.mjs`](test/preload.mjs) 同步                               |
 | 例外   | 联网/上游文案用 `.ts`（非 `*.test.ts`），如 `test/damage-type-infer.<角色>.ts`                                                             |
 | 检查   | `test/` 吃 `format`/`lint:eslint`/`svelte-check`                                                                                           |
 

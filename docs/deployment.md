@@ -73,13 +73,13 @@ pnpm run package:standalone     # 等价于 node scripts/build-standalone.mjs
 | 打开方式 | **必须用 HTTP 服务器**；`file://` 加载 ES module 被浏览器禁止，双击会白屏         |
 | 路径     | 资源走站点根绝对路径（`/_app/...`、`/icons/...`），只能部署在域名根，不能放子路径 |
 
-与常规构建的差别（仅此构建生效，见 `scripts/build-standalone.mjs`）：
+与常规构建的差别（仅此构建生效，见 [`scripts/build-standalone.mjs`](../scripts/build-standalone.mjs)）：
 
-| 方面     | 有服务端的部署                 | 独立静态包（`STANDALONE=1`）                                                  |
-| -------- | ------------------------------ | ----------------------------------------------------------------------------- |
-| 适配器   | adapter-vercel / cloudflare    | adapter-static（`fallback: 200.html`）                                        |
-| 路由     | `trailingSlash: 'never'`       | `trailingSlash: 'always'`（目录 + index.html）                                |
-| 数据接口 | `/api/**` 由服务端转上游并缓存 | `src/lib/api/local-api.ts` 在浏览器内就地解析同一批路径，直调 provider 适配器 |
+| 方面     | 有服务端的部署                 | 独立静态包（`STANDALONE=1`）                                                                                 |
+| -------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| 适配器   | adapter-vercel / cloudflare    | adapter-static（`fallback: 200.html`）                                                                       |
+| 路由     | `trailingSlash: 'never'`       | `trailingSlash: 'always'`（目录 + index.html）                                                               |
+| 数据接口 | `/api/**` 由服务端转上游并缓存 | [`src/lib/api/local-api.ts`](../src/lib/api/local-api.ts) 在浏览器内就地解析同一批路径，直调 provider 适配器 |
 
 静态包不可用能力（调用时明确提示，不会静默算错）：
 
