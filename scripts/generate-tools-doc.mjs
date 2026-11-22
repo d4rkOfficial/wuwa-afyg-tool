@@ -654,21 +654,25 @@ function buildDoc() {
     const lines = []
     lines.push('# 工具文档（AI 助手 / WS 远程接管共用）')
     lines.push('')
-    lines.push(`> 本文档由 \`scripts/generate-tools-doc.mjs\` 从工具源码自动生成，共 **${total}** 个工具。`)
+    lines.push(
+        `> 本文档由 [\`scripts/generate-tools-doc.mjs\`](../scripts/generate-tools-doc.mjs) 从工具源码自动生成，共 **${total}** 个工具。`
+    )
     lines.push('> 新增/修改工具后请重跑：`node scripts/generate-tools-doc.mjs`')
     lines.push('')
-    lines.push(
-        'AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注册表与执行引擎；危险工具在 AI 侧受「危险操作权限」策略约束，WS 侧直接放行。'
-    )
+    lines.push('AI 助手与 WS 远程接管（`#websocket=`）共用同一套工具注册表与执行引擎。')
     lines.push('')
-    lines.push(
-        '**能力门控（AI 独享 / WS 不可调用）**：声明了 `requires` 的工具依赖**宿主能力**，能力缺失时既不会进发给对方的工具清单，直接 exec 也会被拒。' +
-            '当前有 `ask_user`（需要提问界面）与 `web_fetch`（需要宿主网络代理出网）：WS 远程接管不提供这两项能力，故在远程通道里不可见、也不可执行。'
-    )
+    lines.push('| 通道     | 危险工具                         | 宿主能力依赖工具                       |')
+    lines.push('| -------- | -------------------------------- | -------------------------------------- |')
+    lines.push('| AI 助手  | 受「危险操作权限」策略约束       | 可用 `ask_user` / `web_fetch`          |')
+    lines.push('| WS 远程  | 直接放行                         | 无提问界面 / 网络代理，两工具不可见    |')
+    lines.push('')
+    lines.push('声明 `requires` 的工具依赖**宿主能力**：能力缺失时既不进工具清单，直接 exec 也被拒。')
     lines.push('')
     lines.push('## 危险工具')
     lines.push('')
-    lines.push(dangerous.length ? dangerous.map((d) => `- \`${d}\``).join('\n') : '_无_')
+    lines.push('| # | 工具 |')
+    lines.push('| - | ---- |')
+    lines.push(dangerous.length ? dangerous.map((d, i) => `| ${i + 1} | \`${d}\` |`).join('\n') : '| — | _无_ |')
     lines.push('')
 
     for (const g of groups) {
@@ -677,7 +681,7 @@ function buildDoc() {
         for (const t of g.tools) {
             lines.push(`### \`${t.name}\``)
             lines.push('')
-            if (t.dangerous) lines.push('> ⚠️ **危险工具**：执行后不可轻易撤销')
+            if (t.dangerous) lines.push('> **危险工具**：执行后不可轻易撤销')
             lines.push('')
             lines.push(escapeMd(t.description))
             lines.push('')
@@ -688,24 +692,21 @@ function buildDoc() {
 
     lines.push('## 附录：AI 不可修改的设置')
     lines.push('')
-    lines.push('以下设置不允许 AI/WS 修改（调用 `set_setting` 会报错并提示手动调整）：')
-    lines.push('')
-    lines.push('- 自定义主题的创建 / 删除（设置 → 外观主题；仅支持明暗切换与主色调）')
-    lines.push('- 背景图本地文件上传（AI 仅可设置远程 URL / data:image 数据 / 清除）')
-    lines.push('')
-    lines.push('以下设置虽不可直接用 `set_setting`，但有专用工具，**可以**由 AI/WS 修改：')
-    lines.push('')
-    lines.push('- 按键图标 → `get_keymap` / `set_keymap_entry`')
-    lines.push('- 界面快捷键 → `get_shortcuts` / `set_shortcut`')
-    lines.push('- 归档管理 → `archive_project` / `unarchive_project` / `delete_project`')
-    lines.push('- 缓存清理 → `set_setting` key=`clear_cache`（或 `get_cache_counts` 只读）')
-    lines.push('- 助手设置（启用开关 / 危险操作权限 / 人设提示词）→ `set_setting`')
-    lines.push('- AI 配置文件 → `get_ai_profiles` / `manage_ai_profile`')
-    lines.push('- 工坊实例 → `get_settings_state` / `manage_workshop`')
-    lines.push('- AI 上下文分段 / 用量 / 运行情况 → `get_ai_context_state` / `set_ai_context_segment` 等')
+    lines.push('| 类别 | 设置 | 可用工具 / 说明 |')
+    lines.push('| ---- | ---- | --------------- |')
+    lines.push('| 不可修改 | 自定义主题创建 / 删除 | 设置 → 外观主题；`set_setting` 报错提示手动调整 |')
+    lines.push('| 不可修改 | 背景图本地文件上传 | AI 仅可设远程 URL / data:image / 清除 |')
+    lines.push('| 专用工具 | 按键图标 | `get_keymap` / `set_keymap_entry` |')
+    lines.push('| 专用工具 | 界面快捷键 | `get_shortcuts` / `set_shortcut` |')
+    lines.push('| 专用工具 | 归档管理 | `archive_project` / `unarchive_project` / `delete_project` |')
+    lines.push('| 专用工具 | 缓存清理 | `set_setting` key=`clear_cache`（或 `get_cache_counts` 只读） |')
+    lines.push('| 专用工具 | 助手设置（开关 / 危险权限 / 人设） | `set_setting` |')
+    lines.push('| 专用工具 | AI 配置文件 | `get_ai_profiles` / `manage_ai_profile` |')
+    lines.push('| 专用工具 | 工坊实例 | `get_settings_state` / `manage_workshop` |')
+    lines.push('| 专用工具 | AI 上下文分段 / 用量 / 运行 | `get_ai_context_state` / `set_ai_context_segment` 等 |')
     lines.push('')
     lines.push(
-        '> 完整 key 白名单以 `set_setting` 的工具描述为准（`get_settings_state` 会回传 `modifiableKeys` 实时清单）。'
+        '> 完整 key 白名单以 `set_setting` 的工具描述为准（`get_settings_state` 回传 `modifiableKeys` 实时清单）。'
     )
     lines.push('')
 

@@ -2,166 +2,228 @@
 
 纯函数伤害计算引擎：注册一份配置，喂一张表，拿到每段伤害的数值、乘区明细与逐 Buff 贡献。
 
-零运行时依赖、无框架依赖，单文件 ESM，Node 里 `import` 就能跑。引擎不认识任何游戏实体——作用表、
-乘子、公式全部由调用方注册，所以它不止能算《鸣潮》。
+## 入口
 
-- 源码：[`src/coconut-core/`](../src/coconut-core)
-- 注册配置：[`src/coconut-config/`](../src/coconut-config)（当前版本 35 条作用 / 19 个引用来源 /
-  12 个乘子 / 4 条公式，可直接当模板改）
+| 入口     | 路径                                           |
+| -------- | ---------------------------------------------- |
+| 引擎内核 | [`src/coconut-core/`](../src/coconut-core)     |
+| 鸣潮配置 | [`src/coconut-config/`](../src/coconut-config) |
 
-## 注册配置的版本链
+## 功能介绍
 
-`src/coconut-config/` 与内核平级，按游戏版本组织：
-
-| 文件                                                     | 内容                                                       |
-| -------------------------------------------------------- | ---------------------------------------------------------- |
-| [`data.ts`](../src/coconut-config/data.ts)               | 作用表 / 引用来源 / 面板维度 / 目标侧字段 / 常量 / 倍率点  |
-| [`multipliers.ts`](../src/coconut-config/multipliers.ts) | 乘子（防御区 / 抗性区 / 双暴 / 集谐区 / 谐度区 / 同奏区）  |
-| [`formulas.ts`](../src/coconut-config/formulas.ts)       | 每版乘子序 + 公式（基值配方 + 链 + 暴击口径）              |
-| [`versions.ts`](../src/coconut-config/versions.ts)       | 版本链：`v1_0 → v2_0 → v3_0 → v3_7`，`config` 指向最后一版 |
-
-每一版就是「上一版 + 本版新增」的一个对象（`satisfies CoconutCoreConfig`）：`v2_0` 加处决（谐度区、偏谐系数），
-`v3_0` 加效应与集谐区，`v3_7` 加同奏区。应用只用 `config`；前面的版本是口径历史，仍受类型校验。
-
-`src/lib/calc/core-config.ts` 是唯一入口：它把 `config` 装成内核注册表，再补上工具箱自己的口径
-（中文基值类型、展示元数据转发、公式 id 判定），其余代码一律从它取用。
-
-## 安装
-
-```sh
-npm i https://github.com/d4rkOfficial/wuwa-afyg-tool/releases/download/core-v0.1.0/d4rkofficial-coconut-core-0.1.0.tgz
-```
-
-也可以直接拿 `index.js`（单文件 ESM）放进项目，不需要构建。
-
-## 现成配置（`@d4rkofficial/coconut-config`）
-
-懒得自己写注册表，就用工具箱已经调好、与工具箱同口径的那一份（作用 / 引用来源 / 乘子 / 公式 / 面板维度 /
-目标侧字段 / 常量）。它随工具箱发版更新，默认导出即配置对象：
-
-```sh
-npm i https://github.com/d4rkOfficial/wuwa-afyg-tool/releases/latest/download/coconut-config.tgz
-```
-
-```ts
-import { CoconutCore } from '@d4rkofficial/coconut-core'
-import config from '@d4rkofficial/coconut-config'
-
-const core = new CoconutCore().init(config)
-const result = core.compute(table)
-```
-
-## 快速开始
-
-```ts
-import { CoconutCore } from '@d4rkofficial/coconut-core'
-
-const core = new CoconutCore().init({
-    actions, // 作用表：id / 落点 / 聚合方式
-    refSources, // 引用来源：转模要读的白值、面板、目标侧标量
-    multipliers, // 乘子：注册顺序即合法链顺序
-    formulas // 公式：基值配方 + 有序乘子链 + 暴击口径
-})
-
-const result = core.compute(table) // 每段伤害一条结果
-const traced = core.compute(table, { trace: true }) // 附带逐 Buff 贡献
-console.log(result.total)
-```
-
-`init` 当场校验配置（乘子 id 唯一、公式链里的乘子都已登记、链顺序与注册顺序一致），错误直接抛出；
-没 `init` 就 `compute` 会报错。
-
-## 配置（`CoconutCoreConfig`）
-
-| 字段           | 说明                                                                                                     |
-| -------------- | -------------------------------------------------------------------------------------------------------- |
-| `actions`      | 作用表：`side`（`character` / `target`）、`combine`（`sum` / `multiply`）、面板落点、初值、`targetField` |
-| `refSources`   | 引用来源 `{ id, get(panel, target) }`：转模读的白值 / 面板 / 目标侧标量                                  |
-| `multipliers`  | 乘子 `{ id, inputs, uses?, compute }`，数组顺序即合法链顺序                                              |
-| `formulas`     | 公式数组：`{ id, base, chain, critBase }`（基值配方 + 有序乘子链 + 暴击口径）                            |
-| `panel`        | 面板维度 / 白值取整 / 合计公式（`{ dims?, rounding?, aggregate? }`），省略则按作用声明推导               |
-| `targetFields` | 目标侧字段及其形态：`scalar`（标量）/ `map`（按元素分组）/ `text`（字符串）                              |
-| `constants`    | 公式里 `const.<id>` 的来源（`{ id, get(panel, target) }`）                                               |
-| `ratioZone`    | 「倍率追加」作用的 id（省略 = 不追加）                                                                   |
-
-内核只认 id 与形状：**展示名、单位、分组、展示形态都不进内核**，由调用方按 id 另存
-（工具箱里是 [`src/lib/calc/display-meta.ts`](../src/lib/calc/display-meta.ts)）。
-
-id 分三类：`ActionId` / `FormulaId` 是 `string | symbol`，表侧的 `BuffId` 恒为字符串（表可走 JSON，变体 id 靠字符串拼接）。
-
-## 输入（`GeneralTable`）
-
-表只有三个字段，没有隐藏的「基础数值」输入——白值、词条、敌人配置一律编译成 buff：
-
-| 字段             | 含义                                                    |
-| ---------------- | ------------------------------------------------------- |
-| `global_buffs`   | 每条伤害都先应用的 Buff id（敌人配置、无条件全局 Buff） |
-| `buffs`          | Buff 目录 `{ id, effects, role? }`，同一份落值只存一次  |
-| `damage_entries` | 伤害条目 `{ source, damages }`                          |
-
-`Damage` 是 `{ value, base?, hits?, activated_buffs, element, formula }`：
-
-- `value`：倍率串，`'250%'` = 2.5 倍；`formula: 'fixed'` 时是固定伤害值
-- `base`：基值取面板哪一维（维度名来自 `panel.dims` / 作用声明，缺省为注册的第一个维度）
-- `hits`：段数，倍率串描述单段，额外倍率按段数放大
-- `activated_buffs`：这一段生效的 Buff id，条件由调用方判定，引擎不做任何判断
-- `formula`：你注册的公式 id
-
-`BuffEffect` 是 `{ applyTo, value, write?, only?, element? }`：
-
-- `write`：`'add'`（默认）/ `'override'`（覆盖该乘区合计）
-- `only: 'panel'`：只在面板基准下生效，系数基准的条目跳过它（装备双暴即此）
-- `value`：字面值，或引用 `{ refStat, baseLine, sourceUnit, targetUnit, lowerLimit, Upperlimit }` 做转模
-- `role: 'stat'`：基础数值贡献（白值 / 词条 / 敌人配置），不参与贡献溯源
-
-基值配方四种：`panelStat`（面板合计 / 可指定维度）、`zone`（某个作用的落值，可选取整）、
-`targetStat`（注册的目标侧字段）、`fixed`（固定值）。
-
-内核没有暴击模式开关：要「不暴击」就在表里给一条把 `critRate` 覆盖成 `0` 的 Buff（`write: 'override'`），
-必暴则覆盖成 `100`。内核只按乘子链算一个期望值。
-
-## 输出
-
-```ts
-interface CoreResult {
-    damages: DamageResult[] // 每段一条
-    total: number // 各段期望伤害之和
-}
-
-interface DamageResult {
-    entryIndex: number
-    damageIndex: number
-    source: string
-    element: string
-    formula: string
-    baseValue: number
-    expectedRaw: number // 未取整的期望
-    expected: number // 取整后的期望
-    multipliers: MultiplierZone[] // 乘区明细（id / label / 数值 / 展示形态）
-    panel: CharacterPanel
-    target: TargetPanel
-    contributions: BuffContribution[] // 仅 trace: true
-}
-```
-
-「暴击 / 不暴击 / 必暴」这些列由调用方派生：把暴击乘子从乘区积里摘掉即得「不暴击」。
-
-**逐 Buff 贡献**（`trace: true`）：把该 Buff 从 `activated_buffs` 摘掉重算，期望伤害的差值就是它的贡献
-（`{ buffId, applyTo, deltaExpected, share }`，减伤这类会给负贡献；`role: 'stat'` 的目录项不计入）。
-
-## 口径
-
-- **面板**：`total = base + flat + base × pct%`，写入顺序是「白值 → 武器副属性 → 声骸主词条 →
-  声骸副词条 → 生效 Buff → 转模 → 覆盖 → 重算合计」
-- **基值**：`fixed` 固定值 / `targetStat` 目标侧标量 × 倍率 / `panelStat` 面板合计 × 倍率（`effectCoeff` 先取整）
-- **暴击区**：`1 + 等效暴击率 × (暴伤 - 1)`；等效暴击率钳在 0–100（低于 0 按必不暴、高于 100 按必暴），
-  但面板里的 `critRate` 原值不裁剪，「超过 100 转暴伤」这类引用读的就是原值
-- **乘子链**：顺序即注册顺序；工具箱注册的是
-  `deepen → bonus → vuln → resist → defense → tuneStrain → tuneBreak → unison → final → special → crit`
-  （`vuln` 是易伤·免伤区：对敌易伤、免伤无视、敌人免伤同一乘区加算，封底 0）
-- **系数基类**（处决 / 偏谐响应 / 效应）：双暴基准改成 0% / 100%，装备双暴不参与，Buff 追加写入照常
+[README.md](../src/coconut-core/README.md) 中有 CoconutCore 的功能模块详细介绍。
 
 ## 许可
 
-**CoconutCore 自愿放弃版权**：随意使用、二次开发、发布，无需标注出处（Unlicense / 公有领域）。
-工具箱本体（`src/` 其余部分）仍按 [MIT](../LICENSE) 分发。
+CoconutCore 自愿放弃版权（[Unlicense](../src/coconut-core/LICENSE)，公有领域）：随意使用、二次开发、发布，无需标注出处。工具箱本体（其余 `src/`）按 [MIT](../LICENSE) 分发。
+
+## 《鸣潮》伤害计算演化及 CoconutCore 配置版本链
+
+当前计算核心对应的游戏版本：**3.7**
+
+### 公式简介
+
+| 公式                    | 基值 × 乘区                                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------- |
+| 直伤 `direct`           | 攻 / 生 / 防面板值 × 加深 × 增伤 × 易伤 × 抗性 × 防御 × 集谐 × 同奏 × 最终 × 特殊 × 暴击 |
+| 效应结算 `effect`       | 90级效应系数 × 加深 × 易伤 × 抗性 × 防御 × 集谐 × 谐度 × 同奏 × 最终 × 特殊 × 暴击       |
+| 处决 / 震谐·骇破 `tune` | 敌人偏谐系数 × 加深 × 易伤 × 抗性 × 防御 × 集谐 × 谐度 × 同奏 × 最终 × 特殊 × 暴击       |
+| 固定值 `fixed`          | 条目自带固定伤害值                                                                       |
+
+### 1.0：直伤基础公式
+
+单段伤害 = 面板值 × 倍率 × 各乘区连乘。1.0 乘子序与计算规则：
+
+| 顺序 | 乘区           | 计算规则                                                                                                               |
+| ---- | -------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 1    | 加深 `deepen`  | `1 + 加深% / 100`                                                                                                      |
+| 2    | 增伤 `bonus`   | `1 + 增伤% / 100`                                                                                                      |
+| 3    | 易伤 `vuln`    | `max(0, 1 + (易伤 - 穿免 - 敌免伤) / 100)`                                                                             |
+| 4    | 抗性 `resist`  | 分段函数，见「抗性区详解」                                                                                             |
+| 5    | 防御 `defense` | 见「防御区详解」                                                                                                       |
+| 6    | 最终 `final`   | `1 + 最终% / 100`                                                                                                      |
+| 7    | 特殊 `special` | `(special1 ≠ 0 ? 1 + special1/100 : 1) × special2`；独立乘区，一般描述类最终伤害提升，如倍率的提升、倍率提升的效果提升 |
+| 8    | 暴击 `crit`    | `1 + 等效暴击率 × (暴伤 - 1)`                                                                                          |
+
+面板 / 白值 / 面板值，以及 `config` 的建模方式：
+
+| 概念   | 含义                                                                                               | 配置建模                                               |
+| ------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| 白值   | 角色基础属性 + 武器攻击                                                                            | 作用 `atkBase` / `hpBase` / `defBase` → `panel.base.*` |
+| 面板值 | 面板上显示的最终属性                                                                               | `panel.total.*`，由 `aggregate` 算出                   |
+| 固定值 | 固定值也叫平值，一般来自声骸词条，偶尔来自角色拐力（如洛可可大招）；算完白值及其百分比加成后再加算 | 作用 `atkFlat` / `hpFlat` / `defFlat` → `panel.flat.*` |
+| 百分比 | 攻击 / 生命 / 防御百分比                                                                           | 作用 `atkPct` / `hpPct` / `defPct` → `panel.pct.*`     |
+
+面板公式（`PANEL_CONFIG`）：
+
+```ts
+export const PANEL_CONFIG = {
+    dims: ['atk', 'hp', 'def'],
+    rounding: 'round',
+    aggregate: ({ base, flat, pct }) => base + Math.round(flat + (base * pct) / 100)
+} as const
+```
+
+作用表按维度三件套登记（`data.ts`）：
+
+```ts
+{ id: 'atkBase', panel: { base: 'atk' } }              // 白值
+{ id: 'atkFlat', panel: { flat: 'atk', total: 'atk' } } // 固定值
+{ id: 'atkPct',  panel: { pct: 'atk' } }                // 百分比
+```
+
+#### 防御区详解
+
+有效防御先结算减防与穿防，再与角色等级项比较；乘区封底 0.01。90 级时等级项为 1520。
+
+```ts
+// src/coconut-config/multipliers.ts
+const computeDefMulti = (defense, defPen, defDown, charLevel) => {
+    const defEff = Math.max(defense * (1 - defDown / 100) * (1 - defPen / 100), 0)
+    const charTerm = 800 + 8 * charLevel
+    return Math.max(charTerm / (defEff + charTerm), 0.01)
+}
+```
+
+#### 抗性区详解
+
+有效抗性 = 基础抗性 − 抗穿 − 减抗，按负值 / 0～0.8 / 大于 0.8 三段计算。
+
+```ts
+// src/coconut-config/multipliers.ts
+const computeResMulti = (baseResist, resPen, resDown) => {
+    const effResist = baseResist - resPen / 100 - resDown / 100
+    if (effResist < 0) return 1 + Math.abs(effResist) / 2
+    if (effResist < 0.8) return 1 - effResist
+    return 1 / ((effResist + 0.2) * 5)
+}
+```
+
+#### 暴击区详解
+
+暴击乘子用**等效暴击率**计算期望：低于 0 视为必不暴，高于 100 视为必暴。
+
+```ts
+// src/coconut-config/multipliers.ts
+export const effectiveCritRate = (critRate) => Math.min(Math.max(critRate, 0), 100)
+
+({ critRate, critDmg }) => 1 + (effectiveCritRate(critRate) / 100) * (critDmg / 100 - 1)
+```
+
+裁剪只在暴击乘子内部，面板 `critRate` 保留原值，引用转模读原值。
+
+| 场景                               | 原始 `critRate` | 等效值 | 说明                                             |
+| ---------------------------------- | --------------- | ------ | ------------------------------------------------ |
+| 奥古斯塔共鸣链：溢出暴击转爆伤     | >100%           | 100%   | 转化读原始暴击率；计算贡献前就框死会丢掉溢出部分 |
+| 负暴击率（参考《原神》珊瑚宫心海） | <0              | 0%     | 暴击率不为负，按必不暴处理                       |
+
+直伤 `critBase: 'panel'`：`critRate` 初值 5、`critDmg` 初值 150，暴击乘子起始 `1 + 5% × (150% − 1) = 1.025`。
+
+### 2.0：效应公式
+
+效应伤害以「效应系数」为基值，走系数基类公式。
+
+| 项       | 内容                                                            |
+| -------- | --------------------------------------------------------------- |
+| 新增作用 | `effectCoeff`（效应系数，角色侧）                               |
+| 基值     | 效应系数，先取整（`ZONE_EFFECT`）                               |
+| 乘区     | 1.0 乘子序，去掉增伤区（`coeffChain`）                          |
+| 暴击     | 双暴基准 0% / 100%，装备双暴不参与（`critBase: 'coefficient'`） |
+
+#### 效应结算的数据建模
+
+CoconutCore 把战斗抽象成「角色打敌人」：面板、装备、词条都挂在一名源角色上。效应结算没有源角色（无武器、无声骸），工具箱把它建模成一名**虚角色**——沿用同一套「角色打敌人」流程，只是这名角色的面板只带一个属性：效应系数。
+
+| 项         | 直伤条目           | 效应条目                      |
+| ---------- | ------------------ | ----------------------------- |
+| `source`   | 源角色名           | `效应·` + 技能名（虚角色 id） |
+| 面板       | 角色 / 武器 / 声骸 | 只有效应系数 `effectCoeff`    |
+| 系数基准值 | —                  | 90 级效应系数 = 3674          |
+| 基值       | 面板攻 / 生 / 防   | `zone: effectCoeff`（取整）   |
+| 乘区       | 含增伤区           | 去掉增伤区（`coeffChain`）    |
+
+```ts
+// src/lib/calc/compile.ts —— 效应条目改挂虚角色 id
+const VIRTUAL_EFFECT_PREFIX = '效应·'
+const source = isEffect ? `${VIRTUAL_EFFECT_PREFIX}${entry.hitName}` : (entry.character ?? '')
+// 效应系数最后写入面板落值（效应条目无装备）
+registerBuff(`effect:${entry.hitName}`, [{ applyTo: 'effectCoeff', value: String(EFFECT_BASE_VALUE) }])
+
+// src/lib/consts/effect-data.ts
+export const EFFECT_BASE_VALUE = 3674 // 90 级
+```
+
+效应伤害本身不可暴击，暴击期望初始为 1。部分角色共鸣链让效应结算也能暴击，配置侧保留暴击区承载这类机制。按解包，爱弥斯 6 链本质是 80% 概率触发的 270% 特殊终伤，同类角色机制同理；为方便拉表分析，仍划入暴击区。
+
+```ts
+// src/coconut-core/panel.ts —— 系数基准下双暴取 initCoeff
+zones[action.id] = critBase === 'coefficient' && action.initCoeff !== undefined ? action.initCoeff : action.init
+
+// src/coconut-config/data.ts
+{ id: 'critRate', init: 5, initCoeff: 0 }     // 系数基准下暴击率归零
+{ id: 'critDmg', init: 150, initCoeff: 100 }  // 系数基准下暴伤归零（倍率 = 1）
+```
+
+```ts
+// src/coconut-config/versions.ts
+export const v2_0 = {
+    ...v1_0,
+    actions: [...ACTIONS_1_0, EFFECT_COEFF],
+    formulas: [...v1_0.formulas, formula('effect', ZONE_EFFECT, coeffChain(ORDER_2_0), 'coefficient')]
+} satisfies CoconutCoreConfig
+```
+
+### 3.0：谐度公式及集谐乘区
+
+处决 / 偏谐响应以目标侧「偏谐系数」为基值；新增集谐区与谐度区。
+
+| 新增项                         | 归属       | 说明                     |
+| ------------------------------ | ---------- | ------------------------ |
+| `tuneBreakBoost` 谐度破坏增幅  | 角色侧作用 | 谐度区与集谐区的输入     |
+| `enemyCoeff` 偏谐系数          | 目标侧标量 | `tune` 公式的基值        |
+| `tuneStrainLayer` 集谐干涉层数 | 目标侧作用 | 集谐区输入，全队共用一份 |
+| `tuneStrain` 集谐区            | 乘区       | 紧随防御区               |
+| `tuneBreak` 谐度区             | 乘区       | 在集谐区之后             |
+
+集谐区：谐度破坏增幅 × 集谐干涉层数，紧随防御区。
+
+```ts
+// src/coconut-config/multipliers.ts
+;({ tuneBreakBoost, layer }) => 1 + 0.0012 * tuneBreakBoost * layer
+```
+
+谐度区：谐度破坏增幅，排在集谐区之后。
+
+```ts
+// src/coconut-config/multipliers.ts
+;(r) => 1 + r.tuneBreakBoost / 100
+```
+
+新公式 `tune`，基值取目标侧偏谐系数：
+
+```ts
+// src/coconut-config/versions.ts
+formula('tune', TARGET_COEFF, coeffChain(ORDER_3_0), 'coefficient')
+// TARGET_COEFF = { kind: 'targetStat', field: 'coefficient' }
+```
+
+直伤链不含谐度区，谐度区用于处决 / 震谐或骇破响应：
+
+```ts
+export const directChain = (order) => chainOf(order, 'tuneBreak')
+```
+
+### 3.7：同奏区
+
+| 项       | 内容                                      |
+| -------- | ----------------------------------------- |
+| 新增作用 | `unisonBoonLayer`（同奏增益层数，角色侧） |
+| 新增乘区 | `unison`，排在谐度区之后                  |
+
+```ts
+// src/coconut-config/multipliers.ts
+;({ unisonBoonLayer }) => 1 + 0.03 * unisonBoonLayer
+
+// src/coconut-config/versions.ts
+export const config = v3_7
+```

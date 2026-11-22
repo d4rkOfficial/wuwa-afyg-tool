@@ -1,193 +1,183 @@
 # 计算引擎：一切皆 Buff
 
-本文档描述「一切皆 buff」的伤害计算引擎：数据模型、乘区算子与条件系统。
+「一切皆 Buff」引擎的数据模型、乘区算子与条件系统。
 
-> 相关源码
->
-> | 文件                                           | 职责                                                                           |
-> | ---------------------------------------------- | ------------------------------------------------------------------------------ |
-> | `src/coconut-core/engine/registry/actions.ts`  | **Buff 作用注册表**（落点 / 合并语义 / 初值 / 可覆盖 / 可挂条件 / 可引用）     |
-> | `src/coconut-core/engine/calculation.types.ts` | Buff / 乘区 / 条件的类型定义                                                   |
-> | `src/coconut-core/engine/zone-ops.ts`          | 面板结构与作用写入的唯一实现（`emptyPanel` / `applyZone` / `recomputeTotals`） |
-> | `src/coconut-core/engine/condition.ts`         | 乘区级条件（属性 / 类型）求值与归一化                                          |
-> | `src/coconut-core/engine/rules.ts`             | Buff 级规则（求值 / 依赖 / 级联 / 文案）                                       |
-> | `src/coconut-core/engine/compute.ts`           | 贡献聚合与逐条目计算                                                           |
-> | `src/migration/`                               | 历史数据迁移（版本链、拉表态、Buff 文件夹命名、v7 规则化 / v8 伤害名并正则）   |
+| 文件                                                                        | 职责                                                                       |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| [`src/coconut-core/actions.ts`](../src/coconut-core/actions.ts)             | **Buff 作用注册表**（落点 / 合并语义 / 初值 / 可覆盖 / 可挂条件 / 可引用） |
+| [`src/lib/calc/calculation.types.ts`](../src/lib/calc/calculation.types.ts) | Buff / 乘区 / 条件的类型定义                                               |
+| [`src/coconut-core/panel.ts`](../src/coconut-core/panel.ts)                 | 面板结构与作用写入（`emptyPanel` / `applyZone` / `recomputeTotals`）       |
+| [`src/lib/calc/condition.ts`](../src/lib/calc/condition.ts)                 | 乘区级条件求值与归一化                                                     |
+| [`src/lib/calc/rules.ts`](../src/lib/calc/rules.ts)                         | Buff 级规则（求值 / 依赖 / 级联 / 文案）                                   |
+| [`src/coconut-core/compute.ts`](../src/coconut-core/compute.ts)             | 贡献聚合与逐条目计算                                                       |
+| [`src/migration/`](../src/migration)                                        | 历史数据迁移（版本链、拉表态、Buff 文件夹命名、v7 规则化 / v8 伤害名正则） |
 
-## 1. 统一模型
+## 统一模型
 
-所有影响伤害计算的东西都是 **Buff 类实例**（`BuffInstance`）：角色面板、武器、声骸、敌人配置、
-公式固有乘区，以及用户配置的 Buff。它们只通过**贡献（contribution）**进入引擎：
+所有影响伤害的东西都是 **Buff 类实例**（`BuffInstance`）：角色面板、武器、声骸、敌人配置、公式固有乘区、用户 Buff。它们只通过**贡献**进入引擎：
 
-```
+```text
 DamageEntry ──┐
               ├─→ boundBuffs(条目 × 角色 × 条件) ─→ 生效变体 ─→ 作用写入 ─→ CharacterPanel ─→ ResultEntry
 BuffInstance ─┘
 ```
 
-- **写入键 = 作用 id**（`ActionId`，字符串或 symbol）：`atkPct` / `bonusDmg` / `defPen` / `finalDmg` / `specialFinal2` … 见
-  `registry/actions.ts` 的 `BUFF_ACTIONS`。**「乘区」一词只指公式链上的乘子**（增伤区 / 防御区 / 暴击区…），
-  Buff 能施加的东西叫**作用**。
-- 注册表只放内核会读的字段（`side` / `combine` / `panel` / `overridable` / `init` / `initCoeff` / `targetField`）；
-  展示名、分组、单位、是否内部作用、条件匹配能力、乘区展示形态都在
-  [`calc/display-meta.ts`](../src/lib/calc/display-meta.ts)，按 id 取。
-- 装备（武器/声骸）词条经 `applyEntryStatToAccum` 归一化后写入同一个面板。
-- 面板是 `zones: Record<ActionId, number>` + `base`（白值）+ `total`（合计），维度清单由注册层的
-  `PANEL_CONFIG.dims` 给（现在是 `atk` / `hp` / `def`），合计由 `recomputeTotals` 按各作用的 `panel` 声明派生。
-- 目标面板的字段也是注册的（`TARGET_FIELDS`：`defense` / `dmgReduction` / `coefficient` 是标量、
-  `type` 是文本、`resistance` 是按元素分组），内核只按 `kind` 分派，不认字段名。
-- 「元素加成 / 伤害类型加成」是工具箱自己的口径：存 app 的 `AppPanel`，写进 `bonusDmg` 后内核只认那一个作用。
-- `ResultEntry` 是结果页 / 乘区溯源 / 贡献分析唯一消费的数据形状：它们只读 `ResultEntry`，不感知引擎内部结构。
-  贡献分析（副词条 / Buff）另走「改动入参 → `computeOneEntry` 重算 → 差值」这一条路径，与结果页同一实现。
-- `ResultEntry` 的结构化真源是 `formula`（走哪条公式）、`panel`（三维白值 / 合计 / 作用落值）与
-  `multiplierZones`（乘子链）。`baseAtk` / `totalAtk` / `atkPctSum` 这类平铺字段是 `panel` 的**派生兼容层**，
-  新代码优先读 `panel`。
-- 乘区展示参数是**结构化**的（`MultiplierDisplay`：`delta` / `factor` / `deltaWhenActive`），
-  本地化文案由界面层 `result.styles.ts` 的 `formatMultiplierDisplay` 生成 —— 引擎不产出展示字符串。
+| 概念          | 说明                                                                                                                               |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 写入键        | 作用 id（`ActionId`，字符串或 symbol）：`atkPct`/`bonusDmg`/`defPen`/`finalDmg`/`specialFinal2`…                                   |
+| 「乘区」      | 只指公式链上的乘子（增伤区/防御区/暴击区…）；Buff 能施加的东西叫**作用**                                                           |
+| 注册表字段    | 只放内核读的（`side`/`combine`/`panel`/`overridable`/`init`/`initCoeff`/`targetField`）；展示名/分组/单位在 `calc/display-meta.ts` |
+| 装备词条      | 经 `applyEntryStatToAccum` 归一化后写入同一面板                                                                                    |
+| 面板          | `zones: Record<ActionId, number>` + `base`（白值）+ `total`（合计）；维度由 `PANEL_CONFIG.dims`（atk/hp/def）给                    |
+| 目标面板      | `TARGET_FIELDS`：`defense`/`dmgReduction`/`coefficient` 标量、`type` 文本、`resistance` 按元素分组；内核按 `kind` 分派             |
+| 元素/类型加成 | 工具箱做法：存 `AppPanel`，写进 `bonusDmg` 后内核只认那一个作用                                                                    |
+| `ResultEntry` | 结果页/乘区溯源/贡献分析唯一消费的数据形状；只读它，不感知引擎内部结构                                                             |
+| 结构化真源    | `formula`（哪条公式）、`panel`（三维白值/合计/作用落值）、`multiplierZones`（乘子链）；`baseAtk` 等平铺字段是兼容层                |
+| 乘区展示      | 结构化 `MultiplierDisplay`（`delta`/`factor`/`deltaWhenActive`）；本地化文案由界面 `formatMultiplierDisplay` 生成                  |
 
-### 贡献分析的执行方式
+贡献分析执行：
 
-- **基线不重算**：结果页把自己的 `computeAll` 输出（`cleanEntries`）经 `baselineEntries` 传给分析，
-  分析只在没拿到时才内部跑一次 `computeAll`（AI / WS 工具走这条）。
-- **计算在 Worker 线程**（`substat-algorithms/analysis.worker.ts`）：副词条 Shapley 与 Buff 逐条移除是
-  上千次 `computeOneEntry`，放主线程必然卡界面；Worker 不可用时才回退主线程分片（`analysis-runner.ts`）。
-- 两条路径共用 `analysis.ts` 的 `prepareContributionAnalysis` + `runContributionSteps`，结果逐字段一致
-  （`test/src/lib/substat/analysis-runner.test.ts` 钉住等价）。
-- 请求必须可结构化克隆：`$state` 代理在派发前用 `$state.snapshot` 转纯数据。**Worker 里没有
-  `localStorage`**，而客户端构建的 `browser` 恒为 `true` —— 模块顶层读存储一律走
-  `$lib/utils/safe-storage`，否则 Worker 加载即崩。
+| 项   | 说明                                                                                                        |
+| ---- | ----------------------------------------------------------------------------------------------------------- |
+| 基线 | 结果页把自己的 `computeAll` 输出经 `baselineEntries` 传入；没拿到时才内部跑一次                             |
+| 线程 | 在 Worker（`substat-algorithms/analysis.worker.ts`）算；不可用时回退主线程分片                              |
+| 等价 | 两路径共用 `prepareContributionAnalysis` + `runContributionSteps`（`analysis-runner.test.ts` 钉住）         |
+| 克隆 | `$state` 代理派发前用 `$state.snapshot` 转纯数据；Worker 无 `localStorage`，模块顶层读存储走 `safe-storage` |
 
-### 作用写入（`applyZone`）
+### 作用写入 applyZone
 
-每条作用在注册表里只声明一次落点与合并语义，界面与引擎共用同一份声明：
+`applyZone(panel, actionId, value, 'add' | 'override')` 是唯一出口；`recomputeTotals` 在面板类作用变化后重算三维。
 
-| 声明                              | `add`                | `override`          |
-| --------------------------------- | -------------------- | ------------------- |
-| `combine: 'sum'`                  | `v += value`         | `v = value`         |
-| `combine: 'sum'` + 不可覆盖       | `v += value`         | 同 `add`（退让）    |
-| `combine: 'multiply'`             | `v *= 1 + value/100` | `v = 1 + value/100` |
-| 声明了 `panel.total` 的三维固定值 | `v += value`         | 直接写三维合计      |
+| 声明                            | `add`                | `override`          |
+| ------------------------------- | -------------------- | ------------------- |
+| `combine: 'sum'`                | `v += value`         | `v = value`         |
+| `combine: 'sum'` + 不可覆盖     | `v += value`         | 同 `add`（退让）    |
+| `combine: 'multiply'`           | `v *= 1 + value/100` | `v = 1 + value/100` |
+| 声明 `panel.total` 的三维固定值 | `v += value`         | 直接写三维合计      |
 
-`applyZone(panel, actionId, value, 'add' | 'override')` 是唯一出口；`recomputeTotals(panel)` 在面板类作用
-变化后重算攻/生/防三维，保证引用转模读到最新面板。
+注册表两项能力位（界面与引擎共用，非引擎 gate）：
 
-注册表还声明两项**能力位**（界面与引擎共用，不构成引擎 gate）：
+| 能力              | 含义                                                                                           |
+| ----------------- | ---------------------------------------------------------------------------------------------- |
+| `overridable`     | 界面是否给「覆盖」开关                                                                         |
+| `damageMatchable` | 能否挂「伤害匹配」条件（属性/类型）。热熔加成/暴击率成立；热熔共鸣效率/集谐层数/同奏层数不成立 |
 
-- `overridable`：界面是否给出「覆盖」开关；
-- `damageMatchable`：能否挂「伤害匹配」条件（伤害属性 / 伤害类型）。
-  热熔加成 / 热熔暴击率成立；热熔共鸣效率 / 热熔集谐层数 / 热熔同奏层数不成立 —— 这类作用不显示条件配置 UI。
+### 目标侧作用
 
-### 目标侧乘区（挂目标身上，全队一份）
+`side: 'target'` 的作用不写角色面板，目前只有**集谐·干涉层数**（`tuneStrainLayer`，游戏里挂目标/怪物、由队伍施加）：
 
-`side: 'target'` 的作用**不写角色面板**：目前只有**集谐·干涉层数**（`tuneStrainLayer`）——
-游戏里它挂在目标/怪物身上，由队伍施加，所以：
+| 项         | 说明                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------ |
+| 聚合       | `targetSideZonesOf` 从绑定到本条目的 Buff 直接聚合，**不做作用域过滤**（角色1 的 buff 也给全队） |
+| 面板       | `CharacterPanel.zones` 里没有它（写进去也没人读）                                                |
+| 引用       | 不能作为引用写入目标（`ZONE_NO_REF_IDS` 由 `side: 'target'` 派生）                               |
+| 集谐区公式 | `1 + 0.12% × 该角色谐度破坏增幅 × 目标侧层数`：增幅按角色读，层数全队共用                        |
+| 溯源       | 层数来源用 `getTargetSideSourceBuffs()` 取（可能挂别的角色身上）                                 |
 
-- 引擎用 `targetSideZonesOf(candidates, profile, zoneCtx)` 从「绑定到本条目的 Buff」直接聚合，
-  **不做作用域过滤**：一条「作用域=角色1」的集谐 buff 照样给全队提供层数；
-- 因为它不分角色，`CharacterPanel.zones` 里**没有**它的落值（写进去也没人读，故意不留）；
-- 它也不能作为引用写入目标（`ZONE_NO_REF_IDS` 由 `side: 'target'` 自动派生）；
-- 集谐区 = `1 + 0.12% × 该角色谐度破坏增幅 × 目标侧层数`：增幅仍按角色读，层数全队共用一份；
-- 溯源里集谐层数的来源用 `getTargetSideSourceBuffs()` 取（可能挂在别的角色身上）。
+### 集谐区与谐度区
 
-### 集谐区与谐度区是两个独立乘区
+同一个 `tuneBreakBoost`（谐度破坏增幅）在两个乘区里角色不同，**分开展示**：
 
-同一个 `tuneBreakBoost`（谐度破坏增幅）在两个乘区里扮演不同角色，**不能合并展示**：
+| 乘区   | 公式                                       | 吃它的条目                                |
+| ------ | ------------------------------------------ | ----------------------------------------- |
+| 集谐区 | `1 + 0.12% × 谐度破坏增幅 × 集谐·干涉层数` | 直伤 / 处决 / 偏谐响应 / 效应（四条都带） |
+| 谐度区 | `1 + 谐度破坏增幅%`                        | 处决 / 偏谐响应专属                       |
 
-| 乘区   | 公式                                       | 吃它的条目                                    |
-| ------ | ------------------------------------------ | --------------------------------------------- |
-| 集谐区 | `1 + 0.12% × 谐度破坏增幅 × 集谐·干涉层数` | 直伤 / 处决 / 偏谐响应 / 效应（四条公式都带） |
-| 谐度区 | `1 + 谐度破坏增幅%`                        | 处决 / 偏谐响应（它们专属的额外乘子）         |
+`ResultEntry` 用两个 delta 字段分别承载（`finalTuneStrainMulti` / `finalTuneBreakZone`），溯源 `buildDamageSegments` 产出两段（`tune`/`tuneBreak`）。
 
-`ResultEntry` 用两个 delta 字段分别承载（`finalTuneStrainMulti` / `finalTuneBreakZone`，互斥使用），
-乘区溯源 `buildDamageSegments` 也据此产出**两段**（`tune` = 集谐区、`tuneBreak` = 谐度区）；
-谐度破坏增幅的来源只在对应段落列出 —— 把处决/响应的 `1 + 增幅%` 并进集谐区是错的。
+### 四条公式吃的乘区
 
-### 四条公式各自吃哪些乘区
-
-公式链只有一处声明（`FORMULAS` 的 `chain`），界面可用性（`formulaActionClosure`）与溯源段
-（`buildDamageSegments`）都从它派生，**不要另写一份名单**：
+公式链只在 `FORMULAS` 的 `chain` 声明一次，界面可用性（`formulaActionClosure`）与溯源段（`buildDamageSegments`）都从它派生：
 
 | 公式                   | 覆盖                     | 不吃       | 额外   |
 | ---------------------- | ------------------------ | ---------- | ------ |
 | `direct` 直伤          | 除谐度区外的全部乘区     | 谐度区     | —      |
 | `tune` 处决 / 偏谐响应 | 除**增伤区**外的全部乘区 | **增伤区** | 谐度区 |
 | `effect` 效应          | 除**增伤区**外的全部乘区 | **增伤区** | —      |
-| `fixed` 固定值         | 不吃任何乘子（空链）     | 全部       | —      |
+| `fixed` 固定值         | 空链                     | 全部       | —      |
 
-一句话口径：**处决 / 响应 / 效应只不吃增伤区**；加深区、易伤·免伤区、集谐区、终伤区、特殊区、双暴区
-（以及处决/响应专属的谐度区）照常参与。增伤区被排除，是因为这几类条目的「加成」不属于面板增伤口径，
-它们的属性/类型加成也不得出现在结果里（`damage-trace` 的来源收集按同一口径）。
+系数基类（处决 / 响应 / 效应）**只不吃增伤区**：加深区、易伤·免伤区、集谐区、终伤区、特殊区、双暴区（处决/响应另有谐度区）照常参与。增伤区排除是因为这几类条目的「加成」不属面板增伤。
 
-### 系数基类条目（处决 / 响应 / 效应）的双暴
+### 系数基类条目的双暴
 
-处决 / 响应 / 效应 / 偏谐系数直伤走 `computeTuneEntry` / `computeEffectEntry`（判据 `usesCoefficientFormula`），
-它们的**双暴基准是 0% / 100%**（`critBase(coeffEntry=true)`，即「额外暴击伤害 +0%」）：
+处决 / 响应 / 效应走 `computeTuneEntry` / `computeEffectEntry`（判据 `usesCoefficientFormula`），双暴基准 **0% / 100%**：
 
-- **面板双暴不计入**：基础 5% / 150%、声骸与武器副词条、以及转模引用到的面板双暴都不参与
-  （本角色槽位与跨角色引用同一口径，`buildEntryPanel` 一并不带双暴）；
-- **双暴只有「覆盖」写入生效**（`COEFF_OVERRIDE_ONLY_ZONE_IDS`）：追加与引用一律不生效 ——
-  这些条目不参与面板式累加，想给它们定一个双暴值，必须写一条明确的**覆盖**乘区
-  （带引用的「覆盖」按引用处理，同样不生效）。暴击区仍是 `1 + 暴击率 × (暴击伤害 - 1)`；
-- **暴击率为 0 时** `canCrit=false`：结果页「暴击 / 不暴击」两列显示占位符、溯源不出「暴击区」段、
-  期望 = 不暴击 —— 这些条目的数值不随面板双暴变化；
-- **拉表同步挡勾**：可用性判定 `buffUsableByEntry`（分类/分段平铺共用，见 `damage-table.utils.ts`）
-  把「对该条目不生效的乘区」算作不可用，因此**追加型暴击率 / 暴击伤害 buff 在这些条目上不可勾**
-  （覆盖型可勾）；`EFFECT/TUNE_RELEVANT_ZONES` 仍列出双暴，是否可勾由 `zoneAppliesToCoeffEntry` 终判。
+| 项           | 说明                                                                                          |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| 面板双暴     | 不计入：基础 5%/150%、声骸与武器副词条、转模引用的面板双暴都不参与                            |
+| 只有覆盖生效 | `COEFF_OVERRIDE_ONLY_ZONE_IDS`：追加与引用一律不生效，要定双暴值必须写一条明确的**覆盖**乘区  |
+| 暴击区       | 仍为 `1 + 暴击率 × (暴击伤害 - 1)`                                                            |
+| 暴击率 0     | `canCrit=false`：结果页「暴击/不暴击」显示占位符、溯源不出暴击区段、期望=不暴击               |
+| 拉表挡勾     | `buffUsableByEntry` 把不生效乘区算不可用：追加型暴击率/暴伤 buff 在这些条目不可勾，覆盖型可勾 |
 
-### 暴击区的等效暴击率
+### 等效暴击率
 
-暴击区 = `1 + 等效暴击率 × (暴击伤害 - 1)`，**等效暴击率**把面板暴击率钳在 0–100
-（`effectiveCritRate`，见 `src/coconut-config/multipliers.ts`）：低于 0 按必不暴（乘子 1），高于 100 按必暴（乘子 = 暴伤比值）。
+暴击区 = `1 + 等效暴击率 × (暴击伤害 - 1)`；`effectiveCritRate`（[`src/coconut-config/multipliers.ts`](../src/coconut-config/multipliers.ts)）把面板暴击率钳在 0–100：低于 0 必不暴（乘子 1），高于 100 必暴（乘子 = 暴伤比值）。
 
-面板 `zones.critRate` 本身**不裁剪**：负值与 >100 都照原样保留，因为引用读的就是原值 ——
-「暴击超过 100 的部分转成暴击伤害」这类 buff 靠 `StatRef` 读 `critRate` 再减 `baseLine: 100` 实现。
-结果页的 `critRate` 字段是等效值（`0–1`），面板原值仍可从 `panel.zones.critRate` 取。
+`zones.critRate` 原值**不裁剪**：负值与 >100 都保留，引用读的就是原值——「暴击超过 100 的部分转暴伤」靠 `StatRef` 读 `critRate` 再减 `baseLine: 100`。结果页 `critRate` 字段是等效值（0–1），原值从 `panel.zones.critRate` 取。
 
-### 同一个 Buff 里的「同名乘区」
+### 同名乘区
 
-`zones` 是**贡献条目列表**，不是「乘区种类的集合」：同一个乘区可以出现多次，每条是独立贡献单元
-（数值 / 引用 / 覆盖 / **自己的生效条件**）。判定口径：
+`zones` 是**贡献条目列表**，同一乘区可出现多次，每条带自己的数值 / 引用 / 覆盖 / 生效条件：
 
-```
+```ts
 if (链阶硬门槛满足 && 作用域匹配) {
     同乘区各条目：各自 add if 自身条件满足      // 满足的全部相加
     覆盖条目：最后替换该乘区合计               // 覆盖优先于一切
 }
 ```
 
-- 例：`暴击率+20 条件=导电` + `暴击率+10 条件=普攻` → 导电普攻 +30、仅导电 +20、仅普攻 +10、都不是 +0。
-- **覆盖唯一**：同一 Buff 内每个乘区只允许一个覆盖条目（编辑器设覆盖时会取消同乘区其它条目的覆盖）；
-  跨 Buff 允许并存，引擎按 Buff 进入计算的顺序依次写入 —— **后进入者最终生效**。
-- 作用分组由注册表的 `group` 字段给出（基本固定值 / 基本百分比 / 双暴 / 常见增伤拐 / 特殊增伤拐或倍率提升 /
-  倍率追加或锚定 / 使目标 / 对目标 / 层数相关独立终伤）；v3 的 `customFinalDmg` / `customFinalDmgMul`
-  经 `LEGACY_ZONE_IDS` 重映射为 `specialFinal1` / `specialFinal2`（v3 → v4 迁移）。
+| 项       | 说明                                                                                                                       |
+| -------- | -------------------------------------------------------------------------------------------------------------------------- |
+| 示例     | `暴击率+20 条件=导电` + `暴击率+10 条件=普攻` → 导电普攻 +30、仅导电 +20、仅普攻 +10、都不是 +0                            |
+| 覆盖唯一 | 同 Buff 内每乘区只允许一个覆盖条目；跨 Buff 并存时按进入计算顺序写入，**后进入者最终生效**                                 |
+| 分组     | 注册表的 `group`：基本固定值/基本百分比/双暴/常见增伤拐/特殊增伤拐或倍率提升/倍率追加或锚定/使目标/对目标/层数相关独立终伤 |
+| 旧 id    | v3 的 `customFinalDmg`/`customFinalDmgMul` 经 `LEGACY_ZONE_IDS` 重映射为 `specialFinal1`/`specialFinal2`                   |
 
-左侧 Buff 列表与拉表列序都来自工程内**显式存储的树** `CalcState.buffTree`（`{ global, nonGlobal }` 两个根），
-纯逻辑在 `src/lib/buff/tree-state.ts`。树最多两级文件夹，Buff 可落在根 / 一级 / 二级；文件夹名可自定义，
-图标由后代 Buff 派生（同角色纯链 → 头像 + 链范围、同角色纯阶 → 武器 + 阶范围、混合/跨角色 → generic、
-纯效应 → `mdi:auto-fix`）。拖拽 Buff/目录时列表自动收起所有文件夹。
+### Buff 树与归属
 
-**全名是 Buff 归属的唯一真源**：`BuffInstance.name` 与工坊 `buff_sets.buff_name` 都持久化为
-`文件夹A\文件夹B\buff名`（根 Buff 无分隔符）。`buffTree` / `buff_folders` 只负责文件夹节点、排序与空文件夹；
-成员按名字的 `\` 前缀归属。文件夹改名 / 移动 / Buff 移动时级联重写后代全名；普通列表显示最后一段短名，
-结果溯源显示全名。Buff 短名与文件夹名允许 `/`、禁止 `\`。
+左侧 Buff 弹窗分 `全局`/`非全局` 两个页签，各一棵树，`CalcState.buffTree` 随工程保存：
 
-### 本地 Buff 库（工坊来源）
+```ts
+type BuffTreeNode =
+    | { kind: 'folder'; id: string; name: string; children: BuffTreeNode[] }
+    | { kind: 'buff'; id: string; buffId: string }
+interface BuffTreeState {
+    global: BuffTreeNode[]
+    nonGlobal: BuffTreeNode[]
+}
+```
 
-`src/lib/data/buff-library.svelte.ts` 的实体增加一级 `folders`（含空文件夹/排序），Buff 名同样是全名。
-工坊来源实体的结构以工坊为准、本地只读；自定义实体可在本地建 / 改名 / 删除 / 移动文件夹。
-从工坊同步按实体整份覆盖 Buff 与文件夹；导入工程时**丢弃工坊路径**，只取短名后按实体来源（角色本体 / 链 / 武器 / 声骸 / 套装）拼新全名。
+| 项        | 说明                                                                                    |
+| --------- | --------------------------------------------------------------------------------------- |
+| 结构      | 最多两级文件夹；Buff 在根/一级/二级；文件夹名自定义，图标由后代 Buff 派生               |
+| 全局树    | 受保护：文件夹与 Buff 不可删，只能改名/排序/移出；非全局树可递归删                      |
+| 拖拽      | 同容器排序走 `reorderBuffTreeChildren`，跨容器走 `moveBuffTreeNode`，拖到文件夹头即移入 |
+| 全名真源  | `BuffInstance.name` 与工坊 `buff_sets.buff_name` 持久化为 `文件夹A\文件夹B\buff名`      |
+| 改名/移动 | 级联重写后代全名；普通列表显短名，结果溯源显全名；短名与文件夹名允许 `/`、禁止 `\`      |
 
-### 内置 Buff 源
+平铺表细节：
 
-角色白值 / 武器 / 声骸 / 敌人面板与公式固有乘区**不是**可编辑 Buff，也不单独建模：
-角色侧由 `CharacterPanel` 的白值与作用落值承载，敌人侧由工程敌人配置承载，
-公式固有乘区由 `compute.ts` 的乘子算式给出，并在乘区溯源（`damage-trace`）里以「基础 / 武器 / 声骸 / 敌方 / 面板」
-这几类来源列出。
+| 项         | 说明                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------- |
+| 列序       | 根上 Buff 排最左；全局 Buff 不占列、无顶部条带                                                                |
+| 表头       | 按一级/二级/Buff 路径独立纵向均分；可切「简略」隐藏首行/次行                                                  |
+| 不达门槛列 | 设置可切显示/隐藏；隐藏后只留「至少一行达标」的列，显示时未达标格用圆点（已勾选=主题色实心、未勾选=灰色空心） |
+| 单元格状态 | 结构层 `enabled`/`hardOk`（与勾选无关）；渲染层 `rulesMetOf`（依赖勾选，渲染可见格时现算并缓存）              |
+| 分段平铺   | 按时间记点切段；只有「选中来源」行可勾 Buff；列 = 选中来源可吃到的 Buff 并集 ∪ 影响源并集                     |
+| 行头副行   | 可编辑行显伤害类型（手填+自动推导灰字）；灰化行显伤害源                                                       |
 
-## 2. 条件系统
+### 本地 Buff 库与内置源
 
-条件按**挂载位置**分层，能力不同：
+| 项       | 说明                                                                                                              |
+| -------- | ----------------------------------------------------------------------------------------------------------------- |
+| 本地库   | `buff-library.svelte.ts` 实体增一级 `folders`；工坊来源只读，自定义实体本地建/改名/删/移                          |
+| 工坊同步 | 按实体整份覆盖 Buff 与文件夹；导入工程丢弃工坊路径，取短名按实体来源拼新全名                                      |
+| 内置源   | 角色白值/武器/声骸/敌人面板/公式固有乘区**不是**可编辑 Buff；角色侧由 `CharacterPanel` 承载，敌人侧由工程配置承载 |
+
+## 条件系统
+
+条件按**挂载位置**分层：
 
 | 层级    | 字段                      | 可配置条件                                                         |
 | ------- | ------------------------- | ------------------------------------------------------------------ |
@@ -201,42 +191,30 @@ interface BuffCondition {
     damageTypes?: string[]
 }
 
-// Buff 级：discriminated union，一条 Buff 可挂多条，**规则之间全部 AND**
+// Buff 级：discriminated union，一条 Buff 可挂多条，规则之间全部 AND
 type BuffRule =
     | { kind: 'chain'; charIdx: number; min: number }
     | { kind: 'refinement'; charIdx: number; min: number }
-    | { kind: 'damageNameRegex'; pattern: string } // 对条目 displayName 做正则**包含**匹配；全等用 ^…$
+    | { kind: 'damageNameRegex'; pattern: string } // 对 displayName 正则包含匹配；全等用 ^…$
     | { kind: 'zoneCompare'; charIdx: number; zone: ZoneCompareId; op: ZoneCompareOp; value: number }
     | { kind: 'enemyType'; type: 'BOSS' | '精英怪' | '小怪' }
     | { kind: 'buffActive'; mode: 'all' | 'any'; buffIds: string[] }
 ```
 
-- **链与阶可以并存**（v7 起两者都是 Buff 级规则，可同时挂；双条件 Buff 不需要拆成两条，已拆开的保持拆分、不自动回并）。
-- `zoneCompare` 的 `charIdx = -1` 表示「伤害条目的角色」；数值单位与面板显示一致
-  （攻/生/防/谐度增幅/同奏层数为整数，充能/偏谐效率/暴击率/暴伤为百分比）。
-  读的是**「无条件部分」面板** = 装备 + 其它 Buff 的固定乘区，口径如下：
-    - **计入**：作用域覆盖该角色；规则里**不含 `buffActive`**（那需要「哪些 Buff 生效」这个结论，与面板互递归）；
-      除 `zoneCompare` 外的规则（链 / 阶 / 伤害名 / 敌人类型）在该条目上成立 —— 这些规则都不读面板，可安全判定。
-      因此**带链门槛的产层源也算数**（同奏层数这类「由 Buff 产出的面板值」必须靠这一条才能被门槛看到）。
-    - **排除**：带属性/类型条件的乘区条目、带引用的条目（引用要读别人的面板，可能再触发规则判定）。
-    - **不含本 Buff 自身**：`statsOf(charIdx, excludeBuffId)` 会把该 Buff 的乘区从面板里减掉
-      （普通加算直接减法；覆盖写入与 `specialFinal2` 连乘退回整表重算）。
-      这是「每层 +1 层、至多 4 层」这类**自封顶**能成立的前提：判定时看到的是「其它源的层数」。
-        > 自封顶是**逐源自判**的：产层源数量 ≤ 上限时结果正确（4 个源 × `lt 4` → 4 层）；
-        > 数量超过上限（5 个源 × `lt 4`）时每个源都会看到「其它源已满」而**全部关闭**（层数归零）。
-        > 真正的「按上限截断」需要引擎侧 clamp（数据模型目前没有），请按上限数量配置产层源。
-        > 该面板只排除本 Buff 自身，不排除「所有带 rules 的 Buff」—— 同奏层数的每个产层源都带自封顶规则，
-        > 若一并排除，门槛读到的层数会恒为 0（`ge` 永远不满足、`lt` 永远满足），一整类层数门槛全部失效。
-- `buffActive` 按**最小不动点**求值（`resolveActiveBuffIds`）：从「全部未生效」出发反复激活，
-  只有 AND 与正极性引用，所以最小不动点即唯一解；脏数据里的循环引用会稳定落在「都不生效」上。
-  创建期禁止直接自引用与间接循环（`cyclePathOf`，界面 toast 拒绝）。
-- 删除被依赖的 Buff：先用 `buffDeleteCascadeOf` 列出将级联删除的依赖方并二次确认，
-  确认后递归删除；`all` 规则引用任一被删即级联，`any` 规则在引用集合仍有存活项时保留依赖方
-  （并把已删项从 `buffIds` 里剪掉，`pruneRuleDependencies`）。
+| 规则            | 说明                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------ |
+| 链与阶并存      | v7 起两者都是 Buff 级规则，可同时挂                                                                          |
+| `zoneCompare`   | `charIdx = -1` 指出伤角色；读**无条件部分**面板（装备+其它 Buff 固定乘区）                                   |
+| 面板计入        | 作用域覆盖该角色、规则不含 `buffActive`、其它非面板规则（链/阶/伤害名/敌人类型）成立；带链门槛的产层源也算数 |
+| 面板排除        | 带属性/类型条件的乘区条目、带引用的条目                                                                      |
+| 不含本 Buff     | `statsOf(charIdx, excludeBuffId)` 减掉本 Buff 的乘区，是自封顶（每层+1、至多 4 层）成立的前提                |
+| 自封顶逐源自判  | 产层源 ≤ 上限正确；超过上限时每个源看到「其它源已满」会全部关闭（层数归零）；按上限数量配置产层源            |
+| `buffActive`    | 按最小不动点求值（`resolveActiveBuffIds`）；创建期禁止自引用与间接循环（`cyclePathOf`）                      |
+| 删除被依赖 Buff | `buffDeleteCascadeOf` 列出级联依赖方并二次确认；`pruneRuleDependencies` 剪掉已删项                           |
 
-### 组合口径（固定，无可选项）
+### 组合规则
 
-**类内「或」、类间「与」**（仅乘区级；Buff 级规则一律 AND）：
+类内「或」、类间「与」（仅乘区级；Buff 级规则一律 AND）：
 
 | 类别             | 内部           | 类别之间               |
 | ---------------- | -------------- | ---------------------- |
@@ -244,178 +222,86 @@ type BuffRule =
 | 伤害属性（多选） | 或（任一命中） | 与                     |
 | Buff 级规则      | —（每条独立）  | 与（全部规则同时满足） |
 
-- 需要条目上下文的子句（伤害名 / 属性 / 类型）在角色级聚合（无条目上下文）时**不构成否定**；
-  `buffActive` 缺 `activeOf` 时视为「不生效」（只有引擎会提供存活集合）。
-- 乘区级条件不满足时只有该乘区不计入，同一条目其它乘区照常生效。
-- **溯源同口径**：来源列表里的乘区标签会带上该乘区自己的条件前缀（`加成` → `冷凝加成` / `声骸加成` /
-  `共技·冷凝加成`，文案与乘区徽标 `describeZoneConditionBadge` 完全一致，伤害类型简称在前、属性在后），
-  且**条件不满足的乘区不列为来源** —— 判据与引擎共用 `zoneConditionMet`，保证「来源之和 = 该乘区数值」。
-  系数基类条目（处决/响应/效应）的 `ResultEntry.damageTypes` 为空，溯源必须用 `resolveDamageTypes` 现解析后再判。
-- **拉表「可用Buff」过滤同口径**：`buffMatchesEntry` 的上下文就是引擎的 `zoneCtx`（`element` + **解析后**的
-  伤害类型），**非直伤条目一样要传**（效应 → `效应伤害`；处决/响应 → 推断类型，由 `buildDamageTypesByEntry` 提供）。
-  只传空上下文会让「需要条目上下文的子句视为不满足」，把带属性/类型条件的乘区全判成不匹配 ——
-  症状是效应条目上带「导电/效应」条件的加深 buff 挂不上（引擎其实吃它）。
+| 项           | 说明                                                                                                        |
+| ------------ | ----------------------------------------------------------------------------------------------------------- |
+| 缺条目上下文 | 需条目上下文的子句（伤害名/属性/类型）在角色级聚合时不构成否定；`buffActive` 缺 `activeOf` 视为不生效       |
+| 条件不满足   | 只有该乘区不计入，同条目其它乘区照常                                                                        |
+| 溯源规则一致 | 来源标签带该乘区条件前缀（`describeZoneConditionBadge`），条件不满足的不列为来源（共用 `zoneConditionMet`） |
+| 拉表过滤一致 | `buffMatchesEntry` 上下文是引擎 `zoneCtx`（element + 解析后伤害类型），非直伤条目也要传                     |
 
-### 分层裁剪
+### 分层裁剪与迁移
 
-乘区级条件由 `normalizeCondition(cond)` 统一裁剪：**只保留 `elements` / `damageTypes`**，
-其余条件字段（`chains` / `refinements` / `chain` / `refinement` / `logic`）一律丢弃。
-Buff 级规则由 `normalizeRules()` 归一化（非法正则、空引用集合、越界槽位直接丢弃）。
-
-### Buff 集的条件口径（`buff/library-condition`）
-
-Buff 集（主页「Buff 集」/ 工坊 `buff_sets`）存的是**模板**，条件按模板能表达的形态裁剪，
-与工程侧共用同一套 `BuffRule` 形状，差别只有两点：- **5 种规则**：`chain` / `refinement` / `damageNameRegex` / `zoneCompare` / `enemyType`。
-`buffActive` 不入库 —— 它引用工程内 `buff.id`（导入时现生成），库内没有这个 id 空间，
-且「只勾几条」的精细导入会让依赖项缺失。
-
-- **归属只有两档**：`0` = **本角色**（导入时按实体归属重指：角色=本人、武器/声骸/套装=装配者）、
-  `-1` = **出伤者**（本次伤害所属角色，`zoneCompare` 与 `ref` 同一口径）。
-  `chain` / `refinement` 在库里一律 `charIdx = 0`。
-
-`zoneCompare` 的属性白名单排除 `unisonBoonLayer` / `tuneBreakBoost`：它们的「自封顶」依赖
-跨 Buff 的面板聚合，模板里表达不出，配出来只会是「永远不生效」。
-伤害名正则有条数上限（`LIBRARY_REGEX_MAX`）；空正则保留为草稿（与工程侧一致，导入后恒不满足）。
-
-导入工程时 `rewriteOwnerInRules` 把「本角色」档重指到真实槽位，`-1` 档**与归属无关**、
-实体不在配队时也保留；`rewriteOwnerInZones` 对 `characterIdx < 0` 的引用同样不重指。
-
-工坊侧把 rules 放在 `buff_sets.condition.rules`（同一个 jsonb 里与 `chains` / `refinements` 并存，
-读取时两套字段**合并**成一组规则）；引用归属用 `buff_set[].ref.refOwner`（`self` / `owner` = 本角色，
-`active` = 出伤者）。契约细节见工坊仓库的 `docs/api.md`。
-
-### 工程迁移（v7 / v8）
-
-- 实例级 `condition.chains/refinements` 与单值 `chain/refinement`（配合 `conditionRefCharIdx`）
-  在迁移里转成 `chain` / `refinement` 规则（`rulesFromLegacyCondition`）；转换后链阶并存、多条件 AND。
-- 实例级 `elements` / `damageTypes` 属乘区级条件，**不转 rules**，迁移时由 `normalizeZones` 下放到乘区条目。
-- `starred`、`condition`、`conditionRefCharIdx` 等不在模型白名单里的字段在迁移里抹除（`normalizeBuff` 只输出白名单字段）。
-- v8 的 `damageNameRegex` 统一承载伤害名匹配：`damageNameEquals` 的值在迁移时转义正则元字符后写成 `^…$`
-  （空值仍为空草稿），模型与界面只保留正则一种；`normalizeRule` 的兼容分支保证带 `damageNameEquals` 的导入 / 工坊文件也能落成正则。
-- 工坊 share / 本地 Buff 库的导入源格式是实例级条件（`BuffLibraryGateCondition`），
-  导入工程时由 `rulesFromLegacyCondition` 转成规则。
-
-### 链 / 阶档位真源
-
-角色共鸣链与武器精炼档位的**真源是角色槽位**（`CharSlot.chain` / `CharSlot.refinement`），由「角色详情配置」
-编辑；`conditionProfileFromTeam(team)` 把它派生成条件系统读取的 `ConditionProfile`，不参与任何变量机制。
+| 项                   | 说明                                                                                                     |
+| -------------------- | -------------------------------------------------------------------------------------------------------- |
+| `normalizeCondition` | 乘区级只留 `elements`/`damageTypes`，其余字段丢弃                                                        |
+| `normalizeRules`     | Buff 级归一化，非法正则/空引用/越界槽位丢弃                                                              |
+| v7 迁移              | 实例级 `chains`/`refinements` 转成 `chain`/`refinement` 规则；实例级 `elements`/`damageTypes` 下放到乘区 |
+| v8 迁移              | `damageNameEquals` 转义正则元字符后写成 `^…$`；模型与界面只留正则                                        |
+| 链/阶真源            | 角色槽位 `CharSlot.chain`/`refinement`，由「角色详情配置」编辑，`conditionProfileFromTeam` 派生          |
 
 ### 生效成员（作用域四态）
 
-`BuffInstance.scope` 有四种语义（`classifyBuffScope` 归类，界面「生效成员」tab 编辑）。
-**叫法全项目统一**：`'all'` 叫**通用**（三名角色 + 效应），`[0,1,2]` 叫**全队**（只有三名角色）——
-两者不是同义词，别混：
+`BuffInstance.scope` 四种语义（`classifyBuffScope` 归类）。叫法全项目统一：`'all'` 叫**通用**，`[0,1,2]` 叫**全队**，不是同义词：
 
 | 取值      | 含义                        | 效应伤害 | 勾选的角色 |
 | --------- | --------------------------- | -------- | ---------- |
-| `'all'`   | **通用**（三名角色 + 效应） | ✅       | 全部       |
-| `[0,1,2]` | **全队**（不含效应伤害）    | ❌       | 全部       |
-| `[]`      | 仅效应                      | ✅       | 无         |
-| 子集数组  | 指定角色                    | ❌       | 子集       |
+| `'all'`   | **通用**（三名角色 + 效应） | 是       | 全部       |
+| `[0,1,2]` | **全队**（不含效应）        | 否       | 全部       |
+| `[]`      | 仅效应                      | 是       | 无         |
+| 子集数组  | 指定角色                    | 否       | 子集       |
 
-状态迁移（`nextScopeAfterCharToggle` / `nextScopeAfterEffectToggle`）：勾效应 = 通用；
-从通用取消效应 = 全队；仅效应取消效应 = **禁止**（至少保留一个成员）；
-通用取消一个角色 = 取消效应 + 保留剩余；取消最后一个角色 = 仅效应。新建 Buff 默认 `'all'`（通用）。
+状态迁移：勾效应=通用；通用取消效应=全队；仅效应取消效应=禁止（至少留一个成员）；通用取消一个角色=取消效应+留剩余；取消最后一角=仅效应。新建默认 `'all'`。
 
-Buff 库（本地 / 工坊）的作用域是**导入源语义**，由 `mapImportedScope` 落到上表：
-`team` = 通用、`team_only` = 全队、`effect_only` = 仅效应、`self` / `self_except` = 角色子集。
+Buff 库作用域是导入源语义，由 `mapImportedScope` 落表：`team`=通用、`team_only`=全队、`effect_only`=仅效应、`self`/`self_except`=角色子集。
 
-## 3. 引用转模与跨角色「影响源」
+### Buff 集模板条件
 
-`ZoneRef` 让某个乘区引用角色面板（`atkPct += 攻击白值 × pct%`、离散取整、上下限 clamp 等）。
+Buff 集（`buff/library-condition`）存模板，与工程共用 `BuffRule` 形状，两点差别：
 
-**口径：伤害是当下的，buff 也是当下的。**
+| 项         | 说明                                                                                                         |
+| ---------- | ------------------------------------------------------------------------------------------------------------ |
+| 规则       | 5 种：`chain`/`refinement`/`damageNameRegex`/`zoneCompare`/`enemyType`；`buffActive` 不入库                  |
+| 归属       | `0`=本角色（导入按实体归属重指）、`-1`=出伤者；`chain`/`refinement` 在库里一律 `charIdx = 0`                 |
+| 属性白名单 | 排除 `unisonBoonLayer`/`tuneBreakBoost`（自封顶依赖跨 Buff 聚合，模板表达不出）                              |
+| 导入       | `rewriteOwnerInRules` 把「本角色」重指真实槽位，`-1` 与归属无关；工坊侧 rules 在 `buff_sets.condition.rules` |
 
-- **本条目可见面板**：每个角色槽位的面板都只由**绑定到本条目**的 Buff 组成 ——
-  本角色槽位用 `partialStats`，其它角色槽位由 `buildEntryPanel()` 按需现算（同一槽位带缓存）。
-  因此：
-    - 某角色在**它自己其它条目**上勾的 Buff **不会**泄漏到本段的转模读数；
-    - 把「作用域指向被引用角色」的 Buff **勾到本段**上，它就会参与该角色在这一段的面板计算（勾了才生效，且不重复计算）。
-- **引用归属只有两种语义**（`ZoneRef.characterIdx`）：
-    - `0..2` = 指定角色槽位（Buff 集里的「本角色」导入后落到实体归属槽位）；
-    - `-1` = **出伤者**（本条目所属角色）：三处 `panelOf` 都把它归一到 `charIndex`，
-      因此直接返回本条目的 `partialStats`，不额外建面板；`pane-effects` / `global-bindings` 对负值一律跳过
-      （不作为跨角色「影响源」）。
-- **全局 Buff 的自动绑定**：`rebindGlobalBuffs()` 不只把全局 Buff 绑到「作用域命中的条目」，
-  还会绑到**引用了该作用域角色的条目**上（`global-bindings.ts`）。原因同上：转模只读本条目可见面板，
-  若全局自作用域 Buff（如角色固有天赋）只绑在主人自己的条目，队友引用主人面板时就会少算。
-  绑到别的角色条目不会给那个角色白加属性——作用域仍由 `activeBoundForChar` 在计算时过滤。
-- **影响源（界面）**：`getPaneEffectSources(entryId)` 给出「会改写本段所引用面板」的 Buff 列表
-  （`buffId → { 被引用角色槽位, 被改写的面板乘区键 }`，映射表 `PANEL_TO_ZONES` 把面板属性映射到会改写它的乘区键）。
-  它们作为**普通可勾选项**出现在拉表里（分类平铺与分段平铺都会成列，列名左侧带 `mdi:transit-connection-variant`
-  标记，未勾选的格子上也显示连接图标）；引用配置弹窗里不显示副作用列表。
-- **溯源只给结果**：溯源里的引用乘区展示的是**解算后的数值**（`compute.resolveRefZoneValues` 按「本条目可见面板」
-  算出，与逐条目结算走同一条链路），没有转模规则文案（`TracePart` 不带 `note` 字段）；面板 chip 里的引用
-  也按结果逐条列出，残差占位只剩「覆盖等」这类确实无法逐条列出的写入。
-- **v2 → v3 迁移（`migrateV2toV3`）**：v2 语义下被引用角色的面板由该角色**全部条目**上绑定的 Buff 组成；
-  按当前口径（面板只由绑定到本条目的 Buff 组成），只勾在被引用角色身上的副作用 Buff 会失效，迁移用
-  `bindPaneEffectSources()` 把它们补勾到引用这些面板的伤害段上（`entryOwnersFromTimeline()` 从时间线推导条目归属）：
-  只加不减、幂等、跳过全局 Buff 与自引用，且**不按条件过滤**（与 v2 语义的跨条件变化保持等价）。
-  纯逻辑集中在 `src/lib/buff/pane-effects.ts`，store、界面与迁移共用同一口径。
+## 引用转模与影响源
 
-### Buff 树（工程内显式存储）
+`ZoneRef` 让某乘区引用角色面板（`atkPct += 攻击白值 × pct%`、离散取整、上下限 clamp）。原则：**伤害是当下的，buff 也是当下的**。
 
-左侧 Buff 弹窗分 `全局` / `非全局` 两个页签，各自是一棵独立的树；`CalcState.buffTree` 随工程保存 / 导出 / 导入：
+| 项             | 说明                                                                                                             |
+| -------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 本条目可见面板 | 每角色槽位面板只由**绑定到本条目**的 Buff 组成：本槽用 `partialStats`，其它槽 `buildEntryPanel()` 现算（带缓存） |
+| 不泄漏         | 某角色在它自己其它条目勾的 Buff 不泄漏到本段转模读数                                                             |
+| 影响源生效     | 把「作用域指向被引用角色」的 Buff 勾到本段，它才参与该角色这一段面板计算（勾了才生效、不重复）                   |
+| 引用归属       | `0..2`=指定槽位；`-1`=出伤者（归一到 `charIndex`，直接返回本条目 `partialStats`，不作为影响源）                  |
+| 全局自动绑定   | `rebindGlobalBuffs` 还绑到「引用该作用域角色的条目」，否则队友引用主人面板时少算                                 |
+| 影响源界面     | `getPaneEffectSources` 给出改写本段所引用面板的 Buff，作为普通可勾选项出现在拉表（列名带连接图标）               |
+| 溯源           | 引用乘区展示解算后数值（`resolveRefZoneValues`），无转模规则文案                                                 |
+| v2→v3 迁移     | `bindPaneEffectSources` 把只勾在被引用角色的副作用 Buff 补勾到引用其面板的伤害段；只加不减、幂等、不按条件过滤   |
 
-```ts
-type BuffTreeNode =
-    | { kind: 'folder'; id: string; name: string; children: BuffTreeNode[] }
-    | { kind: 'buff'; id: string; buffId: string }
-interface BuffTreeState {
-    global: BuffTreeNode[]
-    nonGlobal: BuffTreeNode[]
-}
-```
+### 数字前后缀迁移
 
-- **最多两级文件夹**，Buff 可落在根 / 一级 / 二级；文件夹名可自定义，图标由后代 Buff 派生。
-- **全局树受保护**：其中的文件夹与 Buff 不可删除，只能改名、排序或移出全局（切到非全局页签）；
-  非全局树可递归删除。
-- **拖拽**：同一容器内排序走 `reorderBuffTreeChildren`；跨容器移动走 `moveBuffTreeNode`；
-  拖到文件夹头上即移入。把 Buff 切到全局时，会把它在非全局树中的**完整文件夹路径**复制到全局树，
-  只移动 Buff 本身，源文件夹保留。
-- **平铺表**（分类平铺）：根上的 Buff 排在最左；全局 Buff **不占列、没有顶部条带**
-  （全局生效的编辑统一在 BUFF 配置弹窗里做）。每列的表头按该列的
-  一级 / 二级 / Buff 路径做**独立的纵向均分**（1 层居中、2 层各 50%、3 层各 1/3）。表头可切「简略」
-  （隐藏首行/次行、只留列名行，全局偏好）。
-- **不达门槛的 Buff 列**：设置-交互相关可切换显示/隐藏（全局偏好）。隐藏后只保留「至少一行真正达标」的列；
-  显示时列照常保留，未达门槛的格子用圆点表示（**已勾选=主题色实心圆**、未勾选=灰色空心圆）。
-- **单元格状态**（`CellData` + 渲染期门槛判定，分层是为了性能）：
-    - 结构层（**与勾选无关**）：`enabled`（作用域/乘区/属性类型条件都满足才可勾）与 `hardOk`（硬门槛，决定列是否保留）；
-    - 渲染层（**依赖勾选**）：Buff 级门槛 `rulesMetOf` —— 面板/生效集合随绑定变化，所以只在渲染可见格时现算并缓存。
-- **分段平铺**：按时间记点（`analysis.timings` 里 seconds 非空、且有对应参考线）切段，每段一张表；
-  行 = 全部伤害（按时间轴顺序），只有「选中来源」的行可勾 Buff，其它行只显示首列伤害信息（右侧绝对留白）；
-  列 = 选中来源能吃到的 Buff 并集 **∪ 影响源并集**（与分类平铺同口径：跨角色转模的 Buff 作用域指向被引用角色，
-  对出伤条目的硬门槛本就不过，靠影响源身份成列，未勾选的格子显示连接图标）。没有记点时退化为单张「全部伤害」表。
-- **行头副行**：可编辑行显示伤害类型（手填标签 + 自动推导灰字）；灰化行（非选中来源）整行压暗，
-  副行改显**伤害源**（角色名，无角色显示「—」）—— 这类行压暗后伤害类型读不出来，来源才是对号入座的信息。
-  倍率名配色取元素色；物理没有专属元素色，取正文色（灰字会与灰化行里被压暗的其它属性伤害混淆）。
+工程迁移 `migrateLegacyBuffTree` 把「前缀+数字+后缀」命名整理成数字文件夹：
 
-### 数字前后缀迁移（仅工程迁移，不在导入时做）
+| 规则         | 说明                                                                 |
+| ------------ | -------------------------------------------------------------------- |
+| 切分         | 只切**最后一段**连续数字；空前缀（`1层`/`2阶`）不建文件夹、名字不改  |
+| 归并键       | 前缀+后缀；同父容器同键 ≥2 条才建文件夹                              |
+| 文件夹名     | 用前缀；撞名第二组起补 `（后缀）`，仍撞名加 `#`                      |
+| 子 Buff 改名 | 真改名为 `${条件文件夹}\${数字文件夹}\${数字}${后缀}`                |
+| 排序         | 数字升序再后缀；撞名追加 `#`                                         |
+| 位置         | 条件文件夹一级、数字文件夹二级；无条件的数字文件夹直接一级           |
+| 导入不做     | 只取工坊短名按实体来源拼新全名（本体/链/武器/声骸/套装），撞名加 `#` |
 
-工程迁移 `migrateLegacyBuffTree`（`buff-tree-state.ts`）会把 `前缀 + 数字 + 后缀` 形式的命名整理成数字文件夹：
+## 新增「Buff 作用」步骤
 
-- 只切分**最后一段**连续数字；`1层` / `2阶` 这类**空前缀**不建文件夹，名字也不改。
-- 归并键是**前缀 + 后缀**：同一父容器内同键 ≥2 条才建文件夹；`锁3链 共鸣解放时…` 与 `锁3链 同奏…` 后缀不同，**不会**合并。
-- 文件夹名用前缀；同前缀不同后缀两组都 ≥2 时，第二组起补 `（后缀）`，仍撞名再加 `#`。
-- 子 Buff **真改名**为全名 `${条件文件夹}\${数字文件夹}\${数字}${后缀}`（如 `散华-千古洑流\千古洑流 共技时 攻击1层\1阶`）。
-- 排序按数字升序、再按后缀；撞名（Buff 短名或文件夹名）追加 `#`，仍冲突继续追加。
-- 数字文件夹的位置：条件文件夹是一级、数字文件夹是二级；无条件的数字文件夹直接落在一级。
-- `BUFF_TREE_VERSION` 记录迁移版本；缺版本或版本为 0 的树会在载入时重新迁移。
-- **导入 Buff 集不做数字迁移**：只取工坊全名的短名，再按实体来源拼新全名（角色本体 `角色名-本体`、链 `角色名-x链`、
-  武器 `角色名-武器名`、首位声骸 `角色名-声骸名`、套装 `角色名-套装名-x件`；后三者的生效条件仍是角色本体门），撞名加 `#`。
+| 步  | 操作                                                                                                                                                                                                                                         |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `registry/actions.ts` 的 `BUFF_ACTIONS` 加一行：`id`/`label`/`unit`/`group`/`side`/`combine`/`panel?`/`overridable`/`damageMatchable`/`init`（系数基类另给 `initCoeff`）。此后界面右栏、分区、覆盖开关、条件显隐、面板写入、三维派生自动跟上 |
+| 2   | 可被引用 → 加 `ref: { label }`；会被哪些作用改写由 `panel` 声明自动推导                                                                                                                                                                      |
+| 3   | 公式要用 → `compute.ts` 乘子算式读 `stats.zones.<id>`                                                                                                                                                                                        |
+| 4   | 同步 share 端 `wuwa-afyg-share/src/lib/consts/buff-zones.ts` 的 `BUFF_ZONES`/`BUFF_ZONE_SECTIONS`（两端白名单一致）                                                                                                                          |
+| 5   | `pnpm run format && lint:eslint && check && pnpm test`（`check-no-hardcoded-ids` 拦实体名字面量）                                                                                                                                            |
 
-## 4. 新增「Buff 作用」的步骤
-
-1. 在 `registry/actions.ts` 的 `BUFF_ACTIONS` 加一行：`id` / `label` / `unit` / `group` / `side` /
-   `combine` / `panel?` / `overridable` / `damageMatchable` / `init`（系数基类口径另给 `initCoeff`）。
-   **这一步之后，界面的「添加作用」右栏、分区、覆盖开关、条件面板显隐、面板写入、三维派生全部自动跟上**
-2. 若要让它能被引用（转模来源）→ 加 `ref: { label }`；会被哪些作用改写由 `panel` 声明自动推导
-   （影响源分析 `PANEL_TO_ZONES` 也是派生的），不需要另登记
-3. 若公式要用它，在 `compute.ts` 对应乘子算式里读 `stats.zones.<id>`（阶段 1 起改为乘子表 `inputs` 声明）
-4. **同步 share 端**：`wuwa-afyg-share/src/lib/consts/buff-zones.ts` 的 `BUFF_ZONES` 与
-   `BUFF_ZONE_SECTIONS`（两端的 id 白名单必须一致，否则工坊存下的数据工具箱认不全）
-5. 运行 `pnpm run format && pnpm run lint:eslint && pnpm run check && pnpm test`
-   —— 其中 `check-no-hardcoded-ids` 会拦住「引擎里又出现实体名字面量」的走捷径写法
-
-> **引用（转模）默认开放**：作用加上 `ref` 即可被引用。只有目标侧作用（值挂在目标面板、由 Buff 直接聚合）
-> 不做引用写入目标，它们由注册表的 `side: 'target'` 自动排除，不需要单独的名单。
+引用（转模）默认开放：作用加 `ref` 即可被引用。目标侧作用由 `side: 'target'` 自动排除，不另设名单。

@@ -1,52 +1,59 @@
 # 工具文档（AI 助手 / WS 远程接管共用）
 
-> 本文档由 `scripts/generate-tools-doc.mjs` 从工具源码自动生成，共 **172** 个工具。
+> 本文档由 [`scripts/generate-tools-doc.mjs`](../scripts/generate-tools-doc.mjs) 从工具源码自动生成，共 **172** 个工具。
 > 新增/修改工具后请重跑：`node scripts/generate-tools-doc.mjs`
 
-AI 助手悬浮窗与 WS 远程接管（`#websocket=`）共用同一套工具注册表与执行引擎；危险工具在 AI 侧受「危险操作权限」策略约束，WS 侧直接放行。
+AI 助手与 WS 远程接管（`#websocket=`）共用同一套工具注册表与执行引擎。
 
-**能力门控（AI 独享 / WS 不可调用）**：声明了 `requires` 的工具依赖**宿主能力**，能力缺失时既不会进发给对方的工具清单，直接 exec 也会被拒。当前有 `ask_user`（需要提问界面）与 `web_fetch`（需要宿主网络代理出网）：WS 远程接管不提供这两项能力，故在远程通道里不可见、也不可执行。
+| 通道    | 危险工具                   | 宿主能力依赖工具                    |
+| ------- | -------------------------- | ----------------------------------- |
+| AI 助手 | 受「危险操作权限」策略约束 | 可用 `ask_user` / `web_fetch`       |
+| WS 远程 | 直接放行                   | 无提问界面 / 网络代理，两工具不可见 |
+
+声明 `requires` 的工具依赖**宿主能力**：能力缺失时既不进工具清单，直接 exec 也被拒。
 
 ## 危险工具
 
-- `generate_buff_set_entity_buffs`
-- `generate_project_buff_confs`
-- `sync_buff_set_from_share`
-- `update_buff_set_entity_buffs`
-- `create_buff_set_folder`
-- `rename_buff_set_folder`
-- `delete_buff_set_folder`
-- `move_buff_set_buff_to_folder`
-- `reorder_buff_set_folder`
-- `delete_buff_set_entity`
-- `clear_buff_set`
-- `create_buff_folder`
-- `rename_buff_folder`
-- `delete_buff_folder`
-- `move_buff_tree_node`
-- `reorder_buff_folder`
-- `delete_buff_conf`
-- `remove_buff_conf_zone`
-- `remove_substat`
-- `kuro_login_with_token`
-- `kuro_logout`
-- `archive_project`
-- `delete_project`
-- `update_skill`
-- `delete_skill`
-- `save_substat_plan`
-- `delete_substat_plan`
-- `reset_standard_substat_plan`
-- `sync_substat_plans_from_share`
-- `sync_substat_plans_from_kuro`
-- `update_custom_hit`
-- `remove_custom_hit`
-- `unbind_damage_hit`
-- `update_damage_hit`
-- `remove_damage_from_target`
-- `remove_op_block`
-- `format_timeline`
-- `remove_ref_line`
+| #   | 工具                             |
+| --- | -------------------------------- |
+| 1   | `generate_buff_set_entity_buffs` |
+| 2   | `generate_project_buff_confs`    |
+| 3   | `sync_buff_set_from_share`       |
+| 4   | `update_buff_set_entity_buffs`   |
+| 5   | `create_buff_set_folder`         |
+| 6   | `rename_buff_set_folder`         |
+| 7   | `delete_buff_set_folder`         |
+| 8   | `move_buff_set_buff_to_folder`   |
+| 9   | `reorder_buff_set_folder`        |
+| 10  | `delete_buff_set_entity`         |
+| 11  | `clear_buff_set`                 |
+| 12  | `create_buff_folder`             |
+| 13  | `rename_buff_folder`             |
+| 14  | `delete_buff_folder`             |
+| 15  | `move_buff_tree_node`            |
+| 16  | `reorder_buff_folder`            |
+| 17  | `delete_buff_conf`               |
+| 18  | `remove_buff_conf_zone`          |
+| 19  | `remove_substat`                 |
+| 20  | `kuro_login_with_token`          |
+| 21  | `kuro_logout`                    |
+| 22  | `archive_project`                |
+| 23  | `delete_project`                 |
+| 24  | `update_skill`                   |
+| 25  | `delete_skill`                   |
+| 26  | `save_substat_plan`              |
+| 27  | `delete_substat_plan`            |
+| 28  | `reset_standard_substat_plan`    |
+| 29  | `sync_substat_plans_from_share`  |
+| 30  | `sync_substat_plans_from_kuro`   |
+| 31  | `update_custom_hit`              |
+| 32  | `remove_custom_hit`              |
+| 33  | `unbind_damage_hit`              |
+| 34  | `update_damage_hit`              |
+| 35  | `remove_damage_from_target`      |
+| 36  | `remove_op_block`                |
+| 37  | `format_timeline`                |
+| 38  | `remove_ref_line`                |
 
 ## AI 助手自身（上下文 / 用量 / 运行情况）
 
@@ -116,7 +123,7 @@ _无参数_
 
 ### `ask_user`
 
-向用户提出一个或多个结构化问题，并阻塞当前回合直到用户作答完毕。界面是**逐题问答**：每题可「上一题 / 下一题 / 忽略本题」，最后一题或任意时刻可「提交」；用户提交或放弃后你才会拿回控制权，期间不要假设用户已经看到或已经作答。 题型与结果里 values 的取值约定： - boolean（是否型）：界面显示「是 / 否」，values 为 ["yes"] 或 ["no"]，请不要给它 options。 - single（单选型）：values 为 [某个选项 value] 或 [用户自定义输入原文]；默认允许自定义输入。 - multi（多选型）：values 为 [选项 value, …]（可能为空），用户的自定义输入原文追加在末尾；默认允许自定义输入。 - 「其它」由界面保证只出现一次：你在 options 里已经写了「其它」（label 或 value 命中「其它 / 其他 / other / custom / 自定义」）时，界面**不会再补一行**，而是让那一项自己展开输入框（此时 answers[].values 里是用户输入的原文）；你没写时界面才补一行「其它」。 什么时候该用： - 缺少只有用户知道的关键信息（目标、偏好、业务含义、外部约束），且不打算为了猜而做无用功； - 存在多个都合理的实现方向，需要用户拍板（例如「要配置工程 Buff，还是管理主页 Buff 集」「用哪种出图口径」）； - 需求内部有冲突/歧义，必须先澄清再动手。 什么时候不该用： - 能自己查到的（工具清单/工程状态/文档里已有的），先自己查，不要把查询工作推给用户； - 不要拿它当「危险操作二次确认」——危险操作有专门的确认机制（工具的 dangerous 标记），用它只会无谓地打断用户一次。 结果约定： - answers 是逐题作答数组，含补全后的 id、type、skipped、values、custom（用户自定义输入原文）。 - 用户可以「忽略本题」（或提交时未答非必答题）：必须逐题检查 skipped，skipped=true 时 values 为空数组——不要臆造被跳过的答案，也不要把「没答」当成「默认值」。 - submitted=false 表示用户中途放弃、面板被关闭或本轮被取消：此时应当停止当前方案并直接询问用户下一步，不要自动重试同一个问题组。 - 额外字段 notes 记录了入参被改写过什么（补 id / 改写重复 id / 忽略 boolean 的 options / 截断超长文本），有内容时请据此修正下次调用。
+向用户提出一个或多个结构化问题，并阻塞当前回合直到用户作答完毕。界面是**逐题问答**：每题可「上一题 / 下一题 / 忽略本题」，最后一题或任意时刻可「提交」；用户提交或放弃后你才会拿回控制权，期间不要假设用户已经看到或已经作答。 题型与结果里 values 的取值约定： - boolean（是否型）：界面显示「是 / 否」，values 为 ["yes"] 或 ["no"]，请不要给它 options。 - single（单选型）：values 为 [某个选项 value] 或 [用户自定义输入原文]；默认允许自定义输入。 - multi（多选型）：values 为 [选项 value, …]（可能为空），用户的自定义输入原文追加在末尾；默认允许自定义输入。 - 「其它」由界面保证只出现一次：你在 options 里已经写了「其它」（label 或 value 命中「其它 / 其他 / other / custom / 自定义」）时，界面**不会再补一行**，而是让那一项自己展开输入框（此时 answers[].values 里是用户输入的原文）；你没写时界面才补一行「其它」。 什么时候该用： - 缺少只有用户知道的关键信息（目标、偏好、业务含义、外部约束），且不打算为了猜而做无用功； - 存在多个都合理的实现方向，需要用户拍板（例如「要配置工程 Buff，还是管理主页 Buff 集」「用哪种出图方式」）； - 需求内部有冲突/歧义，必须先澄清再动手。 什么时候不该用： - 能自己查到的（工具清单/工程状态/文档里已有的），先自己查，不要把查询工作推给用户； - 不要拿它当「危险操作二次确认」——危险操作有专门的确认机制（工具的 dangerous 标记），用它只会无谓地打断用户一次。 结果约定： - answers 是逐题作答数组，含补全后的 id、type、skipped、values、custom（用户自定义输入原文）。 - 用户可以「忽略本题」（或提交时未答非必答题）：必须逐题检查 skipped，skipped=true 时 values 为空数组——不要臆造被跳过的答案，也不要把「没答」当成「默认值」。 - submitted=false 表示用户中途放弃、面板被关闭或本轮被取消：此时应当停止当前方案并直接询问用户下一步，不要自动重试同一个问题组。 - 额外字段 notes 记录了入参被改写过什么（补 id / 改写重复 id / 忽略 boolean 的 options / 截断超长文本），有内容时请据此修正下次调用。
 
 | 参数          | 必填   | 类型   | 说明                                                                                                         |
 | ------------- | ------ | ------ | ------------------------------------------------------------------------------------------------------------ |
@@ -154,7 +161,7 @@ _无参数_
 
 ### `generate_buff_set_entity_buffs`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 为本地 Buff 集中的指定实体（character/weapon/echo/1set-5set）生成 Buff 并写入主页的本地 Buff 集；仅在用户明确要求维护 Buff 集时使用，不用于给工程配 Buff（整体覆写该实体，来源变为自定义）。该工具会自动查询实体官方详情（角色技能/共鸣链/武器效果等）并提取 Buff，无需先调用其它查询工具；生成前若未定义命名规则会先询问用户。
 
@@ -165,7 +172,7 @@ _无参数_
 
 ### `generate_project_buff_confs`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 为当前工程队伍中的实体（角色/武器/首位声骸/触发套装）逐个生成工程 Buff 配置并导入当前工程拉表（含归属绑定）。该工具会自动查询各实体官方详情并提取 Buff，无需先调用其它查询工具。默认遍历全队，可用 slot（1-3）或 entityType 过滤。生成前若未定义命名规则会先询问用户。
 
@@ -178,7 +185,7 @@ _无参数_
 
 ### `sync_buff_set_from_share`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 从工坊同步最新 Buff 集到主页的本地 Buff 集。注意：会整体覆盖“来自工坊”的实体，且工坊中已下线的实体将被移除（自定义实体不受影响）。
 
@@ -203,7 +210,7 @@ _无参数_
 
 ### `update_buff_set_entity_buffs`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 整体覆写主页的本地 Buff 集中指定实体的 Buff 列表；仅在用户明确要求维护 Buff 集时使用，不用于给工程配 Buff（该实体来源变为 custom）。buffName 必须是全名（文件夹A\buff名，根 Buff 直接写短名）；folders 可传空文件夹/排序。buffs 结构：[{"buffName":"文件夹A\\buff名","scope":"self\|self_except\|team_only\|team\|effect_only","exclusive":false,"rules":[...可选],"zones":[...]}]。scope 语义：self=自己 / self_except=自己除外 / team_only=全队（仅三名角色，不含效应）/ team=通用（三名角色 + 效应）/ effect_only=效应专属。rules 是 Buff 级门槛（全部 AND，**同一种 kind 只能有一条**），库内允许 kind：chain（min 0-6）、refinement（min 1-5）、damageNameRegex（pattern）、zoneCompare（charIdx 只有 0=本角色 / -1=出伤者，zone 取 atk/hp/def/recharge/offTuneBuildupRate/critRate/critDmg，op 取 ge/gt/eq/le/lt）、enemyType（types 数组，多选：BOSS/精英怪/小怪）。
 
@@ -225,7 +232,7 @@ _无参数_
 
 ### `create_buff_set_folder`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 在本地自定义 Buff 集实体中新建一级文件夹（工坊来源实体只读）。
 
@@ -237,7 +244,7 @@ _无参数_
 
 ### `rename_buff_set_folder`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 重命名本地自定义 Buff 集实体的文件夹；成员 Buff 的全名前缀会级联更新。
 
@@ -250,7 +257,7 @@ _无参数_
 
 ### `delete_buff_set_folder`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 删除本地自定义 Buff 集实体的一级文件夹；成员 Buff 移回根目录，不删除 Buff。
 
@@ -262,7 +269,7 @@ _无参数_
 
 ### `move_buff_set_buff_to_folder`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 把本地自定义 Buff 集实体的一条 Buff 移入一级文件夹（folder 省略/空 = 移回根）；短名不变，全名前缀级联更新。
 
@@ -275,7 +282,7 @@ _无参数_
 
 ### `reorder_buff_set_folder`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 把本地自定义 Buff 集实体的一级文件夹上移/下移一位（delta=-1/1）。
 
@@ -288,7 +295,7 @@ _无参数_
 
 ### `delete_buff_set_entity`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 从本地 Buff 集删除指定实体（不可恢复）。
 
@@ -299,7 +306,7 @@ _无参数_
 
 ### `clear_buff_set`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 清空整个本地 Buff 集（所有实体与 Buff，不可恢复）。
 
@@ -315,7 +322,7 @@ _无参数_
 
 ### `create_buff_folder`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 在当前工程 Buff 树新建文件夹（最多两级）。name 只能是短名，不能含反斜杠；parentFolderId 省略则建在根。
 
@@ -327,7 +334,7 @@ _无参数_
 
 ### `rename_buff_folder`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 重命名当前工程 Buff 文件夹（只改短名；后代 Buff 全名会级联更新）。
 
@@ -338,7 +345,7 @@ _无参数_
 
 ### `delete_buff_folder`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 删除当前工程非全局 Buff 文件夹（含其中 Buff，递归删除；全局树受保护）。
 
@@ -348,7 +355,7 @@ _无参数_
 
 ### `move_buff_tree_node`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 把当前工程的一个文件夹或 Buff 移到目标容器（targetFolderId 省略则移到所在根目录）。保持同一 global/nonGlobal 页签；移动后 Buff 全名级联更新。
 
@@ -359,7 +366,7 @@ _无参数_
 
 ### `reorder_buff_folder`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 把当前工程某个文件夹在同级上移/下移一位（delta = -1 上移，1 下移）。
 
@@ -426,7 +433,7 @@ _无参数_
 
 ### `delete_buff_conf`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 删除指定工程 Buff 配置（按**序号**，同时清理它对所有条目的绑定）。
 
@@ -537,7 +544,7 @@ _无参数_
 
 ### `remove_buff_conf_zone`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 从工程 Buff 配置中删除指定乘区（不可恢复；同一乘区的多条贡献条目会全部删除）。乘区 id 接受旧 id（customFinalDmg/customFinalDmgMul 会自动重映射）。
 
@@ -558,7 +565,7 @@ _无参数_
 
 ### `set_buff_conf_zone_condition`
 
-设置某条工程 Buff 配置内指定乘区的**乘区级生效条件**，传 null 清除。只接受 elements（伤害属性）与 damageTypes（伤害类型）两类，可只给其中一类；condition 对象形如 {"elements":["冷凝","热熔"],"damageTypes":["普攻伤害","重击伤害"]}。取值边界：属性取自 game-terms 的 ELEMENTS、伤害类型取自 DAMAGE_TYPES（见参数说明里的完整可选值）。判定口径为**类内「或」、类间「与」**——同类多选任一命中即满足，两类都给了则必须同时满足。链条件（chains）与阶条件（refinements）是整个 Buff 的硬门槛，不允许挂到乘区上（传了会被忽略并回传 strippedKeys），请用 set_buff_conf_rules 设置。生效效果：不满足时仅该乘区不计入，同一条目的其它乘区照常生效。
+设置某条工程 Buff 配置内指定乘区的**乘区级生效条件**，传 null 清除。只接受 elements（伤害属性）与 damageTypes（伤害类型）两类，可只给其中一类；condition 对象形如 {"elements":["冷凝","热熔"],"damageTypes":["普攻伤害","重击伤害"]}。取值边界：属性取自 game-terms 的 ELEMENTS、伤害类型取自 DAMAGE_TYPES（见参数说明里的完整可选值）。判定规则为**类内「或」、类间「与」**——同类多选任一命中即满足，两类都给了则必须同时满足。链条件（chains）与阶条件（refinements）是整个 Buff 的硬门槛，不允许挂到乘区上（传了会被忽略并回传 strippedKeys），请用 set_buff_conf_rules 设置。生效效果：不满足时仅该乘区不计入，同一条目的其它乘区照常生效。
 
 | 参数        | 必填   | 类型   | 说明                                                  |
 | ----------- | ------ | ------ | ----------------------------------------------------- |
@@ -655,7 +662,7 @@ _无参数_
 
 ### `remove_substat`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 移除指定角色槽位（1-3）第 N 个声骸（1-5）的第 idx 条副词条（从 0 开始）。
 
@@ -722,7 +729,7 @@ _无参数_
 
 ### `kuro_login_with_token`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 用库街区 token 登录（用户在库街区 App / H5 里复制的登录凭据；可整段粘贴，服务端会自动提取 token 值）。
 
@@ -738,7 +745,7 @@ _无参数_
 
 ### `kuro_logout`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 退出库街区登录（同时清除本地声骸数据暂存）。用户要求退出或换账号时使用。
 
@@ -812,7 +819,7 @@ _无参数_
 
 ### `archive_project`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 将指定工程归档（从侧边栏隐藏，可在设置-归档管理中恢复）。
 
@@ -830,7 +837,7 @@ _无参数_
 
 ### `delete_project`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 永久删除指定工程（不可恢复）。
 
@@ -1019,7 +1026,7 @@ _无参数_
 
 | 参数          | 必填   | 类型                       | 说明                                                           |
 | ------------- | ------ | -------------------------- | -------------------------------------------------------------- |
-| `name`        | **是** | string                     | 技能名（唯一，例如「XX 角色配装口径」）                        |
+| `name`        | **是** | string                     | 技能名（唯一，例如「XX 角色配装方案」）                        |
 | `description` | 否     | string                     | 一句话描述（主动技能清单会用它判断何时激活；建议不超过 60 字） |
 | `body`        | **是** | string                     | 技能正文：激活后要遵守的完整规范/步骤/注意事项                 |
 | `mode`        | 否     | string（active / passive） | active=按需激活（默认）；passive=每轮常驻注入正文              |
@@ -1027,9 +1034,9 @@ _无参数_
 
 ### `update_skill`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
-修改一张已有技能卡（按当前 name 定位）。可改 newName（改名，内置技能不可改名）、description、body、mode、enabled；未提供的字段保持原值。这是管理内置技能（如「Buff 命名规则」「黑话词典」）的唯一入口：改其正文即改对应流程的口径，清空正文会让内置默认重新生效。
+修改一张已有技能卡（按当前 name 定位）。可改 newName（改名，内置技能不可改名）、description、body、mode、enabled；未提供的字段保持原值。这是管理内置技能（如「Buff 命名规则」「黑话词典」）的唯一入口：改其正文即改对应流程的规则，清空正文会让内置默认重新生效。
 
 | 参数          | 必填   | 类型                       | 说明                                                       |
 | ------------- | ------ | -------------------------- | ---------------------------------------------------------- |
@@ -1042,7 +1049,7 @@ _无参数_
 
 ### `delete_skill`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 删除一张**自定义**技能卡（按名称定位）。内置技能不可删除，只能通过 update_skill 禁用。删除后使用 use_skill 将无法再激活它。
 
@@ -1080,7 +1087,7 @@ _无参数_
 
 ### `save_substat_plan`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 新建或覆盖一条声骸词条方案（覆盖会先弹确认框）。standard=true 时写的是该角色的标准14词条，要求副词条恰好 14 条；自定义方案要求 5 个槽位、cost 取值 1/3/4 且合计 ≤12、每槽副词条 ≤5 且不重复。slots 里主词条可写字符串（如 "暴击率"，数值自动取满级），副词条可写 "暴击率" 或 {type:"暴击率",value:7.5}（数值自动吸附到合法档位）。
 
@@ -1103,7 +1110,7 @@ _无参数_
 
 ### `delete_substat_plan`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 删除一条自定义声骸词条方案（不可恢复；标准14词条不能删除，需要清掉改动请用 reset_standard_substat_plan）。
 
@@ -1134,7 +1141,7 @@ _无参数_
 
 ### `reset_standard_substat_plan`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 重置某角色的标准14词条：清掉本地修改/工坊同步的版本，回落到「工坊同步」或按角色数据自动生成。
 
@@ -1144,7 +1151,7 @@ _无参数_
 
 ### `sync_substat_plans_from_share`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 从工坊同步全部角色的标准14词条集（只覆盖工坊来源的方案，本地修改与自定义方案不受影响；工坊已下线的会移除）。
 
@@ -1152,7 +1159,7 @@ _无参数_
 
 ### `sync_substat_plans_from_kuro`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 从库街区同步当前账号下鸣潮角色「正在装配的声骸」，写成本地自定义词条方案（方案名「库街区同步」，同名覆盖、可重复同步）。
 
@@ -1274,7 +1281,7 @@ _无参数_
 
 ### `update_custom_hit`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 修改一条自定义倍率（按角色 + 当前倍率名定位）。可改 newName（改名，仍须同角色内唯一）、flatValue、pctValue、pctUnit、element、hits；未提供的字段保持原值。修改后至少仍保留一个 >0 的固定值 / 百分比。
 
@@ -1291,7 +1298,7 @@ _无参数_
 
 ### `remove_custom_hit`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 删除一条自定义倍率（按角色 + 倍率名定位）。已经绑定到操作块的同名命中不会自动解除绑定，删除前请确认该倍率的绑定与用途均已处理。
 
@@ -1318,7 +1325,7 @@ _无参数_
 
 ### `unbind_damage_hit`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 从指定操作块 / 参考线解绑**一条**直伤命中（保留该目标上的其它伤害）。先用 get_damage_bindings 查该条命中的 hitKey。
 
@@ -1330,7 +1337,7 @@ _无参数_
 
 ### `update_damage_hit`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 修改某个操作块/参考线上**已有的一条直伤命中**的倍率、属性或段数（用 get_damage_bindings 查 hitKey）。倍率的基础类型必须保持不变（只改数值/段数），否则会改变底层条目 id 并让 Buff 绑定失效 —— 这种情况会明确拒绝；改名请用 rename_damage_entry。hitKey 不含倍率/属性/段数，所以改完仍可用同一个 hitKey 再次操作。
 
@@ -1345,7 +1352,7 @@ _无参数_
 
 ### `remove_damage_from_target`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 清空指定操作块 / 参考线上的**全部伤害绑定**（直伤 + 非直伤），但保留操作块 / 参考线本身。等价于「删除该目标的伤害条目」。
 
@@ -1356,7 +1363,7 @@ _无参数_
 
 ### `remove_op_block`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 删除指定操作块（按**短索引**）。其它块的短索引不受影响（由内部 id 派生，永不改变），无需重读摘要。
 
@@ -1396,7 +1403,7 @@ _无参数_
 
 ### `format_timeline`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 自动格式化排轴：各操作块右边界对齐下一个块（可跨角色）的左边界，参考线跟随其左右块。
 
@@ -1436,7 +1443,7 @@ _无参数_
 
 ### `remove_ref_line`
 
-> ⚠️ **危险工具**：执行后不可轻易撤销
+> **危险工具**：执行后不可轻易撤销
 
 删除指定参考线（按**短索引**）。左/右边界锚点（起点与结束线）不可删除，会明确报错。其它参考线的短索引不受影响（由内部 id 派生，永不改变），无需重读摘要。
 
@@ -1629,20 +1636,17 @@ _无参数_
 
 ## 附录：AI 不可修改的设置
 
-以下设置不允许 AI/WS 修改（调用 `set_setting` 会报错并提示手动调整）：
+| 类别     | 设置                               | 可用工具 / 说明                                               |
+| -------- | ---------------------------------- | ------------------------------------------------------------- |
+| 不可修改 | 自定义主题创建 / 删除              | 设置 → 外观主题；`set_setting` 报错提示手动调整               |
+| 不可修改 | 背景图本地文件上传                 | AI 仅可设远程 URL / data:image / 清除                         |
+| 专用工具 | 按键图标                           | `get_keymap` / `set_keymap_entry`                             |
+| 专用工具 | 界面快捷键                         | `get_shortcuts` / `set_shortcut`                              |
+| 专用工具 | 归档管理                           | `archive_project` / `unarchive_project` / `delete_project`    |
+| 专用工具 | 缓存清理                           | `set_setting` key=`clear_cache`（或 `get_cache_counts` 只读） |
+| 专用工具 | 助手设置（开关 / 危险权限 / 人设） | `set_setting`                                                 |
+| 专用工具 | AI 配置文件                        | `get_ai_profiles` / `manage_ai_profile`                       |
+| 专用工具 | 工坊实例                           | `get_settings_state` / `manage_workshop`                      |
+| 专用工具 | AI 上下文分段 / 用量 / 运行        | `get_ai_context_state` / `set_ai_context_segment` 等          |
 
-- 自定义主题的创建 / 删除（设置 → 外观主题；仅支持明暗切换与主色调）
-- 背景图本地文件上传（AI 仅可设置远程 URL / data:image 数据 / 清除）
-
-以下设置虽不可直接用 `set_setting`，但有专用工具，**可以**由 AI/WS 修改：
-
-- 按键图标 → `get_keymap` / `set_keymap_entry`
-- 界面快捷键 → `get_shortcuts` / `set_shortcut`
-- 归档管理 → `archive_project` / `unarchive_project` / `delete_project`
-- 缓存清理 → `set_setting` key=`clear_cache`（或 `get_cache_counts` 只读）
-- 助手设置（启用开关 / 危险操作权限 / 人设提示词）→ `set_setting`
-- AI 配置文件 → `get_ai_profiles` / `manage_ai_profile`
-- 工坊实例 → `get_settings_state` / `manage_workshop`
-- AI 上下文分段 / 用量 / 运行情况 → `get_ai_context_state` / `set_ai_context_segment` 等
-
-> 完整 key 白名单以 `set_setting` 的工具描述为准（`get_settings_state` 会回传 `modifiableKeys` 实时清单）。
+> 完整 key 白名单以 `set_setting` 的工具描述为准（`get_settings_state` 回传 `modifiableKeys` 实时清单）。
