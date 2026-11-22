@@ -22,57 +22,17 @@
 
 ---
 
-<div align="center">
-<table>
-<tr>
-<td width="24%">
-<svg viewBox="0 0 220 140" xmlns="http://www.w3.org/2000/svg">
-  <!-- 去掉fill背景，透明继承页面主题 -->
-  <rect x="2" y="2" width="216" height="136" rx="8" fill="transparent" stroke="#8b949e" stroke-width="1"/>
-  <rect x="2" y="2" width="216" height="4" rx="2" fill="#cf222e"/>
-  <text x="12" y="30" fill="#cf222e" font-size="18" font-weight="bold">网页版</text>
-  <text x="12" y="58" fill="#656d76" font-size="13">拉表 / 排轴 / 配装对比</text>
-</svg>
-<br>
-<a href="https://wuwa-afyg-tool.200503.xyz/">前往主站</a> ·
-<a href="https://wuwa-hpyg-tool.200503.xyz/">前往副站</a>
-</td>
+### 网页版
+在线访问椰果工具箱。
+[前往主站(vercel)](https://wuwa-afyg-tool.200503.xyz/) | [前往副站(cfpages)](https://wuwa-hpyg-tool.200503.xyz/)
 
-<td width="24%">
-<svg viewBox="0 0 220 140" xmlns="http://www.w3.org/2000/svg">
-  <rect x="2" y="2" width="216" height="136" rx="8" fill="transparent" stroke="#8b949e" stroke-width="1"/>
-  <rect x="2" y="2" width="216" height="4" rx="2" fill="#bf8700"/>
-  <text x="12" y="30" fill="#bf8700" font-size="18" font-weight="bold">启动器</text>
-  <text x="12" y="58" fill="#656d76" font-size="13">桌面端 / 插件宿主</text>
-</svg>
-<br>
-<a href="https://github.com/d4rkOfficial/coconut-app">启动器仓库</a> ·
-<a href="https://github.com/d4rkOfficial/coconut-app-plugin-sdk">插件 SDK</a>
-</td>
+### 启动器
+椰果工具箱的桌面启动器，支持插件拓展功能。
+ [启动器仓库](https://github.com/d4rkOfficial/coconut-app) | [插件 SDK仓库](https://github.com/d4rkOfficial/coconut-app-plugin-sdk)
 
-<td width="24%">
-<svg viewBox="0 0 220 140" xmlns="http://www.w3.org/2000/svg">
-  <rect x="2" y="2" width="216" height="136" rx="8" fill="transparent" stroke="#8b949e" stroke-width="1"/>
-  <rect x="2" y="2" width="216" height="4" rx="2" fill="#4493f8"/>
-  <text x="12" y="30" fill="#4493f8" font-size="18" font-weight="bold">椰果工坊</text>
-  <text x="12" y="58" fill="#656d76" font-size="13">方案分享与数据同步</text>
-</svg>
-<br>
-<a href="https://github.com/d4rkOfficial/wuwa-afyg-share">前往椰果工坊</a>
-</td>
-
-<td width="24%">
-<svg viewBox="0 0 220 140" xmlns="http://www.w3.org/2000/svg">
-  <rect x="2" y="2" width="216" height="136" rx="8" fill="transparent" stroke="#8b949e" stroke-width="1"/>
-  <rect x="2" y="2" width="216" height="4" rx="2" fill="#3fb950"/>
-  <text x="12" y="30" fill="#3fb950" font-size="18" font-weight="bold">椰果引擎</text>
-  <text x="12" y="58" fill="#656d76" font-size="13">纯函数伤害计算核心</text>
-</svg>
-<br>
-<a href="src/coconut-core/README.md">CoconutCore README</a>
-</td>
-</tr>
-</table>
+### 椰果工坊
+工程分享平台，也维护着一套Buff集、拉表词条集。
+[前往椰果工坊](https://github.com/d4rkOfficial/wuwa-afyg-share)
 </div>
 
 
@@ -99,9 +59,9 @@
 | **改共鸣链 / 武器精炼阶** | **Buff 副作用与伤害计算随条件自动改动** |
 | **拉表配 Buff**           | **被条件门槛拦截，降低拉假表的可能**    |
 
-## 计算引擎
+## 底层计算引擎
 
-[CoconutCore](docs/coconut-core.md) 是**纯函数伤害计算引擎**，面板 / 乘区 / 公式均可**自行注册**，适合所有战斗二游的**伤害计算与 Buff 贡献溯源**。自愿放弃版权，随意使用、二次开发、发布，无需标注出处。
+椰果工具箱底层计算引擎为 [CoconutCore](docs/coconut-core.md) 。是**纯函数伤害计算引擎**，面板 / 乘区 / 公式均可**自行注册**，适合所有战斗二游的**伤害计算与 Buff 贡献溯源**。自愿放弃版权，随意使用、二次开发、发布，无需标注出处。
 
 ```sh
 npm i https://github.com/d4rkOfficial/wuwa-afyg-tool/releases/download/core-v0.1.0/d4rkofficial-coconut-core-0.1.0.tgz
