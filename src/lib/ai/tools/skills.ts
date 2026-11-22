@@ -99,7 +99,7 @@ defineTool('create_skill', {
     parameters: {
         type: 'object',
         properties: {
-            name: { type: 'string', description: '技能名（唯一，例如「XX 角色配装口径」）' },
+            name: { type: 'string', description: '技能名（唯一，例如「XX 角色配装方案」）' },
             description: {
                 type: 'string',
                 description: '一句话描述（主动技能清单会用它判断何时激活；建议不超过 60 字）'
@@ -133,7 +133,7 @@ defineTool('create_skill', {
 
 defineTool('update_skill', {
     description:
-        '修改一张已有技能卡（按当前 name 定位）。可改 newName（改名，内置技能不可改名）、description、body、mode、enabled；未提供的字段保持原值。这是管理内置技能（如「Buff 命名规则」「黑话词典」）的唯一入口：改其正文即改对应流程的口径，清空正文会让内置默认重新生效。',
+        '修改一张已有技能卡（按当前 name 定位）。可改 newName（改名，内置技能不可改名）、description、body、mode、enabled；未提供的字段保持原值。这是管理内置技能（如「Buff 命名规则」「黑话词典」）的唯一入口：改其正文即改对应流程的规则，清空正文会让内置默认重新生效。',
     dangerous: true,
     parameters: {
         type: 'object',
