@@ -22,26 +22,59 @@
 
 ---
 
+<div align="center">
 <table>
 <tr>
-<td width="25%" valign="top" style="border:1px solid #8b949e;border-top:3px solid #cf222e;border-radius:8px;padding:12px">
-<b style="color:#cf222e">网页版</b><br />拉表 / 排轴 / 配装对比<br /><br />
-<div align="right"><a href="https://wuwa-afyg-tool.200503.xyz/" style="color:#cf222e">前往主站</a> · <a href="https://wuwa-hpyg-tool.200503.xyz/" style="color:#cf222e">前往副站</a></div>
+<td width="24%">
+<svg viewBox="0 0 220 140" xmlns="http://www.w3.org/2000/svg">
+  <!-- 去掉fill背景，透明继承页面主题 -->
+  <rect x="2" y="2" width="216" height="136" rx="8" fill="transparent" stroke="#8b949e" stroke-width="1"/>
+  <rect x="2" y="2" width="216" height="4" rx="2" fill="#cf222e"/>
+  <text x="12" y="30" fill="#cf222e" font-size="18" font-weight="bold">网页版</text>
+  <text x="12" y="58" fill="#656d76" font-size="13">拉表 / 排轴 / 配装对比</text>
+</svg>
+<br>
+<a href="https://wuwa-afyg-tool.200503.xyz/">前往主站</a> ·
+<a href="https://wuwa-hpyg-tool.200503.xyz/">前往副站</a>
 </td>
-<td width="25%" valign="top" style="border:1px solid #8b949e;border-top:3px solid #bf8700;border-radius:8px;padding:12px">
-<b style="color:#bf8700">启动器</b><br />桌面端 / 插件宿主<br /><br />
-<div align="right"><a href="https://github.com/d4rkOfficial/coconut-app" style="color:#bf8700">启动器仓库</a> · <a href="https://github.com/d4rkOfficial/coconut-app-plugin-sdk" style="color:#bf8700">插件 SDK</a></div>
+
+<td width="24%">
+<svg viewBox="0 0 220 140" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="2" width="216" height="136" rx="8" fill="transparent" stroke="#8b949e" stroke-width="1"/>
+  <rect x="2" y="2" width="216" height="4" rx="2" fill="#bf8700"/>
+  <text x="12" y="30" fill="#bf8700" font-size="18" font-weight="bold">启动器</text>
+  <text x="12" y="58" fill="#656d76" font-size="13">桌面端 / 插件宿主</text>
+</svg>
+<br>
+<a href="https://github.com/d4rkOfficial/coconut-app">启动器仓库</a> ·
+<a href="https://github.com/d4rkOfficial/coconut-app-plugin-sdk">插件 SDK</a>
 </td>
-<td width="25%" valign="top" style="border:1px solid #8b949e;border-top:3px solid #4493f8;border-radius:8px;padding:12px">
-<b style="color:#4493f8">椰果工坊</b><br />方案分享与数据同步<br /><br />
-<div align="right"><a href="https://github.com/d4rkOfficial/wuwa-afyg-share" style="color:#4493f8">前往椰果工坊</a></div>
+
+<td width="24%">
+<svg viewBox="0 0 220 140" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="2" width="216" height="136" rx="8" fill="transparent" stroke="#8b949e" stroke-width="1"/>
+  <rect x="2" y="2" width="216" height="4" rx="2" fill="#4493f8"/>
+  <text x="12" y="30" fill="#4493f8" font-size="18" font-weight="bold">椰果工坊</text>
+  <text x="12" y="58" fill="#656d76" font-size="13">方案分享与数据同步</text>
+</svg>
+<br>
+<a href="https://github.com/d4rkOfficial/wuwa-afyg-share">前往椰果工坊</a>
 </td>
-<td width="25%" valign="top" style="border:1px solid #8b949e;border-top:3px solid #3fb950;border-radius:8px;padding:12px">
-<b style="color:#3fb950">椰果引擎</b><br />纯函数伤害计算核心<br /><br />
-<div align="right"><a href="src/coconut-core/README.md" style="color:#3fb950">CoconutCore README</a></div>
+
+<td width="24%">
+<svg viewBox="0 0 220 140" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="2" width="216" height="136" rx="8" fill="transparent" stroke="#8b949e" stroke-width="1"/>
+  <rect x="2" y="2" width="216" height="4" rx="2" fill="#3fb950"/>
+  <text x="12" y="30" fill="#3fb950" font-size="18" font-weight="bold">椰果引擎</text>
+  <text x="12" y="58" fill="#656d76" font-size="13">纯函数伤害计算核心</text>
+</svg>
+<br>
+<a href="src/coconut-core/README.md">CoconutCore README</a>
 </td>
 </tr>
 </table>
+</div>
+
 
 ## 功能
 
