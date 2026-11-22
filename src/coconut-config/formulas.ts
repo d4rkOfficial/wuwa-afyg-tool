@@ -23,20 +23,19 @@ export const ORDER_1_0: readonly MultiplierId[] = [
     'crit'
 ]
 
-/** @desc 乘子序（鸣潮 2.0）：处决带来谐度区，排在减防之后 */
+/** @desc 乘子序（鸣潮 2.0）：效应不新增乘区，沿用 1.0 的乘子序 */
 export const ORDER_2_0: readonly MultiplierId[] = [
     'deepen',
     'bonus',
     'vuln',
     'resist',
     'defense',
-    'tuneBreak',
     'final',
     'special',
     'crit'
 ]
 
-/** @desc 乘子序（鸣潮 3.0）：集谐区紧随减防，谐度区在其后 */
+/** @desc 乘子序（鸣潮 3.0）：处决带来谐度区、集谐带来集谐区，集谐区紧随减防、谐度区在其后 */
 export const ORDER_3_0: readonly MultiplierId[] = [
     'deepen',
     'bonus',

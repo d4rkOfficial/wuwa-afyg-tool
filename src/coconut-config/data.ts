@@ -241,7 +241,7 @@ export const ACTIONS_1_0 = [
 
 // ─────────────────────── 作用表（后续版本新增，逐版追加） ───────────────────────
 
-/** @desc 鸣潮 2.0 处决：谐度破坏增幅 */
+/** @desc 鸣潮 3.0 处决：谐度破坏增幅 */
 export const TUNE_BREAK_BOOST = {
     id: 'tuneBreakBoost',
     side: 'character',
@@ -250,7 +250,7 @@ export const TUNE_BREAK_BOOST = {
     init: 0
 } as const satisfies BuffActionDef
 
-/** @desc 鸣潮 2.0 处决：偏谐系数（目标侧标量） */
+/** @desc 鸣潮 3.0 处决：偏谐系数（目标侧标量） */
 export const ENEMY_COEFF = {
     id: 'enemyCoeff',
     side: 'target',
@@ -260,7 +260,7 @@ export const ENEMY_COEFF = {
     targetField: 'coefficient'
 } as const satisfies BuffActionDef
 
-/** @desc 鸣潮 3.0 效应：效应系数（效应结算的基值） */
+/** @desc 鸣潮 2.0 效应：效应系数（效应结算的基值） */
 export const EFFECT_COEFF = {
     id: 'effectCoeff',
     side: 'character',

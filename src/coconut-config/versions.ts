@@ -37,8 +37,8 @@ import {
     ZONE_EFFECT
 } from './formulas'
 
-const ACTIONS_2_0 = [...ACTIONS_1_0, TUNE_BREAK_BOOST, ENEMY_COEFF]
-const ACTIONS_3_0 = [...ACTIONS_2_0, EFFECT_COEFF, TUNE_STRAIN_LAYER]
+const ACTIONS_2_0 = [...ACTIONS_1_0, EFFECT_COEFF]
+const ACTIONS_3_0 = [...ACTIONS_2_0, TUNE_BREAK_BOOST, ENEMY_COEFF, TUNE_STRAIN_LAYER]
 const ACTIONS_3_7 = [...ACTIONS_3_0, UNISON_BOON_LAYER]
 
 /** @desc 鸣潮 1.0：直伤与固定值，双暴按面板 */
@@ -53,16 +53,16 @@ export const v1_0 = {
     ratioZone: RATIO_ZONE
 } satisfies CoconutCoreConfig
 
-/** @desc 鸣潮 2.0：加入处决（谐度破坏），并带来谐度区与偏谐系数 */
+/** @desc 鸣潮 2.0：加入效应（效应系数），效应条目以系数基类公式结算 */
 export const v2_0 = {
     ...v1_0,
     actions: ACTIONS_2_0,
     refSources: refSourcesOf(ACTIONS_2_0),
     multipliers: chainOf(ORDER_2_0),
-    formulas: [...v1_0.formulas, formula('tune', TARGET_COEFF, coeffChain(ORDER_2_0), 'coefficient')]
+    formulas: [...v1_0.formulas, formula('effect', ZONE_EFFECT, coeffChain(ORDER_2_0), 'coefficient')]
 } satisfies CoconutCoreConfig
 
-/** @desc 鸣潮 3.0：加入效应与集谐区（偏谐响应沿用处决的系数基类公式） */
+/** @desc 鸣潮 3.0：加入处决（谐度破坏、偏谐系数）与集谐区（集谐干涉层数），并带来谐度区与集谐区 */
 export const v3_0 = {
     ...v2_0,
     actions: ACTIONS_3_0,

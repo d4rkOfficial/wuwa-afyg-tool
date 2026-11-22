@@ -93,7 +93,7 @@ const tuneStrainMultiplier = defineFormula(
     ({ tuneBreakBoost, 'target.tuneStrainLayer': layer }) => 1 + 0.0012 * tuneBreakBoost * layer
 )
 
-/** @desc 谐度区（鸣潮 2.0 处决） */
+/** @desc 谐度区（鸣潮 3.0 处决） */
 const tuneBreakMultiplier = defineFormula(
     {
         id: 'tuneBreak',
